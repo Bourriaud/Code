@@ -2,33 +2,31 @@ program main
   
   use inout
   use efficiency
+  use types
   
   implicit none
 
-  real, dimension(:), allocatable :: Ix,Iy
-  real, dimension(:,:,:), allocatable :: sol
+  type(meshStruct) :: mesh
+  type(solStruct) :: sol
   real :: xL,xR,yL,yR
-  integer :: nx,ny,nsol
   real :: dx,dy
   character(len=20) :: namefile
-  character(len=20), dimension(:), allocatable :: solname
   integer :: i,j
   
-  call init(xL,xR,yL,yR,nx,ny,dx,dy,nsol,namefile,solname)
+  call init(xL,xR,yL,yR,dx,dy,namefile,mesh,sol)
+  allocate(mesh%X(0:mesh%nx,0:mesh%ny),mesh%Y(0:mesh%nx,0:mesh%ny),sol%val(0:mesh%nx,0:mesh%ny,sol%nsol))
 
-  allocate(Ix(0:nx),Iy(0:ny),sol(0:nx,0:ny,nsol))
+  call buildmesh(xL,xR,yL,yR,mesh)
 
-  call buildmesh(xL,xR,yL,yR,nx,ny,Ix,Iy)
-
-  do i=0,nx
-     do j=0,ny
-        sol(i,j,1)=1.
+  do i=0,mesh%nx
+     do j=0,mesh%ny
+        sol%val(i,j,1)=1.
      enddo
   enddo
-  call exactsol(Ix,Iy,sol(:,:,2))
+  call exactsol(mesh,sol%val(:,:,2))
 
-  call writeSol(Ix,Iy,nsol,sol,namefile,solname)
+  call writeSol(mesh,sol,namefile)
 
-  deallocate(Ix,Iy,sol,solname)
+  deallocate(mesh%X,mesh%Y,sol%val,sol%name)
   
 end program main
