@@ -21,16 +21,60 @@ contains
     read(11,*)mesh%nx
     read(11,*)mesh%ny
     read(11,*)namefile
-    read(11,*)sol%nsol
-    allocate(sol%name(sol%nsol))
-    do i=1,sol%nsol
+    read(11,*)sol%nvar
+    allocate(sol%name(sol%nvar))
+    do i=1,sol%nvar
        read(11,*)sol%name(i)
     enddo
     close(11)
+
     dx=(xR-xL)/mesh%nx
     dy=(yR-yL)/mesh%ny
+    allocate(mesh%X(0:mesh%nx,0:mesh%ny),mesh%Y(0:mesh%nx,0:mesh%ny))
+    allocate(mesh%boundType(0:mesh%nx,0:mesh%ny),mesh%bound(0:mesh%nx,0:mesh%ny))
+    allocate(sol%val(0:mesh%nx,0:mesh%ny,sol%nvar))
+
     return
   end subroutine init
+
+  subroutine IC(mesh,sol)
+    type(meshStruct), intent(in) :: mesh
+    type(solStruct), intent(inout) :: sol
+    integer :: i,j,n
+
+    do i=0,mesh%nx
+       do j=0,mesh%ny
+          if ((mesh%X(i,j)**2+mesh%Y(i,j)**2)**0.5<5) then
+             sol%val(i,j,1)=1.
+          else
+             sol%val(i,j,1)=0.
+          endif
+       enddo
+    enddo
+    return
+  end subroutine IC
+
+  subroutine BC(xL,xR,yL,yR,mesh)
+    real, intent(in) :: xL,xR,yL,yR
+    type(meshStruct), intent(inout) :: mesh
+    integer :: i,j
+
+    do i=0,mesh%nx
+       do j=0,mesh%ny
+          if ((mesh%X(i,j)==xL).or.(mesh%Y(i,j)==yL)) then
+             mesh%boundType(i,j)='DIRICHLET'
+             mesh%bound(i,j)=0.
+          elseif ((mesh%X(i,j)==xR).or.(mesh%Y(i,j)==yR)) then
+             mesh%boundType(i,j)='DIRICHLET'
+             mesh%bound(i,j)=0.
+          else
+             mesh%boundType(i,j)='NOT A BOUNDARY'
+             mesh%bound(i,j)=0.
+          endif
+       enddo
+    enddo
+    return   
+  end subroutine BC
   
   subroutine buildMesh(xL,xR,yL,yR,mesh)
     real, intent(in) :: xL,xR,yL,yR
@@ -70,7 +114,7 @@ contains
        enddo
     enddo
     write(11,'(a,i8)')"POINT_DATA ",(mesh%nx+1)*(mesh%ny+1)
-    do n=1,sol%nsol
+    do n=1,sol%nvar
        write(11,'(a,a,a)')"SCALARS ",sol%name(n)," float 1"
        write(11,'(a)')"LOOKUP_TABLE default"
        do j=0,mesh%ny
@@ -79,8 +123,17 @@ contains
           enddo
        enddo
     enddo
+    do n=1,sol%nsolUser
+       write(11,'(a,a,a)')"SCALARS ",sol%nameUser(n)," float 1"
+       write(11,'(a)')"LOOKUP_TABLE default"
+       do j=0,mesh%ny
+          do i=0,mesh%nx
+             write(11,'(e15.8)')sol%user(i,j,n)
+          enddo
+       enddo
+    enddo
     close(11)
-  return
-end subroutine writeSol
+    return
+  end subroutine writeSol
 
 end module inout
