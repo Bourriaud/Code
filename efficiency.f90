@@ -8,11 +8,11 @@ contains
 
   subroutine exactSol(mesh,tabSol)
     type (meshStruct) :: mesh
-    real, dimension(0:,0:,:), intent(out) :: tabSol
+    real, dimension(:,:,:), intent(out) :: tabSol
     integer :: i,j
 
-    do i=0,mesh%nx
-       do j=0,mesh%ny
+    do i=1,mesh%nx
+       do j=1,mesh%ny
           tabSol(i,j,1)=real(i+j)
        enddo
     enddo
@@ -27,7 +27,7 @@ contains
     
     sol%nsolUser=1
     
-    allocate(sol%user(0:mesh%nx,0:mesh%ny,sol%nsolUser),sol%nameUser(sol%nsolUser))
+    allocate(sol%user(mesh%nx,mesh%ny,sol%nsolUser),sol%nameUser(sol%nsolUser))
 
     sol%nameUser(1)='SolAnal'
     call exactSol(mesh,sol%user(:,:,1:sol%nsolUser))

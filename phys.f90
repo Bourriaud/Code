@@ -5,13 +5,15 @@ module phys
 contains
 
   subroutine f_transport(u,f)
-    real, intent(in) :: u
-    real, dimension(2), intent(out) :: f
+    real, dimension(:), intent(in) :: u
+    real, dimension(:,:), intent(inout) :: f
     real, dimension(2) :: a
-    
-    a=1.
-    f=u*a
-    
+
+    a(1)=1.
+    a(2)=1.
+    f(:,1)=a(1)*u
+    f(:,2)=a(2)*u
+
     return
   end subroutine f_transport
 

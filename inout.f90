@@ -6,8 +6,8 @@ module inout
 
 contains
 
-  subroutine init(xL,xR,yL,yR,dx,dy,namefile,mesh,sol)
-    real, intent(out) :: xL,xR,yL,yR,dx,dy
+  subroutine init(xL,xR,yL,yR,dx,dy,dt,tf,namefile,mesh,sol)
+    real, intent(out) :: xL,xR,yL,yR,dx,dy,dt,tf
     character(len=20), intent(out) :: namefile
     type(meshStruct), intent(out) :: mesh
     type(solStruct), intent(out) :: sol
@@ -20,6 +20,8 @@ contains
     read(11,*)yR
     read(11,*)mesh%nx
     read(11,*)mesh%ny
+    read(11,*)dt
+    read(11,*)tf
     read(11,*)namefile
     read(11,*)sol%nvar
     allocate(sol%name(sol%nvar))
@@ -30,9 +32,9 @@ contains
 
     dx=(xR-xL)/mesh%nx
     dy=(yR-yL)/mesh%ny
-    allocate(mesh%X(0:mesh%nx,0:mesh%ny),mesh%Y(0:mesh%nx,0:mesh%ny))
-    allocate(mesh%boundType(0:mesh%nx,0:mesh%ny),mesh%bound(0:mesh%nx,0:mesh%ny))
-    allocate(sol%val(0:mesh%nx,0:mesh%ny,sol%nvar))
+    allocate(mesh%X(mesh%nx,mesh%ny),mesh%Y(mesh%nx,mesh%ny))
+    allocate(mesh%boundType(mesh%nx,mesh%ny),mesh%bound(mesh%nx,mesh%ny))
+    allocate(sol%val(mesh%nx,mesh%ny,sol%nvar))
 
     return
   end subroutine init
@@ -42,8 +44,8 @@ contains
     type(solStruct), intent(inout) :: sol
     integer :: i,j,n
 
-    do i=0,mesh%nx
-       do j=0,mesh%ny
+    do i=1,mesh%nx
+       do j=1,mesh%ny
           if ((mesh%X(i,j)**2+mesh%Y(i,j)**2)**0.5<5) then
              sol%val(i,j,1)=1.
           else
@@ -59,8 +61,8 @@ contains
     type(meshStruct), intent(inout) :: mesh
     integer :: i,j
 
-    do i=0,mesh%nx
-       do j=0,mesh%ny
+    do i=1,mesh%nx
+       do j=1,mesh%ny
           if ((mesh%X(i,j)==xL).or.(mesh%Y(i,j)==yL)) then
              mesh%boundType(i,j)='DIRICHLET'
              mesh%bound(i,j)=0.
@@ -85,49 +87,54 @@ contains
     dx=(xR-xL)/mesh%nx
     dy=(yR-yL)/mesh%ny
 
-    do i=0,mesh%nx
-       mesh%X(i,:)=xL+i*dx
+    do i=1,mesh%nx
+       mesh%X(i,:)=xL+i*dx-dx/2.
     enddo
-    do i=0,mesh%ny
-       mesh%Y(:,i)=yL+i*dy
+    do i=1,mesh%ny
+       mesh%Y(:,i)=yL+i*dy-dy/2
     enddo
     return
   end subroutine buildMesh
   
-  subroutine writeSol(mesh,sol,namefile)
+  subroutine writeSol(mesh,sol,namefile,nfile)
     type(meshStruct), intent(in) :: mesh
     type(solStruct), intent(in) :: sol
     character(len=20), intent(in) :: namefile
+    integer, intent(in) :: nfile
     integer :: i,j,n
     integer :: nx,ny
+    character(len=34) :: completenamefile
 
-    open(11,file=namefile,form="formatted")
+    write(completenamefile,'(A,A,I3.3,A)')'./results/',trim(namefile),nfile,'.vtk'
+    open(11,file=completenamefile,form="formatted")
     write(11,'(a)')"# vtk DataFile Version 2.0"
     write(11,'(a)')"Results of the calculation"
     write(11,'(a)')"ASCII"
     write(11,'(a)')"DATASET STRUCTURED_GRID"
-    write(11,'(a,i4,a,i4,a)')"DIMENSIONS ",mesh%nx+1," ",mesh%ny+1," 1"
-    write(11,'(a,i8,a)')"POINTS ",(mesh%nx+1)*(mesh%ny+1)," float"
-    do j=0,mesh%ny
-       do i=0,mesh%nx
+    write(11,'(a,i4,a,i4,a)')"DIMENSIONS ",mesh%nx," ",mesh%ny," 1"
+    write(11,'(a,i8,a)')"POINTS ",(mesh%nx)*(mesh%ny)," float"
+    do j=1,mesh%ny
+       do i=1,mesh%nx
           write(11,'(e15.8,a,e15.8,a,e15.8)')mesh%X(i,j)," ",mesh%Y(i,j)," ",0.
        enddo
     enddo
-    write(11,'(a,i8)')"POINT_DATA ",(mesh%nx+1)*(mesh%ny+1)
+
+    write(11,'(a,i8)')"POINT_DATA ",(mesh%nx)*(mesh%ny)
     do n=1,sol%nvar
        write(11,'(a,a,a)')"SCALARS ",sol%name(n)," float 1"
        write(11,'(a)')"LOOKUP_TABLE default"
-       do j=0,mesh%ny
-          do i=0,mesh%nx
+       do j=1,mesh%ny
+          do i=1,mesh%nx
              write(11,'(e15.8)')sol%val(i,j,n)
           enddo
        enddo
     enddo
+    
     do n=1,sol%nsolUser
        write(11,'(a,a,a)')"SCALARS ",sol%nameUser(n)," float 1"
        write(11,'(a)')"LOOKUP_TABLE default"
-       do j=0,mesh%ny
-          do i=0,mesh%nx
+       do j=1,mesh%ny
+          do i=1,mesh%nx
              write(11,'(e15.8)')sol%user(i,j,n)
           enddo
        enddo
