@@ -5,8 +5,9 @@ module types
   type :: meshStruct
      integer :: nx,ny
      real, dimension(:,:), allocatable :: X,Y
+     real, dimension(:,:), allocatable :: CX,CY
      character(len=20), dimension(:,:), allocatable :: boundType
-     real, dimension(:,:), allocatable :: bound
+     real, dimension(:,:,:), allocatable :: bound
   end type meshStruct
 
   type :: solStruct

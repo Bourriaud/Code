@@ -28,7 +28,7 @@ phys.o : phys.f90
 
 FV.mod : FV.o
 
-FV.o : FV.f90 types.mod phys.mod inout.mod
+FV.o : FV.f90 types.mod phys.mod inout.mod efficiency.mod
 	gfortran -c FV.f90
 
 clean :
