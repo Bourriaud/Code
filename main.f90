@@ -28,6 +28,12 @@ program main
   call errorL2(sol%val(:,1),sol%user(:,1),error)
   print*, "errorL2 = ",error
 
+  do fs=1,mesh%nc
+     if (mesh%cell(fs)%xc==0.505) then
+        print*,sol%val(fs,1),mesh%cell(fs)%yc
+     endif
+  enddo
+  
   deallocate(mesh%node,mesh%cell,sol%val,sol%user,sol%name,sol%nameUser)
   
 end program main

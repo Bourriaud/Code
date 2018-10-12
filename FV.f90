@@ -8,11 +8,12 @@ module FV
   implicit none
 
   abstract interface
-     subroutine sub (u1,u2,dir,F)
+     subroutine sub_flux (u1,u2,f_equa,dir,F)
        real, dimension(:), intent(in) :: u1,u2
+       procedure (sub_f), pointer, intent(in) :: f_equa
        integer, intent(in) :: dir
        real, dimension(:), intent(inout) :: F
-     end subroutine sub
+     end subroutine sub_flux
   end interface
   
 contains
@@ -28,11 +29,13 @@ contains
     real, dimension(:,:), allocatable :: F
     real, dimension(:), allocatable :: Ftemp
     real :: t,dx,dy
-    procedure (sub), pointer :: flux => null()
+    procedure (sub_flux), pointer :: flux => null()
+    procedure (sub_f), pointer :: f_equa => null()
 
     allocate(F(sol%nvar,4),Ftemp(sol%nvar))
     allocate(sol2%val(mesh%nc,sol%nvar))
-    flux => flux_godunov
+    flux => flux_HLL
+    f_equa => f_euler
     
     t=0.
     n=1
@@ -45,11 +48,11 @@ contains
              neigh=mesh%cell(k)%edge(i)%neigh
              normal=mesh%cell(k)%edge(i)%normal
              if (neigh==-1) then
-                call boundary(flux,sol%val(k,:),mesh%cell(k)%edge(i)%boundType,mesh%cell(k)%edge(i)%bound,normal,Ftemp(:))
+                call boundary(flux,f_equa,sol%val(k,:),mesh%cell(k)%edge(i)%boundType,mesh%cell(k)%edge(i)%bound,normal,Ftemp(:))
              else
                 k1=min(k,neigh)
                 k2=max(k,neigh)
-                call flux(sol%val(k1,:),sol%val(k2,:),normal,Ftemp(:))
+                call flux(sol%val(k1,:),sol%val(k2,:),f_equa,normal,Ftemp(:))
              endif
              F(:,normal)=F(:,normal)+Ftemp(:)
           enddo
@@ -72,24 +75,48 @@ contains
 
   end subroutine calculation
 
-  subroutine boundary(flux_ptr,u,boundtype,bound,normal,F)
-    procedure (sub), pointer, intent(in) :: flux_ptr
+  subroutine boundary(flux_ptr,f_equa,u,boundtype,bound,normal,F)
+    procedure (sub_flux), pointer, intent(in) :: flux_ptr
+    procedure (sub_f), pointer, intent(in) :: f_equa
     real, dimension(:), intent(in) :: u
     character(len=20), intent(in) :: boundtype
     real, dimension(:), intent(in) :: bound
     integer, intent(in) :: normal      !1=left 2=bottom 3=right 4=top
     real, dimension(:), intent(inout) :: F
+    real, dimension(:), allocatable :: v
 
     if (trim(boundtype)=='DIRICHLET') then
        if (normal==1) then
-          call flux_ptr(bound,u,1,F)
+          call flux_ptr(bound,u,f_equa,1,F)
        elseif (normal==2) then
-          call flux_ptr(bound,u,2,F)
+          call flux_ptr(bound,u,f_equa,2,F)
        elseif (normal==3) then
-          call flux_ptr(u,bound,1,F)
+          call flux_ptr(u,bound,f_equa,1,F)
        else
-          call flux_ptr(u,bound,2,F)
+          call flux_ptr(u,bound,f_equa,2,F)
        endif
+       
+    elseif (trim(boundtype)=='TRANSMISSIVE') then
+       call flux_ptr(u,u,f_equa,normal,F)
+       
+    elseif (trim(boundtype)=='WALL') then
+       allocate(v(size(u)))
+       v=u
+       if (normal==1) then
+          v(2)=-u(2)
+          call flux_ptr(v,u,f_equa,1,F)
+       elseif (normal==2) then
+          v(3)=-u(3)
+          call flux_ptr(v,u,f_equa,2,F)
+       elseif (normal==3) then
+          v(2)=-u(2)
+          call flux_ptr(u,v,f_equa,1,F)
+       else
+          v(3)=-u(3)
+          call flux_ptr(u,v,f_equa,2,F)
+       endif
+       deallocate(v)
+       
     else
        print*,"Boundary condition ",trim(boundtype)," not implemented"
        call exit()
@@ -97,8 +124,9 @@ contains
 
   end subroutine boundary
   
-  subroutine flux_godunov(u1,u2,normal,F)
+  subroutine flux_godunov(u1,u2,f_equa,normal,F)
     real, dimension(:), intent(in) :: u1,u2
+    procedure (sub_f), pointer, intent(in) :: f_equa
     integer, intent(in) :: normal     !1=left 2=bottom 3=right 4=top
     real, dimension(:), intent(inout) :: F
     real, dimension(:), allocatable :: ustar
@@ -112,8 +140,10 @@ contains
     else
        dir=2
     endif
-    call RP(u1,u2,ustar,dir)
-    call f_transport(ustar,Fvect)
+    
+    call RS_advection(u1,u2,f_equa,ustar,dir)
+    call f_equa(ustar,Fvect)
+    
     F(:)=Fvect(:,dir)
 
     deallocate(ustar,Fvect)
@@ -121,8 +151,9 @@ contains
     return
   end subroutine flux_godunov
 
-  subroutine RP(u1,u2,ustar,dir)
+  subroutine RS_advection(u1,u2,f_equa,ustar,dir)
     real, dimension(:), intent(in) :: u1,u2
+    procedure (sub_f), pointer, intent(in) :: f_equa
     real, dimension(:), intent(inout) :: ustar
     integer, intent(in) :: dir
     real :: s
@@ -130,11 +161,10 @@ contains
     real, dimension(:), allocatable :: f1,f2
     integer :: i
 
-    ! Seulement advection linéaire
-
     allocate(f1vect(size(u1),2),f2vect(size(u1),2),f1(size(u1)),f2(size(u1)))
-    call f_transport(u1,f1vect(:,:))
-    call f_transport(u2,f2vect(:,:))
+    
+    call f_equa(u1,f1vect(:,:))
+    call f_equa(u2,f2vect(:,:))
     f1=f1vect(:,dir)
     f2=f2vect(:,dir)
 
@@ -148,7 +178,49 @@ contains
     enddo
 
     return
-  end subroutine RP
+  end subroutine RS_advection
+
+  subroutine flux_HLL(u1,u2,f_equa,normal,F)
+    real, dimension(:), intent(in) :: u1,u2
+    procedure (sub_f), pointer, intent(in) :: f_equa
+    integer, intent(in) :: normal     !1=left 2=bottom 3=right 4=top
+    real, dimension(:), intent(inout) :: F
+    real, dimension(:,:), allocatable :: F1vect,F2vect
+    integer :: dir
+    real :: SL,SR,p1,p2,a1,a2,gamma
+
+    allocate (F1vect(size(u1),2),F2vect(size(u2),2))
+
+    if ((normal==1).or.(normal)==3) then
+       dir=1
+    else
+       dir=2
+    endif
+
+    gamma=1.4
+    p1=(u1(4)-u1(1)*(0.5*((u1(2)/u1(1))**2+(u1(3)/u1(1))**2)))*(gamma-1)
+    p2=(u2(4)-u2(1)*(0.5*((u2(2)/u2(1))**2+(u2(3)/u2(1))**2)))*(gamma-1)
+    a1=(gamma*p1/u1(1))**0.5
+    a2=(gamma*p2/u2(1))**0.5
+    SL=min(u1(2+dir-1)-a1,u2(2+dir-1)-a2)
+    SR=max(u1(2+dir-1)+a1,u2(2+dir-1)+a2)
+    
+    if (SL>0.) then
+       call f_equa(u1,F1vect)
+       F(:)=F1vect(:,dir)
+    else if (SR<0.) then
+       call f_equa(u2,F2vect)
+       F(:)=F2vect(:,dir)
+    else
+       call f_equa(u1,F1vect)
+       call f_equa(u2,F2vect)
+       F(:)=(SR*F1vect(:,dir)-SL*F2vect(:,dir)+SL*SR*(u2(:)-u1(:)))/(SR-SL)
+    endif
+          
+    deallocate(F1vect,F2vect)
+    
+    return
+  end subroutine flux_HLL
        
 
 end module FV

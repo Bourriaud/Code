@@ -52,15 +52,25 @@ contains
     type(meshStruct), intent(in) :: mesh
     type(solStruct), intent(inout) :: sol
     integer :: k,n
+    real :: rho,u,v,p,gamma
 
+    gamma=1.4
     do k=1,mesh%nc
-       if ((mesh%cell(k)%xc**2+mesh%cell(k)%yc**2)**0.5<5) then
-          sol%val(k,1)=1.
-          sol%val(k,2)=1.
+       if (mesh%cell(k)%yc<0.3) then
+          rho=1.
+          u=0.
+          v=0.75
+          p=1.
        else
-          sol%val(k,1)=0.
-          sol%val(k,2)=0.
+          rho=0.125
+          u=0.
+          v=0.
+          p=0.1
        endif
+       sol%val(k,1)=rho
+       sol%val(k,2)=rho*u
+       sol%val(k,3)=rho*v
+       sol%val(k,4)=rho*(0.5*(u**2+v**2)+p/((gamma-1)*rho))
     enddo
     
     return
@@ -79,18 +89,18 @@ contains
     enddo
     
     do j=1,ny
-       mesh%cell((j-1)*nx+1)%edge(1)%boundType='DIRICHLET'
+       mesh%cell((j-1)*nx+1)%edge(1)%boundType='WALL'
        mesh%cell((j-1)*nx+1)%edge(1)%bound(:)=0.
        
-       mesh%cell((j-1)*nx+nx)%edge(3)%boundType='DIRICHLET'
+       mesh%cell((j-1)*nx+nx)%edge(3)%boundType='WALL'
        mesh%cell((j-1)*nx+nx)%edge(3)%bound(:)=0.
     enddo
     
     do i=1,nx
-       mesh%cell(i)%edge(2)%boundType='DIRICHLET'
+       mesh%cell(i)%edge(2)%boundType='TRANSMISSIVE'
        mesh%cell(i)%edge(2)%bound(:)=0.
        
-       mesh%cell((ny-1)*nx+i)%edge(4)%boundType='DIRICHLET'
+       mesh%cell((ny-1)*nx+i)%edge(4)%boundType='TRANSMISSIVE'
        mesh%cell((ny-1)*nx+i)%edge(4)%bound(:)=0.
     enddo
     return   
