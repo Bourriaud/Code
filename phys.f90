@@ -1,13 +1,6 @@
 module phys
 
   implicit none
-
-  abstract interface
-     subroutine sub_f (u,f)
-       real, dimension(:), intent(in) :: u
-       real, dimension(:,:), intent(inout) :: f
-     end subroutine sub_f
-  end interface
   
 contains
 
@@ -34,7 +27,7 @@ contains
   end subroutine f_transport
 
   subroutine f_euler(u,f)
-    real, dimension(:), intent(in) :: u     !u=(rho,u,v,p)
+    real, dimension(:), intent(in) :: u     !u=(rho,rhou,rhov,E)
     real, dimension(:,:), intent(inout) :: f
     real :: p,gamma,ux,uy
 

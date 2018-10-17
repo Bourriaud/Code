@@ -1,0 +1,20 @@
+0.	xL
+1.	xR
+0.	yL
+1.	yR
+100	nx
+100	ny
+0.7	cfl
+0.2	tf
+euler	equation
+HLL		flux
+euler_exp	time scheme
+10	save frequency
+euler	namefile
+4	nvar
+rho	var 1
+u	var 2
+v
+p
+1	nsolUser
+SolAnal	userSol 1

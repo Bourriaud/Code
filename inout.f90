@@ -6,14 +6,13 @@ module inout
 
 contains
 
-  subroutine init(xL,xR,yL,yR,nx,ny,nvar,dt,tf,fs,namefile,mesh,sol)
-    real, intent(out) :: xL,xR,yL,yR,dt,tf
-    integer, intent(out) :: nx,ny,nvar
-    character(len=20), intent(out) :: namefile
+  subroutine init(xL,xR,yL,yR,nx,ny,nvar,cfl,tf,fs,namefile,mesh,sol,str_equa,str_flux,str_time_scheme)
+    real, intent(out) :: xL,xR,yL,yR,cfl,tf
+    integer, intent(out) :: nx,ny,nvar,fs
+    character(len=20), intent(out) :: namefile,str_equa,str_flux,str_time_scheme
     type(meshStruct), intent(out) :: mesh
     type(solStruct), intent(out) :: sol
-    integer, intent(out) :: fs
-    integer :: i
+    integer :: i,Nf_equa,Nflux,Ntime_scheme
 
     open(11,file="configuration",form="formatted")
     read(11,*)xL
@@ -22,8 +21,11 @@ contains
     read(11,*)yR
     read(11,*)nx
     read(11,*)ny
-    read(11,*)dt
+    read(11,*)cfl
     read(11,*)tf
+    read(11,*)str_equa
+    read(11,*)str_flux
+    read(11,*)str_time_scheme
     read(11,*)fs
     read(11,*)namefile
     read(11,*)nvar
@@ -37,7 +39,7 @@ contains
        read(11,*)sol%nameUser(i)
     enddo
     close(11)
-
+    
     mesh%nc=nx*ny
     mesh%np=(nx+1)*(ny+1)
     sol%nvar=nvar
@@ -56,10 +58,10 @@ contains
 
     gamma=1.4
     do k=1,mesh%nc
-       if (mesh%cell(k)%yc<0.3) then
+       if (mesh%cell(k)%xc<0.3) then
           rho=1.
-          u=0.
-          v=0.75
+          u=0.75
+          v=0.
           p=1.
        else
           rho=0.125
@@ -70,7 +72,7 @@ contains
        sol%val(k,1)=rho
        sol%val(k,2)=rho*u
        sol%val(k,3)=rho*v
-       sol%val(k,4)=rho*(0.5*(u**2+v**2)+p/((gamma-1)*rho))
+       sol%val(k,4)=rho*0.5*(u**2+v**2)+p/(gamma-1)
     enddo
     
     return
@@ -89,18 +91,18 @@ contains
     enddo
     
     do j=1,ny
-       mesh%cell((j-1)*nx+1)%edge(1)%boundType='WALL'
+       mesh%cell((j-1)*nx+1)%edge(1)%boundType='TRANSMISSIVE'
        mesh%cell((j-1)*nx+1)%edge(1)%bound(:)=0.
        
-       mesh%cell((j-1)*nx+nx)%edge(3)%boundType='WALL'
+       mesh%cell((j-1)*nx+nx)%edge(3)%boundType='TRANSMISSIVE'
        mesh%cell((j-1)*nx+nx)%edge(3)%bound(:)=0.
     enddo
     
     do i=1,nx
-       mesh%cell(i)%edge(2)%boundType='TRANSMISSIVE'
+       mesh%cell(i)%edge(2)%boundType='WALL'
        mesh%cell(i)%edge(2)%bound(:)=0.
        
-       mesh%cell((ny-1)*nx+i)%edge(4)%boundType='TRANSMISSIVE'
+       mesh%cell((ny-1)*nx+i)%edge(4)%boundType='WALL'
        mesh%cell((ny-1)*nx+i)%edge(4)%bound(:)=0.
     enddo
     return   

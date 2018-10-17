@@ -1,9 +1,9 @@
-OBJECTS = main.o inout.o efficiency.o types.o phys.o FV.o
+OBJECTS = main.o inout.o efficiency.o types.o phys.o FV.o time.o
 
 run: $(OBJECTS)
 	gfortran -o run $(OBJECTS)
 
-main.o : main.f90 inout.mod efficiency.mod types.mod phys.mod FV.mod
+main.o : main.f90 inout.mod efficiency.mod types.mod phys.mod FV.mod time.mod
 	gfortran -c main.f90
 
 inout.mod : inout.o
@@ -30,6 +30,11 @@ FV.mod : FV.o
 
 FV.o : FV.f90 types.mod phys.mod inout.mod efficiency.mod
 	gfortran -c FV.f90
+
+time.mod : time.o
+
+time.o : time.f90 types.mod FV.mod
+	gfortran -c time.f90
 
 clean :
 	rm -f *.o *.mod *~
