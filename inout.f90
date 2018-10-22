@@ -6,9 +6,9 @@ module inout
 
 contains
 
-  subroutine init(xL,xR,yL,yR,nx,ny,nvar,cfl,tf,fs,namefile,mesh,sol,str_equa,str_flux,str_time_scheme)
+  subroutine init(xL,xR,yL,yR,nx,ny,nvar,cfl,tf,fs,namefile,mesh,sol,str_equa,str_flux,str_time_scheme,order)
     real, intent(out) :: xL,xR,yL,yR,cfl,tf
-    integer, intent(out) :: nx,ny,nvar,fs
+    integer, intent(out) :: nx,ny,nvar,fs,order
     character(len=20), intent(out) :: namefile,str_equa,str_flux,str_time_scheme
     type(meshStruct), intent(out) :: mesh
     type(solStruct), intent(out) :: sol
@@ -26,6 +26,7 @@ contains
     read(11,*)str_equa
     read(11,*)str_flux
     read(11,*)str_time_scheme
+    read(11,*)order
     read(11,*)fs
     read(11,*)namefile
     read(11,*)nvar
@@ -54,25 +55,17 @@ contains
     type(meshStruct), intent(in) :: mesh
     type(solStruct), intent(inout) :: sol
     integer :: k,n
-    real :: rho,u,v,p,gamma
+    real :: x,y,rho,u,v,p,gamma
 
     gamma=1.4
     do k=1,mesh%nc
-       if (mesh%cell(k)%xc<0.3) then
-          rho=1.
-          u=0.75
-          v=0.
-          p=1.
-       else
-          rho=0.125
-          u=0.
-          v=0.
-          p=0.1
-       endif
+       x=mesh%cell(k)%xc
+       y=mesh%cell(k)%yc
+       rho=exp(-(x-5.)**2-(y-5.)**2)
        sol%val(k,1)=rho
-       sol%val(k,2)=rho*u
-       sol%val(k,3)=rho*v
-       sol%val(k,4)=rho*0.5*(u**2+v**2)+p/(gamma-1)
+       sol%val(k,2)=rho
+       !sol%val(k,3)=rho*v
+       !sol%val(k,4)=rho*0.5*(u**2+v**2)+p/(gamma-1)
     enddo
     
     return
@@ -91,18 +84,18 @@ contains
     enddo
     
     do j=1,ny
-       mesh%cell((j-1)*nx+1)%edge(1)%boundType='TRANSMISSIVE'
+       mesh%cell((j-1)*nx+1)%edge(1)%boundType='DIRICHLET'
        mesh%cell((j-1)*nx+1)%edge(1)%bound(:)=0.
        
-       mesh%cell((j-1)*nx+nx)%edge(3)%boundType='TRANSMISSIVE'
+       mesh%cell((j-1)*nx+nx)%edge(3)%boundType='DIRICHLET'
        mesh%cell((j-1)*nx+nx)%edge(3)%bound(:)=0.
     enddo
     
     do i=1,nx
-       mesh%cell(i)%edge(2)%boundType='WALL'
+       mesh%cell(i)%edge(2)%boundType='DIRICHLET'
        mesh%cell(i)%edge(2)%bound(:)=0.
        
-       mesh%cell((ny-1)*nx+i)%edge(4)%boundType='WALL'
+       mesh%cell((ny-1)*nx+i)%edge(4)%boundType='DIRICHLET'
        mesh%cell((ny-1)*nx+i)%edge(4)%bound(:)=0.
     enddo
     return   

@@ -6,27 +6,28 @@ program main
   use phys
   use FV
   use time
+  use reconstruction
   
   implicit none
 
   type(meshStruct) :: mesh
   type(solStruct) :: sol
   real :: xL,xR,yL,yR,cfl,tf,error
-  integer :: nx,ny,nvar,fs
+  integer :: nx,ny,nvar,fs,order
   character(len=20) :: namefile,str_equa,str_flux,str_time_scheme
 
-  call init(xL,xR,yL,yR,nx,ny,nvar,cfl,tf,fs,namefile,mesh,sol,str_equa,str_flux,str_time_scheme)
+  call init(xL,xR,yL,yR,nx,ny,nvar,cfl,tf,fs,namefile,mesh,sol,str_equa,str_flux,str_time_scheme,order)
   call buildmesh(xL,xR,yL,yR,nx,ny,mesh)
   call IC(mesh,sol)
   call BC(nx,ny,nvar,mesh)
   call userSol(0.,mesh,sol)
   call writeSol(mesh,sol,namefile,0)
 
-  call calculation(mesh,sol,str_equa,str_flux,str_time_scheme,cfl,tf,fs,namefile)
+  call calculation(mesh,sol,str_equa,str_flux,str_time_scheme,order,cfl,tf,fs,namefile)
   
-  call errorL1(sol%val(:,1),sol%user(:,1),error)
+  call errorL1(mesh,sol%val(:,2),sol%user(:,1),error)
   print*, "errorL1 = ",error
-  call errorL2(sol%val(:,1),sol%user(:,1),error)
+  call errorL2(mesh,sol%val(:,2),sol%user(:,1),error)
   print*, "errorL2 = ",error
   
   deallocate(mesh%node,mesh%cell,sol%val,sol%user,sol%name,sol%nameUser)
@@ -71,10 +72,11 @@ contains
     return
   end subroutine init_FV
 
-  subroutine calculation(mesh,sol,str_equa,str_flux,str_time_scheme,cfl,tf,fs,namefile)
+  subroutine calculation(mesh,sol,str_equa,str_flux,str_time_scheme,order,cfl,tf,fs,namefile)
     type(meshStruct), intent(inout) :: mesh
     type(solStruct), intent(inout) :: sol
     character(len=20), intent(in) :: str_equa,str_flux,str_time_scheme
+    integer, intent(in) :: order
     real, intent(in) :: cfl,tf
     integer, intent(in) :: fs
     character(len=20),intent(in) :: namefile
@@ -89,7 +91,7 @@ contains
     t=0.
     n=1
     do while (t<tf)
-       call time_scheme(mesh,sol,f_equa,flux,cfl,t)
+       call time_scheme(mesh,sol,f_equa,flux,order,cfl,t)
        if (mod(n,fs)==0) then
           call userSol(t,mesh,sol)
           call writeSol(mesh,sol,namefile,n/fs)

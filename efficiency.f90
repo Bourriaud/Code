@@ -11,20 +11,14 @@ contains
     type (meshStruct) :: mesh
     real, dimension(:,:), intent(inout) :: tabSol
     integer :: k
-    real :: a1,a2
+    real :: a1,a2,x,y
 
     a1=1.
-    a2=0.
+    a2=1.
     do k=1,mesh%nc
-       if (((mesh%cell(k)%xc-a1*t)**2+(mesh%cell(k)%yc-a2*t)**2)**0.5<5) then
-          if((mesh%cell(k)%xc-a1*t>0.).and.(mesh%cell(k)%yc-a2*t>0.)) then
-             tabsol(k,1)=1.
-          else
-             tabsol(k,1)=0.
-          endif
-       else
-          tabsol(k,1)=0.
-       endif
+       x=mesh%cell(k)%xc
+       y=mesh%cell(k)%yc
+       tabsol(k,1)=exp(-(x-a1*t-5.)**2-(y-a2*t-5.)**2)
     enddo
     
     return
@@ -40,27 +34,35 @@ contains
     return
   end subroutine userSol
 
-  subroutine errorL1(sol,exactsol,eL1)
+  subroutine errorL1(mesh,sol,exactsol,eL1)
+    type(meshStruct), intent(in) :: mesh
     real, dimension(:), intent(in) :: sol,exactsol
     real, intent(out) :: eL1
     integer :: k
+    real :: dx,dy
 
     eL1=0.
     do k=1,size(sol(:))
-          eL1=eL1+abs(sol(k)-exactsol(k))
+       dx=mesh%cell(k)%dx
+       dy=mesh%cell(k)%dy
+       eL1=eL1+abs(sol(k)-exactsol(k))*dx*dy
     enddo
 
     return
   end subroutine errorL1
 
-  subroutine errorL2(sol,exactsol,eL2)
+  subroutine errorL2(mesh,sol,exactsol,eL2)
+    type(meshStruct), intent(in) :: mesh
     real, dimension(:), intent(in) :: sol,exactsol
     real, intent(out) :: eL2
     integer :: k
+    real :: dx,dy
 
     eL2=0.
     do k=1,size(sol(:))
-       eL2=eL2+(sol(k)-exactsol(k))**2
+       dx=mesh%cell(k)%dx
+       dy=mesh%cell(k)%dy
+       eL2=eL2+dx*dy*(sol(k)-exactsol(k))**2
     enddo
     eL2=eL2**0.5
 

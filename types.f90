@@ -33,6 +33,12 @@ module types
      real, dimension(:,:), allocatable :: val,user
   end type solStruct
 
+  type :: polStruct
+     integer :: deg
+     real, dimension(:), allocatable :: xi
+     real, dimension(:), allocatable :: coef
+  end type polStruct
+
   abstract interface
      
      subroutine sub_f (u,f)
@@ -48,13 +54,14 @@ module types
        real, intent(out) :: Smax
      end subroutine sub_flux
 
-     subroutine sub_time (mesh,sol,f_ptr,flux_ptr,cfl,t)
+     subroutine sub_time (mesh,sol,f_ptr,flux_ptr,order,cfl,t)
        import meshStruct
        import solStruct
        type(meshStruct), intent(in) :: mesh
        type(solStruct), intent(inout) :: sol
        procedure (sub_f), pointer, intent(in) :: f_ptr
        procedure (sub_flux), pointer, intent(in) :: flux_ptr
+       integer, intent(in) :: order
        real, intent(in) :: cfl
        real, intent(inout) :: t
      end subroutine sub_time

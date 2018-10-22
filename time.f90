@@ -2,27 +2,29 @@ module time
 
   use types
   use FV
+  use reconstruction
   
   implicit none
 
 contains
 
-  subroutine advance(mesh,sol,sol2,f_ptr,flux_ptr,cfl,t)
+  subroutine advance(mesh,sol,sol2,f_ptr,flux_ptr,order,cfl,t)
     type(meshStruct), intent(in) :: mesh
     type(solStruct), intent(in) :: sol
     type(solStruct), intent(inout) :: sol2
     procedure (sub_f), pointer, intent(in) :: f_ptr
     procedure (sub_flux), pointer, intent(in) :: flux_ptr
+    integer, intent(in) :: order
     real, intent(in) :: cfl
     real, intent(inout) :: t
-    integer :: k,i,neigh,normal,k1,k2
+    integer :: k,i,neigh,normal
     real, dimension(:,:), allocatable :: F
-    real, dimension(:), allocatable :: Ftemp
+    real, dimension(:), allocatable :: Ftemp,ul,ur
     type(cellStruct) :: cell
     type(edgeStruct) :: edge
     real :: dx,dy,dt,S
     
-    allocate(F(sol%nvar,4),Ftemp(sol%nvar))
+    allocate(F(sol%nvar,4),Ftemp(sol%nvar),ul(sol%nvar),ur(sol%nvar))
 
     dt=1.
     do k=1,mesh%nc
@@ -35,11 +37,11 @@ contains
           neigh=edge%neigh
           normal=edge%normal
           if (neigh==-1) then
-             call boundary(flux_ptr,f_ptr,sol%val(k,:),edge%boundType,edge%bound,normal,Ftemp(:),S)
+             call reconstruct_boundary(mesh,sol,k,order,normal,ul)
+             call boundary(flux_ptr,f_ptr,ul,edge%boundType,edge%bound,normal,Ftemp(:),S)
           else
-             k1=min(k,neigh)
-             k2=max(k,neigh)
-             call flux_ptr(sol%val(k1,:),sol%val(k2,:),f_ptr,normal,Ftemp(:),S)
+             call reconstruct(mesh,sol,k,neigh,order,normal,ul,ur)
+             call flux_ptr(ul,ur,f_ptr,normal,Ftemp(:),S)
           endif
           F(:,normal)=F(:,normal)+Ftemp(:)
           dt=min(dt,cfl*min(dx,dy)/S)
@@ -53,18 +55,19 @@ contains
     return
   end subroutine advance
 
-  subroutine euler_exp(mesh,sol,f_ptr,flux_ptr,cfl,t)
+  subroutine euler_exp(mesh,sol,f_ptr,flux_ptr,order,cfl,t)
     type(meshStruct), intent(in) :: mesh
     type(solStruct), intent(inout) :: sol
     procedure (sub_f), pointer, intent(in) :: f_ptr
     procedure (sub_flux), pointer, intent(in) :: flux_ptr
+    integer, intent(in) :: order
     real, intent(in) :: cfl
     real, intent(inout) :: t
     type(solStruct) :: sol1
 
     allocate(sol1%val(mesh%nc,sol%nvar))
     
-    call advance(mesh,sol,sol1,f_ptr,flux_ptr,cfl,t)
+    call advance(mesh,sol,sol1,f_ptr,flux_ptr,order,cfl,t)
     sol%val=sol1%val
 
     deallocate(sol1%val)
@@ -72,11 +75,12 @@ contains
     return
   end subroutine euler_exp
 
-  subroutine SSPRK2(mesh,sol,f_ptr,flux_ptr,cfl,t)
+  subroutine SSPRK2(mesh,sol,f_ptr,flux_ptr,order,cfl,t)
     type(meshStruct), intent(in) :: mesh
     type(solStruct), intent(inout) :: sol
     procedure (sub_f), pointer, intent(in) :: f_ptr
     procedure (sub_flux), pointer, intent(in) :: flux_ptr
+    integer, intent(in) :: order
     real, intent(in) :: cfl
     real, intent(inout) :: t
     real :: t1
@@ -84,9 +88,9 @@ contains
 
     allocate(sol1%val(mesh%nc,sol%nvar),sol2%val(mesh%nc,sol%nvar))
 
-    call advance(mesh,sol,sol1,f_ptr,flux_ptr,cfl,t)
+    call advance(mesh,sol,sol1,f_ptr,flux_ptr,order,cfl,t)
     t1=t
-    call advance(mesh,sol1,sol2,f_ptr,flux_ptr,cfl,t1)
+    call advance(mesh,sol1,sol2,f_ptr,flux_ptr,order,cfl,t1)
     sol%val=(sol%val+sol2%val)/2.
 
     deallocate(sol1%val,sol2%val)
@@ -94,11 +98,12 @@ contains
     return
   end subroutine SSPRK2
 
-  subroutine SSPRK3(mesh,sol,f_ptr,flux_ptr,cfl,t)
+  subroutine SSPRK3(mesh,sol,f_ptr,flux_ptr,order,cfl,t)
     type(meshStruct), intent(in) :: mesh
     type(solStruct), intent(inout) :: sol
     procedure (sub_f), pointer, intent(in) :: f_ptr
     procedure (sub_flux), pointer, intent(in) :: flux_ptr
+    integer, intent(in) :: order
     real, intent(in) :: cfl
     real, intent(inout) :: t
     real :: t1,t2
@@ -106,12 +111,12 @@ contains
 
     allocate(sol1%val(mesh%nc,sol%nvar),sol2%val(mesh%nc,sol%nvar))
     
-    call advance(mesh,sol,sol1,f_ptr,flux_ptr,cfl,t)
+    call advance(mesh,sol,sol1,f_ptr,flux_ptr,order,cfl,t)
     t1=t
-    call advance(mesh,sol1,sol2,f_ptr,flux_ptr,cfl,t1)
+    call advance(mesh,sol1,sol2,f_ptr,flux_ptr,order,cfl,t1)
     t2=t1
     sol1%val=3./4.*sol%val+1./4.*sol1%val    
-    call advance(mesh,sol1,sol2,f_ptr,flux_ptr,cfl,t2)   
+    call advance(mesh,sol1,sol2,f_ptr,flux_ptr,order,cfl,t2)   
     sol%val=1./3.*sol%val+2./3.*sol2%val
 
     deallocate(sol1%val,sol2%val)
