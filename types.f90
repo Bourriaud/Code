@@ -33,12 +33,6 @@ module types
      real, dimension(:,:), allocatable :: val,user
   end type solStruct
 
-  type :: polStruct
-     integer :: deg
-     real, dimension(:), allocatable :: xi
-     real, dimension(:), allocatable :: coef
-  end type polStruct
-
   abstract interface
      
      subroutine sub_f (u,f)

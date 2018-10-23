@@ -2,14 +2,14 @@
 10.	xR
 0.	yL
 10.	yR
-50	nx
-50	ny
-0.45	cfl
+100	nx
+100	ny
+0.3	cfl
 1.	tf
 transport	equation
 godunov		flux
-euler_exp	time scheme
-1	space order
+SSPRK3	time scheme
+4	space order
 1	save frequency
 test	namefile
 2	nvar

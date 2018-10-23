@@ -23,10 +23,10 @@ contains
     type(cellStruct) :: cell
     type(edgeStruct) :: edge
     real :: dx,dy,dt,S
-    
+
     allocate(F(sol%nvar,4),Ftemp(sol%nvar),ul(sol%nvar),ur(sol%nvar))
 
-    dt=1.
+    dt=10.**20
     do k=1,mesh%nc
        F=0.
        cell=mesh%cell(k)
@@ -50,7 +50,7 @@ contains
     enddo
     t=t+dt
 
-    deallocate(F,Ftemp)
+    deallocate(F,Ftemp,ul,ur)
     
     return
   end subroutine advance
@@ -66,6 +66,7 @@ contains
     type(solStruct) :: sol1
 
     allocate(sol1%val(mesh%nc,sol%nvar))
+    sol1=sol
     
     call advance(mesh,sol,sol1,f_ptr,flux_ptr,order,cfl,t)
     sol%val=sol1%val
@@ -87,6 +88,8 @@ contains
     type(solStruct) :: sol1,sol2
 
     allocate(sol1%val(mesh%nc,sol%nvar),sol2%val(mesh%nc,sol%nvar))
+    sol1=sol
+    sol2=sol
 
     call advance(mesh,sol,sol1,f_ptr,flux_ptr,order,cfl,t)
     t1=t
@@ -107,19 +110,22 @@ contains
     real, intent(in) :: cfl
     real, intent(inout) :: t
     real :: t1,t2
-    type(solStruct) :: sol1,sol2
+    type(solStruct) :: sol1,sol2,sol3
 
-    allocate(sol1%val(mesh%nc,sol%nvar),sol2%val(mesh%nc,sol%nvar))
+    allocate(sol1%val(mesh%nc,sol%nvar),sol2%val(mesh%nc,sol%nvar),sol3%val(mesh%nc,sol%nvar))
+    sol1=sol
+    sol2=sol
+    sol3=sol
     
     call advance(mesh,sol,sol1,f_ptr,flux_ptr,order,cfl,t)
     t1=t
     call advance(mesh,sol1,sol2,f_ptr,flux_ptr,order,cfl,t1)
     t2=t1
-    sol1%val=3./4.*sol%val+1./4.*sol1%val    
-    call advance(mesh,sol1,sol2,f_ptr,flux_ptr,order,cfl,t2)   
-    sol%val=1./3.*sol%val+2./3.*sol2%val
+    sol2%val=3./4.*sol%val+1./4.*sol2%val    
+    call advance(mesh,sol2,sol3,f_ptr,flux_ptr,order,cfl,t2)   
+    sol%val=1./3.*sol%val+2./3.*sol3%val
 
-    deallocate(sol1%val,sol2%val)
+    deallocate(sol1%val,sol2%val,sol3%val)
 
     return
   end subroutine SSPRK3

@@ -93,7 +93,7 @@ contains
     integer, intent(out) :: kpos
     real, dimension(:), allocatable :: X2,U2
     integer :: i,j,neigh1,neigh2
-
+    
     allocate(X2(k-2*order:k+2*order),U2(k-2*order:k+2*order-1))
 
     if ((normal==1).or.(normal==3)) then
@@ -133,7 +133,7 @@ contains
           j=j+1
        enddo
     endif
-
+    
     kpos=i
 
     allocate(X(1:i+j-1),U(1:i+j-2))
@@ -182,11 +182,6 @@ contains
           call evaluate(xbound,order,Xstencil,Ustencil,ul(isol))
        endif
     enddo
-
-    !print*,"xbound : ",mesh%cell(k)%xc,xbound
-    !print*,"Ugauche : ",U(kpos-1),"Uk : ",U(kpos),"Udroite : ",U(kpos+1)
-    !print*,"    ul : ",ul,"    ur : ",ur
-    !print*,"Bon u  : ",xbound**10,xbound**1
     
     deallocate(X,U,Xstencil,Ustencil)
 
@@ -217,11 +212,6 @@ contains
        call buildStencil(X,U,kpos,order,Xstencil,Ustencil)
        call evaluate(xbound,order,Xstencil,Ustencil,ubound(isol))
     enddo
-
-    !print*,"xbound : ",mesh%cell(k)%xc,xbound
-    !print*,"Ugauche : ",U(kpos-1),"Uk : ",U(kpos),"Udroite : ",U(kpos+1)
-    !print*,"    ubound : ",ubound
-    !print*,"Bon ubound  : ",xbound**10,xbound**1
     
     deallocate(X,U,Xstencil,Ustencil)
 
