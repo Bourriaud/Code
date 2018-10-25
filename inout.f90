@@ -1,5 +1,6 @@
 module inout
 
+  use constant
   use types
   
   implicit none
@@ -7,7 +8,7 @@ module inout
 contains
 
   subroutine init(xL,xR,yL,yR,nx,ny,nvar,cfl,tf,fs,namefile,mesh,sol,str_equa,str_flux,str_time_scheme,order)
-    real, intent(out) :: xL,xR,yL,yR,cfl,tf
+    real(dp), intent(out) :: xL,xR,yL,yR,cfl,tf
     integer, intent(out) :: nx,ny,nvar,fs,order
     character(len=20), intent(out) :: namefile,str_equa,str_flux,str_time_scheme
     type(meshStruct), intent(out) :: mesh
@@ -55,13 +56,13 @@ contains
     type(meshStruct), intent(in) :: mesh
     type(solStruct), intent(inout) :: sol
     integer :: k,n
-    real :: x,y,rho,u,v,p,gamma
+    real(dp) :: x,y,rho,u,v,p,gamma
 
-    gamma=1.4
+    gamma=1.4_dp
     do k=1,mesh%nc
        x=mesh%cell(k)%xc
        y=mesh%cell(k)%yc
-       rho=exp(-(x-5.)**2-(y-5.)**2)
+       rho=cos((x-5.0_dp)*pi/5.0_dp)+cos((y-5.0_dp)*pi/5.0_dp)
        sol%val(k,1)=rho
        sol%val(k,2)=rho
        !sol%val(k,3)=rho*v
@@ -84,29 +85,29 @@ contains
     enddo
     
     do j=1,ny
-       mesh%cell((j-1)*nx+1)%edge(1)%boundType='DIRICHLET'
-       mesh%cell((j-1)*nx+1)%edge(1)%bound(:)=0.
+       mesh%cell((j-1)*nx+1)%edge(1)%boundType='PERIODIC'
+       mesh%cell((j-1)*nx+1)%edge(1)%bound(:)=0.0_dp
        
-       mesh%cell((j-1)*nx+nx)%edge(3)%boundType='DIRICHLET'
-       mesh%cell((j-1)*nx+nx)%edge(3)%bound(:)=0.
+       mesh%cell((j-1)*nx+nx)%edge(3)%boundType='PERIODIC'
+       mesh%cell((j-1)*nx+nx)%edge(3)%bound(:)=0.0_dp
     enddo
     
     do i=1,nx
-       mesh%cell(i)%edge(2)%boundType='DIRICHLET'
-       mesh%cell(i)%edge(2)%bound(:)=0.
+       mesh%cell(i)%edge(2)%boundType='PERIODIC'
+       mesh%cell(i)%edge(2)%bound(:)=0.0_dp
        
-       mesh%cell((ny-1)*nx+i)%edge(4)%boundType='DIRICHLET'
-       mesh%cell((ny-1)*nx+i)%edge(4)%bound(:)=0.
+       mesh%cell((ny-1)*nx+i)%edge(4)%boundType='PERIODIC'
+       mesh%cell((ny-1)*nx+i)%edge(4)%bound(:)=0.0_dp
     enddo
     return   
   end subroutine BC
   
   subroutine buildMesh(xL,xR,yL,yR,nx,ny,mesh)
-    real, intent(in) :: xL,xR,yL,yR
+    real(dp), intent(in) :: xL,xR,yL,yR
     integer, intent(in) :: nx,ny
     type(meshStruct), intent(inout) :: mesh
     integer :: i,j,k
-    real :: dx,dy
+    real(dp) :: dx,dy
 
     dx=(xR-xL)/nx
     dy=(yR-yL)/ny
@@ -141,8 +142,8 @@ contains
           k=(j-1)*nx+i
           mesh%cell(k)%dx=dx
           mesh%cell(k)%dy=dy
-          mesh%cell(k)%xc=xL+i*dx-dx/2.
-          mesh%cell(k)%yc=yL+j*dy-dy/2.
+          mesh%cell(k)%xc=xL+i*dx-dx/2.0_dp
+          mesh%cell(k)%yc=yL+j*dy-dy/2.0_dp
 
           allocate(mesh%cell(k)%edge(4))
 
@@ -151,7 +152,7 @@ contains
           mesh%cell(k)%edge(1)%normal=1
           mesh%cell(k)%edge(1)%neigh=k-1
           if (i==1) then
-             mesh%cell(k)%edge(1)%neigh=-1
+             mesh%cell(k)%edge(1)%neigh=-(j*nx)
           endif
 
           mesh%cell(k)%edge(2)%node1=(j-1)*(nx+1)+i
@@ -159,7 +160,7 @@ contains
           mesh%cell(k)%edge(2)%normal=2
           mesh%cell(k)%edge(2)%neigh=k-nx
           if (j==1) then
-             mesh%cell(k)%edge(2)%neigh=-1
+             mesh%cell(k)%edge(2)%neigh=-(nx*(ny-1)+i)
           endif
           
           mesh%cell(k)%edge(3)%node1=(j-1)*(nx+1)+i+1
@@ -167,7 +168,7 @@ contains
           mesh%cell(k)%edge(3)%normal=3
           mesh%cell(k)%edge(3)%neigh=k+1
           if (i==nx) then
-             mesh%cell(k)%edge(3)%neigh=-1
+             mesh%cell(k)%edge(3)%neigh=-((j-1)*nx+1)
           endif
 
           mesh%cell(k)%edge(4)%node1=j*(nx+1)+i
@@ -175,7 +176,7 @@ contains
           mesh%cell(k)%edge(4)%normal=4
           mesh%cell(k)%edge(4)%neigh=k+nx
           if (j==ny) then
-             mesh%cell(k)%edge(4)%neigh=-1
+             mesh%cell(k)%edge(4)%neigh=-i
           endif
        enddo
     enddo
@@ -203,7 +204,7 @@ contains
     
     write(11,'(a,i8,a)')"POINTS ",mesh%np," float"
     do k=1,mesh%np
-       write(11,'(e15.8,a,e15.8,a,e15.8)')mesh%node(k)%x," ",mesh%node(k)%y," ",0.
+       write(11,'(e15.8,a,e15.8,a,e15.8)')mesh%node(k)%x," ",mesh%node(k)%y," ",0.0_dp
     enddo
 
     write(11,'(a,i8,i9)')"CELLS ",mesh%nc,5*mesh%nc
@@ -243,7 +244,7 @@ contains
   end subroutine writeSol
 
   subroutine print(t,n)
-    real, intent(in) :: t
+    real(dp), intent(in) :: t
     integer, intent(in) :: n
 
     print*,"t=",t,"itération ",n

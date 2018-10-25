@@ -1,5 +1,6 @@
 program main
-  
+
+  use constant
   use inout
   use efficiency
   use types
@@ -12,7 +13,7 @@ program main
 
   type(meshStruct) :: mesh
   type(solStruct) :: sol
-  real :: xL,xR,yL,yR,cfl,tf,error
+  real(dp) :: xL,xR,yL,yR,cfl,tf,error
   integer :: nx,ny,nvar,fs,order
   character(len=20) :: namefile,str_equa,str_flux,str_time_scheme
 
@@ -20,11 +21,11 @@ program main
   call buildmesh(xL,xR,yL,yR,nx,ny,mesh)
   call IC(mesh,sol)
   call BC(nx,ny,nvar,mesh)
-  call userSol(0.,mesh,sol)
+  call userSol(0.0_dp,mesh,sol)
   call writeSol(mesh,sol,namefile,0)
 
   call calculation(mesh,sol,str_equa,str_flux,str_time_scheme,order,cfl,tf,fs,namefile)
-  
+
   call errorL1(mesh,sol%val(:,2),sol%user(:,1),error)
   print*, "errorL1 = ",error
   call errorL2(mesh,sol%val(:,2),sol%user(:,1),error)
@@ -77,18 +78,18 @@ contains
     type(solStruct), intent(inout) :: sol
     character(len=20), intent(in) :: str_equa,str_flux,str_time_scheme
     integer, intent(in) :: order
-    real, intent(in) :: cfl,tf
+    real(dp), intent(in) :: cfl,tf
     integer, intent(in) :: fs
     character(len=20),intent(in) :: namefile
     integer :: n
-    real :: t
+    real(dp) :: t
     procedure (sub_f), pointer :: f_equa
     procedure (sub_flux), pointer :: flux
     procedure (sub_time), pointer :: time_scheme
 
     call init_FV(str_equa,str_flux,str_time_scheme,f_equa,flux,time_scheme)
     
-    t=0.
+    t=0.0_dp
     n=1
     do while (t<tf)
        call time_scheme(mesh,sol,f_equa,flux,order,cfl,t)

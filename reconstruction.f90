@@ -1,5 +1,6 @@
 module reconstruction
 
+  use constant
   use types
 
   implicit none
@@ -7,10 +8,10 @@ module reconstruction
 contains
 
   recursive subroutine DivDiff(X,U,i1,i2,dd)
-    real, dimension(:), intent(in) :: X,U
+    real(dp), dimension(:), intent(in) :: X,U
     integer, intent(in) :: i1,i2
-    real, intent(out) :: dd
-    real :: dd1,dd2
+    real(dp), intent(out) :: dd
+    real(dp) :: dd1,dd2
 
     if (i2==i1+1) then
        dd=U(i1)
@@ -24,18 +25,18 @@ contains
   end subroutine DivDiff
 
   subroutine evaluate(x,deg,stencil,U,val)
-    real, intent(in) :: x
+    real(dp), intent(in) :: x
     integer, intent(in) :: deg
-    real, dimension(:), intent(in) :: stencil,U
-    real, intent(out) :: val
+    real(dp), dimension(:), intent(in) :: stencil,U
+    real(dp), intent(out) :: val
     integer :: j,m,l
-    real :: prod,sum,dd
+    real(dp) :: prod,sum,dd
 
-    val=0.
+    val=0.0_dp
     do j=1,deg
-       sum=0.
+       sum=0.0_dp
        do m=0,j-1
-          prod=1.
+          prod=1.0_dp
           do l=0,m-1
              prod=prod*(x-stencil(l+1))
           enddo
@@ -52,13 +53,13 @@ contains
   end subroutine evaluate
 
   subroutine buildStencil(X,U,k,order,stencil,Ux)
-    real, dimension(:), intent(in) :: X,U
+    real(dp), dimension(:), intent(in) :: X,U
     integer, intent(in) :: k,order
-    real, dimension(:), allocatable, intent(out) :: stencil,Ux
+    real(dp), dimension(:), allocatable, intent(out) :: stencil,Ux
     integer :: i,nl,nr
-    real :: dd1,dd2
+    real(dp) :: dd1,dd2
 
-    if (k+1<size(X)) then
+    if (k+1<=ubound(X,1)) then
        nl=k
        nr=k+1
     else
@@ -89,15 +90,15 @@ contains
     type(meshStruct), intent(in) :: mesh
     type(solStruct), intent(in) :: sol
     integer, intent(in) :: k,order,normal,isol
-    real, dimension(:), allocatable, intent(out) :: X,U
+    real(dp), dimension(:), allocatable, intent(out) :: X,U
     integer, intent(out) :: kpos
-    real, dimension(:), allocatable :: X2,U2
+    real(dp), dimension(:), allocatable :: X2,U2
     integer :: i,j,neigh1,neigh2
     
     allocate(X2(k-2*order:k+2*order),U2(k-2*order:k+2*order-1))
 
     if ((normal==1).or.(normal==3)) then
-       X2(k)=mesh%cell(k)%xc-mesh%cell(k)%dx/2.
+       X2(k)=mesh%cell(k)%xc-mesh%cell(k)%dx/2.0_dp
        neigh1=mesh%cell(k)%edge(1)%neigh
        neigh2=k
        i=1
@@ -150,23 +151,23 @@ contains
     type(meshStruct), intent(in) :: mesh
     type(solStruct), intent(in) :: sol
     integer, intent(in) :: k,neigh,order,normal
-    real, dimension(:), intent(inout) :: ul,ur
-    real, dimension(:), allocatable :: X,U,Xstencil,Ustencil
+    real(dp), dimension(:), intent(inout) :: ul,ur
+    real(dp), dimension(:), allocatable :: X,U,Xstencil,Ustencil
     integer :: kpos,isol
-    real :: xbound
+    real(dp) :: xbound
 
     if (normal==1) then
-       xbound=mesh%cell(k)%xc-mesh%cell(k)%dx/2.
+       xbound=mesh%cell(k)%xc-mesh%cell(k)%dx/2.0_dp
     elseif (normal==2) then
-       xbound=mesh%cell(k)%yc-mesh%cell(k)%dy/2.
+       xbound=mesh%cell(k)%yc-mesh%cell(k)%dy/2.0_dp
     elseif (normal==3) then
-       xbound=mesh%cell(k)%xc+mesh%cell(k)%dx/2.
+       xbound=mesh%cell(k)%xc+mesh%cell(k)%dx/2.0_dp
     else
-       xbound=mesh%cell(k)%yc+mesh%cell(k)%dy/2.
+       xbound=mesh%cell(k)%yc+mesh%cell(k)%dy/2.0_dp
     endif
 
     do isol=1,sol%nvar
-       if (k<neigh) then
+       if ((normal==3).or.(normal==4)) then
           call extractDirection(mesh,sol,k,order,normal,isol,X,U,kpos)
           call buildStencil(X,U,kpos,order,Xstencil,Ustencil)
           call evaluate(xbound,order,Xstencil,Ustencil,ul(isol))
@@ -192,19 +193,19 @@ contains
     type(meshStruct), intent(in) :: mesh
     type(solStruct), intent(in) :: sol
     integer, intent(in) :: k,order,normal
-    real, dimension(:), intent(inout) :: ubound
-    real, dimension(:), allocatable :: X,U,Xstencil,Ustencil
+    real(dp), dimension(:), intent(inout) :: ubound
+    real(dp), dimension(:), allocatable :: X,U,Xstencil,Ustencil
     integer :: kpos,isol
-    real :: xbound
+    real(dp) :: xbound
 
     if (normal==1) then
-       xbound=mesh%cell(k)%xc-mesh%cell(k)%dx/2.
+       xbound=mesh%cell(k)%xc-mesh%cell(k)%dx/2.0_dp
     elseif (normal==2) then
-       xbound=mesh%cell(k)%yc-mesh%cell(k)%dy/2.
+       xbound=mesh%cell(k)%yc-mesh%cell(k)%dy/2.0_dp
     elseif (normal==3) then
-       xbound=mesh%cell(k)%xc+mesh%cell(k)%dx/2.
+       xbound=mesh%cell(k)%xc+mesh%cell(k)%dx/2.0_dp
     else
-       xbound=mesh%cell(k)%yc+mesh%cell(k)%dy/2.
+       xbound=mesh%cell(k)%yc+mesh%cell(k)%dy/2.0_dp
     endif
 
     do isol=1,sol%nvar

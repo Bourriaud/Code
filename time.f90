@@ -1,5 +1,6 @@
 module time
 
+  use constant
   use types
   use FV
   use reconstruction
@@ -15,20 +16,20 @@ contains
     procedure (sub_f), pointer, intent(in) :: f_ptr
     procedure (sub_flux), pointer, intent(in) :: flux_ptr
     integer, intent(in) :: order
-    real, intent(in) :: cfl
-    real, intent(inout) :: t
+    real(dp), intent(in) :: cfl
+    real(dp), intent(inout) :: t
     integer :: k,i,neigh,normal
-    real, dimension(:,:), allocatable :: F
-    real, dimension(:), allocatable :: Ftemp,ul,ur
+    real(dp), dimension(:,:), allocatable :: F
+    real(dp), dimension(:), allocatable :: Ftemp,ul,ur
     type(cellStruct) :: cell
     type(edgeStruct) :: edge
-    real :: dx,dy,dt,S
+    real(dp) :: dx,dy,dt,S
 
     allocate(F(sol%nvar,4),Ftemp(sol%nvar),ul(sol%nvar),ur(sol%nvar))
 
-    dt=10.**20
+    dt=10.0_dp**20
     do k=1,mesh%nc
-       F=0.
+       F=0.0_dp
        cell=mesh%cell(k)
        dx=cell%dx
        dy=cell%dy
@@ -36,9 +37,9 @@ contains
           edge=cell%edge(i)
           neigh=edge%neigh
           normal=edge%normal
-          if (neigh==-1) then
+          if (neigh<0) then
              call reconstruct_boundary(mesh,sol,k,order,normal,ul)
-             call boundary(flux_ptr,f_ptr,ul,edge%boundType,edge%bound,normal,Ftemp(:),S)
+             call boundary(flux_ptr,f_ptr,neigh,ul,sol,edge%boundType,edge%bound,normal,Ftemp(:),S)
           else
              call reconstruct(mesh,sol,k,neigh,order,normal,ul,ur)
              call flux_ptr(ul,ur,f_ptr,normal,Ftemp(:),S)
@@ -61,8 +62,8 @@ contains
     procedure (sub_f), pointer, intent(in) :: f_ptr
     procedure (sub_flux), pointer, intent(in) :: flux_ptr
     integer, intent(in) :: order
-    real, intent(in) :: cfl
-    real, intent(inout) :: t
+    real(dp), intent(in) :: cfl
+    real(dp), intent(inout) :: t
     type(solStruct) :: sol1
 
     allocate(sol1%val(mesh%nc,sol%nvar))
@@ -82,9 +83,9 @@ contains
     procedure (sub_f), pointer, intent(in) :: f_ptr
     procedure (sub_flux), pointer, intent(in) :: flux_ptr
     integer, intent(in) :: order
-    real, intent(in) :: cfl
-    real, intent(inout) :: t
-    real :: t1
+    real(dp), intent(in) :: cfl
+    real(dp), intent(inout) :: t
+    real(dp) :: t1
     type(solStruct) :: sol1,sol2
 
     allocate(sol1%val(mesh%nc,sol%nvar),sol2%val(mesh%nc,sol%nvar))
@@ -94,7 +95,7 @@ contains
     call advance(mesh,sol,sol1,f_ptr,flux_ptr,order,cfl,t)
     t1=t
     call advance(mesh,sol1,sol2,f_ptr,flux_ptr,order,cfl,t1)
-    sol%val=(sol%val+sol2%val)/2.
+    sol%val=0.5_dp*(sol%val+sol2%val)
 
     deallocate(sol1%val,sol2%val)
 
@@ -107,9 +108,9 @@ contains
     procedure (sub_f), pointer, intent(in) :: f_ptr
     procedure (sub_flux), pointer, intent(in) :: flux_ptr
     integer, intent(in) :: order
-    real, intent(in) :: cfl
-    real, intent(inout) :: t
-    real :: t1,t2
+    real(dp), intent(in) :: cfl
+    real(dp), intent(inout) :: t
+    real(dp) :: t1,t2
     type(solStruct) :: sol1,sol2,sol3
 
     allocate(sol1%val(mesh%nc,sol%nvar),sol2%val(mesh%nc,sol%nvar),sol3%val(mesh%nc,sol%nvar))
@@ -121,9 +122,9 @@ contains
     t1=t
     call advance(mesh,sol1,sol2,f_ptr,flux_ptr,order,cfl,t1)
     t2=t1
-    sol2%val=3./4.*sol%val+1./4.*sol2%val    
+    sol2%val=0.75_dp*sol%val+0.25_dp*sol2%val    
     call advance(mesh,sol2,sol3,f_ptr,flux_ptr,order,cfl,t2)   
-    sol%val=1./3.*sol%val+2./3.*sol3%val
+    sol%val=1.0_dp/3.0_dp*sol%val+2.0_dp/3.0_dp*sol3%val
 
     deallocate(sol1%val,sol2%val,sol3%val)
 
