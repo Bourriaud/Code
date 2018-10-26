@@ -14,8 +14,8 @@ contains
     integer :: k
     real(dp) :: a1,a2,x,y
 
-    a1=1.0_dp
-    a2=1.0_dp
+    a1=-1.0_dp
+    a2=-1.0_dp
     do k=1,mesh%nc
        x=mesh%cell(k)%xc
        y=mesh%cell(k)%yc

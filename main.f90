@@ -23,7 +23,6 @@ program main
   call BC(nx,ny,nvar,mesh)
   call userSol(0.0_dp,mesh,sol)
   call writeSol(mesh,sol,namefile,0)
-
   call calculation(mesh,sol,str_equa,str_flux,str_time_scheme,order,cfl,tf,fs,namefile)
 
   call errorL1(mesh,sol%val(:,2),sol%user(:,1),error)

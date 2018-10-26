@@ -17,8 +17,8 @@ contains
     a(1,1)=1.0_dp
     a(1,2)=0.0_dp
     ! Transport deuxième variable
-    a(2,1)=1.0_dp
-    a(2,2)=1.0_dp
+    a(2,1)=-1.0_dp
+    a(2,2)=-1.0_dp
     
     f(1,:)=a(1,:)*u(1)
     f(2,:)=a(2,:)*u(2)

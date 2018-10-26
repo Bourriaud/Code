@@ -30,7 +30,7 @@ types.o: constant.o
 
 phys.o: constant.o
 
-FV.o: constant.o types.o phys.o inout.o efficiency.o
+FV.o: constant.o types.o phys.o inout.o efficiency.o reconstruction.o
 
 time.o: constant.o types.o FV.o reconstruction.o
 

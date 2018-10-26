@@ -37,7 +37,7 @@ program test
   enddo
 
   k=1
-  order=1
+  order=2
   dir=1
   neigh=51
   !call extractDirection(mesh,sol,k,order,dir,1,X,U,kpos)
@@ -45,19 +45,28 @@ program test
   !print*,Xstencil
   !print*,Ustencil
   !print*,U(kpos),kpos,U(98),98
-  !call reconstruct(mesh,sol,k,neigh,order,dir,ul,ur)
-  call reconstruct_boundary(mesh,sol,k,order,dir,ul)
+  !do i=2,99
+     !k=i
+     !neigh=i+1
+     !dir=3
+     !call reconstruct(mesh,sol,k,neigh,order,dir,ul,ur)
+     !print*,"k=",k
+     !print*,ul(2),ur(2)
+     !print*,sol%val(k,2),sol%val(k+1,2)
+     !print*,"--------------------------------------------"
+  !enddo
+  !call reconstruct_boundary(mesh,sol,k,order,dir,ul)
 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-  !X2(1)=0.0_dp
-  !X2(2)=1.0_dp
-  !X2(3)=2.0_dp
-  !U2(1)=0.5_dp
-  !U2(2)=1.5_dp
+  X2(1)=0.0_dp
+  X2(2)=1.0_dp
+  X2(3)=2.0_dp
+  U2(1)=0.5_dp
+  U2(2)=1.5_dp
 
-  !call evaluate(4.0_dp,2,X2,U2,val)
-  !print*,val
+  call evaluate(3.0_dp,1,X2,U2,val)
+  print*,val
 
 
 end program test

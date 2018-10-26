@@ -5,20 +5,23 @@ module FV
   use phys
   use inout
   use efficiency
+  use reconstruction
   
   implicit none
   
 contains
 
-  subroutine boundary(flux_ptr,f_equa,neigh,u,sol,boundtype,bound,normal,F,S)
+  subroutine boundary(flux_ptr,f_equa,neigh,u,mesh,sol,boundtype,bound,normal,order,F,S)
     procedure (sub_flux), pointer, intent(in) :: flux_ptr
     procedure (sub_f), pointer, intent(in) :: f_equa
     integer, intent(in) :: neigh
     real(dp), dimension(:), intent(in) :: u
+    type(meshStruct), intent(in) :: mesh
     type(solStruct), intent(in) :: sol
     character(len=20), intent(in) :: boundtype
     real(dp), dimension(:), intent(in) :: bound
     integer, intent(in) :: normal      !1=left 2=bottom 3=right 4=top
+    integer, intent(in) :: order
     real(dp), dimension(:), intent(inout) :: F
     real(dp), intent(out) :: S
     real(dp), dimension(:), allocatable :: v
@@ -59,12 +62,16 @@ contains
        allocate(v(size(u)))
        v=sol%val(abs(neigh),:)
        if (normal==1) then
+          call reconstruct_boundary(mesh,sol,abs(neigh),order,3,v)
           call flux_ptr(v,u,f_equa,1,F,S)
        elseif (normal==2) then
+          call reconstruct_boundary(mesh,sol,abs(neigh),order,4,v)
           call flux_ptr(v,u,f_equa,2,F,S)
        elseif (normal==3) then
+          call reconstruct_boundary(mesh,sol,abs(neigh),order,1,v)
           call flux_ptr(u,v,f_equa,1,F,S)
        else
+          call reconstruct_boundary(mesh,sol,abs(neigh),order,2,v)
           call flux_ptr(u,v,f_equa,2,F,S)
        endif
        deallocate(v)

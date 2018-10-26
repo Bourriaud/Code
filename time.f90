@@ -19,17 +19,17 @@ contains
     real(dp), intent(in) :: cfl
     real(dp), intent(inout) :: t
     integer :: k,i,neigh,normal
-    real(dp), dimension(:,:), allocatable :: F
+    real(dp), dimension(:,:,:), allocatable :: F   !F(k,var,dir)
     real(dp), dimension(:), allocatable :: Ftemp,ul,ur
     type(cellStruct) :: cell
     type(edgeStruct) :: edge
     real(dp) :: dx,dy,dt,S
 
-    allocate(F(sol%nvar,4),Ftemp(sol%nvar),ul(sol%nvar),ur(sol%nvar))
+    allocate(F(mesh%nc,sol%nvar,4),Ftemp(sol%nvar),ul(sol%nvar),ur(sol%nvar))
 
     dt=10.0_dp**20
+    F=0.0_dp
     do k=1,mesh%nc
-       F=0.0_dp
        cell=mesh%cell(k)
        dx=cell%dx
        dy=cell%dy
@@ -39,16 +39,17 @@ contains
           normal=edge%normal
           if (neigh<0) then
              call reconstruct_boundary(mesh,sol,k,order,normal,ul)
-             call boundary(flux_ptr,f_ptr,neigh,ul,sol,edge%boundType,edge%bound,normal,Ftemp(:),S)
+             call boundary(flux_ptr,f_ptr,neigh,ul,mesh,sol,edge%boundType,edge%bound,normal,order,Ftemp(:),S)
           else
              call reconstruct(mesh,sol,k,neigh,order,normal,ul,ur)
              call flux_ptr(ul,ur,f_ptr,normal,Ftemp(:),S)
           endif
-          F(:,normal)=F(:,normal)+Ftemp(:)
+          F(k,:,normal)=F(k,:,normal)+Ftemp(:)
           dt=min(dt,cfl*min(dx,dy)/S)
        enddo
-       sol2%val(k,:)=sol%val(k,:)-dt/dx*(F(:,3)-F(:,1))-dt/dy*(F(:,4)-F(:,2))
     enddo
+    
+    sol2%val(1:mesh%nc,:)=sol%val(1:mesh%nc,:)-dt/dx*(F(1:mesh%nc,:,3)-F(1:mesh%nc,:,1))-dt/dy*(F(1:mesh%nc,:,4)-F(1:mesh%nc,:,2))
     t=t+dt
 
     deallocate(F,Ftemp,ul,ur)
