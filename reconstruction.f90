@@ -68,12 +68,18 @@ contains
     endif
 
     do i=2,order
-       call DivDiff(X,U,nl-1,nr,dd1)
-       call DivDiff(X,U,nl,nr+1,dd2)
-       if (((abs(dd1) < abs(dd2)).and.(nl-1>0)).or.(nr+1>size(X))) then
+       if (nl-1<=0) then
+          nr=nr+1
+       elseif (nr+1>size(X)) then
           nl=nl-1
        else
-          nr=nr+1   
+          call DivDiff(X,U,nl-1,nr,dd1)
+          call DivDiff(X,U,nl,nr+1,dd2)
+          if (abs(dd1) < abs(dd2)) then
+             nl=nl-1
+          else
+             nr=nr+1   
+          endif
        endif
     enddo
 

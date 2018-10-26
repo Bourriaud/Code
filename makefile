@@ -1,56 +1,42 @@
-OBJECTS = main.o constant.o inout.o efficiency.o types.o phys.o FV.o time.o reconstruction.o
+PROG = run
+SRCS = main.f90 constant.f90 inout.f90 efficiency.f90 types.f90 phys.f90 FV.f90 time.f90 reconstruction.f90
+OBJS = main.o constant.o inout.o efficiency.o types.o phys.o FV.o time.o reconstruction.o
 
-run: $(OBJECTS)
-	gfortran -o run $(OBJECTS)
+F90 = gfortran
+F90FLAGS=-O0 -Wall -ffpe-trap=invalid,overflow -fcheck=all -pedantic
+F90FLAGS2=-O0 -Wall -ffpe-trap=invalid,overflow -fcheck=all -pedantic -g -pg
+F90FLAGS3=-O2 -march=native
 
-main.o : main.f90 constant.mod inout.mod efficiency.mod types.mod phys.mod FV.mod time.mod reconstruction.mod
-	gfortran -c main.f90
+all: $(PROG)
 
-constant.mod : constant.o
+$(PROG): $(OBJS)
+	$(F90) -o $@ $(OBJS)
 
-constant.o : constant.f90
-	gfortran -c constant.f90
+clean:
+	rm -f $(PROG) $(OBJS) *.mod
 
-inout.mod : inout.o
+.SUFFIXES: $(SUFFIXES) .f90
 
-inout.o : inout.f90 constant.mod types.mod
-	gfortran -c inout.f90
+.f90.o:
+	$(F90) $(F90FLAGS) -c $<
 
-efficiency.mod : efficiency.o
+main.o: constant.o inout.o efficiency.o types.o phys.o FV.o time.o reconstruction.o
 
-efficiency.o : efficiency.f90 constant.mod types.mod
-	gfortran -c efficiency.f90
+inout.o: constant.o types.o
 
-types.mod : types.o
+efficiency.o: constant.o types.o
 
-types.o : types.f90 constant.mod
-	gfortran -c types.f90
+types.o: constant.o
 
-phys.mod : phys.o
+phys.o: constant.o
 
-phys.o : phys.f90 constant.mod
-	gfortran -c phys.f90
+FV.o: constant.o types.o phys.o inout.o efficiency.o
 
-FV.mod : FV.o
+time.o: constant.o types.o FV.o reconstruction.o
 
-FV.o : FV.f90 constant.mod types.mod phys.mod inout.mod efficiency.mod
-	gfortran -c FV.f90
-
-time.mod : time.o
-
-time.o : time.f90 constant.mod types.mod FV.mod reconstruction.mod
-	gfortran -c time.f90
-
-reconstruction.mod : reconstruction.o
-
-reconstruction.o : reconstruction.f90 constant.mod types.mod
-	gfortran -c reconstruction.f90
-
-clean :
-	rm -f *.o *.mod *~
+reconstruction.o: constant.o types.o
 
 test: test.o constant.o reconstruction.o types.o inout.o
-	gfortran -o test test.o reconstruction.o types.o inout.o
+	$(F90) -o test test.o reconstruction.o types.o inout.o
 
-test.o : test.f90 constant.mod reconstruction.mod types.mod inout.mod
-	gfortran -c test.f90
+test.o : constant.o reconstruction.o types.o inout.o

@@ -13,7 +13,7 @@ contains
     character(len=20), intent(out) :: namefile,str_equa,str_flux,str_time_scheme
     type(meshStruct), intent(out) :: mesh
     type(solStruct), intent(out) :: sol
-    integer :: i,Nf_equa,Nflux,Ntime_scheme
+    integer :: i
 
     open(11,file="configuration",form="formatted")
     read(11,*)xL
@@ -55,10 +55,11 @@ contains
   subroutine IC(mesh,sol)
     type(meshStruct), intent(in) :: mesh
     type(solStruct), intent(inout) :: sol
-    integer :: k,n
-    real(dp) :: x,y,rho,u,v,p,gamma
+    integer :: k
+    real(dp) :: x,y,rho
+    !real(dp) :: u,v,p,gamma
 
-    gamma=1.4_dp
+    !gamma=1.4_dp
     do k=1,mesh%nc
        x=mesh%cell(k)%xc
        y=mesh%cell(k)%yc
@@ -191,7 +192,6 @@ contains
     integer, intent(in) :: nfile
     integer :: k,n
     integer :: i1,i2,i3,i4
-    integer :: nx,ny
     character(len=34) :: completenamefile
 
     write(completenamefile,'(A,A,I3.3,A)')'./results/',trim(namefile),nfile,'.vtk'

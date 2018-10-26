@@ -20,7 +20,7 @@ program test
   real(dp) :: val
   
 
-  call init(xL,xR,yL,yR,nx,ny,nvar,cfl,tf,fs,namefile,mesh,sol,str_equa,str_flux,str_time_scheme)
+  call init(xL,xR,yL,yR,nx,ny,nvar,cfl,tf,fs,namefile,mesh,sol,str_equa,str_flux,str_time_scheme,order)
   call buildmesh(xL,xR,yL,yR,nx,ny,mesh)
 
   do i=1,100

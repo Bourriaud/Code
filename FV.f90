@@ -123,17 +123,21 @@ contains
     call f_equa(u2,f2vect(:,:))
     f1=f1vect(:,dir)
     f2=f2vect(:,dir)
-
+    
     do i=1,size(u1)
-       s=(f2(i)-f1(i))/(u2(i)-u1(i))
-       Smax=max(abs(s),Smax)
-       if (s<0.0_dp) then
-          ustar(i)=u2(i)
+       if (u1(i)/=u2(i)) then
+          s=(f2(i)-f1(i))/(u2(i)-u1(i))
+          Smax=max(abs(s),Smax)
+          if (s<0.0_dp) then
+             ustar(i)=u2(i)
+          else
+             ustar(i)=u1(i)
+          endif
        else
           ustar(i)=u1(i)
        endif
     enddo
-
+    
     return
   end subroutine RS_advection
 
