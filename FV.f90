@@ -26,60 +26,63 @@ contains
     real(dp), intent(out) :: S
     real(dp), dimension(:), allocatable :: v
 
-    if (trim(boundtype)=='DIRICHLET') then
-       if (normal==1) then
+    select case (trim(boundtype))
+    case ('DIRICHLET')
+       select case (normal)
+       case (1)
           call flux_ptr(bound,u,f_equa,1,F,S)
-       elseif (normal==2) then
+       case (2)
           call flux_ptr(bound,u,f_equa,2,F,S)
-       elseif (normal==3) then
+       case (3)
           call flux_ptr(u,bound,f_equa,1,F,S)
-       else
+       case (4)
           call flux_ptr(u,bound,f_equa,2,F,S)
-       endif
+       end select
        
-    elseif (trim(boundtype)=='TRANSMISSIVE') then
+    case ('TRANSMISSIVE')
        call flux_ptr(u,u,f_equa,normal,F,S)
        
-    elseif (trim(boundtype)=='WALL') then
+    case ('WALL')
        allocate(v(size(u)))
        v=u
-       if (normal==1) then
+       select case (normal)
+       case (1)
           v(2)=-u(2)
           call flux_ptr(v,u,f_equa,1,F,S)
-       elseif (normal==2) then
+       case (2)
           v(3)=-u(3)
           call flux_ptr(v,u,f_equa,2,F,S)
-       elseif (normal==3) then
+       case (3)
           v(2)=-u(2)
           call flux_ptr(u,v,f_equa,1,F,S)
-       else
+       case (4)
           v(3)=-u(3)
           call flux_ptr(u,v,f_equa,2,F,S)
-       endif
+       end select
        deallocate(v)
 
-    elseif (trim(boundtype)=='PERIODIC') then
+    case ('PERIODIC')
        allocate(v(size(u)))
-       v=sol%val(abs(neigh),:)
-       if (normal==1) then
+       select case (normal)
+       case (1)
           call reconstruct_boundary(mesh,sol,abs(neigh),order,3,v)
           call flux_ptr(v,u,f_equa,1,F,S)
-       elseif (normal==2) then
+       case (2)
           call reconstruct_boundary(mesh,sol,abs(neigh),order,4,v)
           call flux_ptr(v,u,f_equa,2,F,S)
-       elseif (normal==3) then
+       case (3)
           call reconstruct_boundary(mesh,sol,abs(neigh),order,1,v)
           call flux_ptr(u,v,f_equa,1,F,S)
-       else
+       case (4)
           call reconstruct_boundary(mesh,sol,abs(neigh),order,2,v)
           call flux_ptr(u,v,f_equa,2,F,S)
-       endif
+       end select
        deallocate(v)
        
-    else
+    case default
        print*,"Boundary condition ",trim(boundtype)," not implemented"
        call exit()
-    endif
+    end select
 
   end subroutine boundary
   
@@ -95,11 +98,16 @@ contains
 
     allocate (ustar(size(u1)),Fvect(size(u1),2))
 
-    if ((normal==1).or.(normal)==3) then
+    select case (normal)
+    case (1)
        dir=1
-    else
+    case (2)
        dir=2
-    endif
+    case (3)
+       dir=1
+    case (4)
+       dir=2
+    end select
     
     call RS_advection(u1,u2,f_equa,ustar,dir,Smax)
     call f_equa(ustar,Fvect)
@@ -160,11 +168,16 @@ contains
 
     allocate (F1vect(size(u1),2),F2vect(size(u2),2))
 
-    if ((normal==1).or.(normal)==3) then
+    select case (normal)
+    case (1)
        dir=1
-    else
+    case (2)
        dir=2
-    endif
+    case (3)
+       dir=1
+    case (4)
+       dir=2
+    end select
 
     gamma=1.4
     p1=(u1(4)-u1(1)*(0.5_dp*((u1(2)/u1(1))**2+(u1(3)/u1(1))**2)))*(gamma-1)

@@ -22,7 +22,7 @@ clean:
 
 main.o: constant.o inout.o efficiency.o types.o phys.o FV.o time.o reconstruction.o
 
-inout.o: constant.o types.o
+inout.o: constant.o types.o efficiency.o
 
 efficiency.o: constant.o types.o
 
@@ -36,7 +36,7 @@ time.o: constant.o types.o FV.o reconstruction.o
 
 reconstruction.o: constant.o types.o
 
-test: test.o constant.o reconstruction.o types.o inout.o
-	$(F90) -o test test.o reconstruction.o types.o inout.o
+test: test.o constant.o reconstruction.o types.o inout.o efficiency.o phys.o FV.o time.o
+	$(F90) -o test test.o reconstruction.o types.o inout.o efficiency.o phys.o FV.o time.o
 
-test.o : constant.o reconstruction.o types.o inout.o
+test.o : constant.o reconstruction.o types.o inout.o efficiency.o phys.o FV.o time.o

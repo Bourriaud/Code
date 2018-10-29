@@ -2,6 +2,7 @@ module inout
 
   use constant
   use types
+  use efficiency
   
   implicit none
 
@@ -52,6 +53,15 @@ contains
     return
   end subroutine init
 
+  subroutine IC_func(x,y,t,s)
+    real(dp), intent(in) :: x,y,t
+    real(dp), intent(out) :: s
+
+    s=cos((x-5.0_dp)*pi/5.0_dp)+cos((y-5.0_dp)*pi/5.0_dp)
+    
+    return
+  end subroutine IC_func
+  
   subroutine IC(mesh,sol)
     type(meshStruct), intent(in) :: mesh
     type(solStruct), intent(inout) :: sol
@@ -63,7 +73,8 @@ contains
     do k=1,mesh%nc
        x=mesh%cell(k)%xc
        y=mesh%cell(k)%yc
-       rho=cos((x-5.0_dp)*pi/5.0_dp)+cos((y-5.0_dp)*pi/5.0_dp)
+       !call IC_func(x,y,0.0_dp,rho)
+       call quadrature3(IC_func,mesh,0.0_dp,k,rho)
        sol%val(k,1)=rho
        sol%val(k,2)=rho
        !sol%val(k,3)=rho*v

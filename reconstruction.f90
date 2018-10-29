@@ -162,15 +162,16 @@ contains
     integer :: kpos,isol
     real(dp) :: xbound
 
-    if (normal==1) then
+    select case (normal)
+    case (1)
        xbound=mesh%cell(k)%xc-mesh%cell(k)%dx/2.0_dp
-    elseif (normal==2) then
+    case (2)
        xbound=mesh%cell(k)%yc-mesh%cell(k)%dy/2.0_dp
-    elseif (normal==3) then
+    case (3)
        xbound=mesh%cell(k)%xc+mesh%cell(k)%dx/2.0_dp
-    else
+    case (4)
        xbound=mesh%cell(k)%yc+mesh%cell(k)%dy/2.0_dp
-    endif
+    end select
 
     do isol=1,sol%nvar
        if ((normal==3).or.(normal==4)) then
@@ -204,15 +205,16 @@ contains
     integer :: kpos,isol
     real(dp) :: xbound
 
-    if (normal==1) then
+    select case (normal)
+    case (1)
        xbound=mesh%cell(k)%xc-mesh%cell(k)%dx/2.0_dp
-    elseif (normal==2) then
+    case (2)
        xbound=mesh%cell(k)%yc-mesh%cell(k)%dy/2.0_dp
-    elseif (normal==3) then
+    case (3)
        xbound=mesh%cell(k)%xc+mesh%cell(k)%dx/2.0_dp
-    else
+    case (4)
        xbound=mesh%cell(k)%yc+mesh%cell(k)%dy/2.0_dp
-    endif
+    end select
 
     do isol=1,sol%nvar
        call extractDirection(mesh,sol,k,order,normal,isol,X,U,kpos)

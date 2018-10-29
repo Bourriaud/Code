@@ -64,6 +64,12 @@ module types
        real(dp), intent(in) :: cfl
        real(dp), intent(inout) :: t
      end subroutine sub_time
+
+     subroutine sub_fquadra (x,y,t,s)
+       use constant
+       real(dp), intent(in) :: x,y,t
+       real(dp), intent(out) :: s
+     end subroutine sub_fquadra
      
   end interface
 

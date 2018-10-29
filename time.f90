@@ -69,7 +69,7 @@ contains
 
     allocate(sol1%val(mesh%nc,sol%nvar))
     sol1=sol
-    
+
     call advance(mesh,sol,sol1,f_ptr,flux_ptr,order,cfl,t)
     sol%val=sol1%val
 
@@ -118,13 +118,13 @@ contains
     sol1=sol
     sol2=sol
     sol3=sol
-    
+
     call advance(mesh,sol,sol1,f_ptr,flux_ptr,order,cfl,t)
     t1=t
     call advance(mesh,sol1,sol2,f_ptr,flux_ptr,order,cfl,t1)
     t2=t1
     sol2%val=0.75_dp*sol%val+0.25_dp*sol2%val    
-    call advance(mesh,sol2,sol3,f_ptr,flux_ptr,order,cfl,t2)   
+    call advance(mesh,sol2,sol3,f_ptr,flux_ptr,order,cfl,t2)
     sol%val=1.0_dp/3.0_dp*sol%val+2.0_dp/3.0_dp*sol3%val
 
     deallocate(sol1%val,sol2%val,sol3%val)

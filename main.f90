@@ -40,34 +40,37 @@ contains
     procedure (sub_flux), pointer, intent(out) :: flux
     procedure (sub_time), pointer, intent(out) :: time_scheme
 
-    if (trim(str_equa)=='transport') then
+    select case (trim(str_equa))
+    case ('transport')
        f_equa => f_transport
-    elseif (trim(str_equa)=='euler') then
+    case ('euler')
        f_equa => f_euler
-    else
+    case default
        print*,trim(str_equa)," equation not implemented"
        call exit()
-    endif
-    
-    if (trim(str_flux)=='godunov') then
+    end select
+
+    select case (trim(str_flux))
+    case ('godunov')
        flux => flux_godunov
-    elseif (trim(str_flux)=='HLL') then
+    case ('HLL')
        flux => flux_HLL
-    else
+    case default
        print*,trim(str_flux)," flux not implemented"
        call exit()
-    endif
+    end select
 
-    if (trim(str_time_scheme)=='euler_exp') then
+    select case (trim(str_time_scheme))
+    case ('euler_exp')
        time_scheme => euler_exp
-    elseif (trim(str_time_scheme)=='SSPRK2') then
+    case ('SSPRK2')
        time_scheme => SSPRK2
-    elseif (trim(str_time_scheme)=='SSPRK3') then
+    case ('SSPRK3')
        time_scheme => SSPRK3
-    else
+    case default
        print*,trim(str_time_scheme)," time scheme not implemented"
        call exit()
-    endif
+    end select
 
     return
   end subroutine init_FV
