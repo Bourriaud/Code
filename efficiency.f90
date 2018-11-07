@@ -4,14 +4,6 @@ module efficiency
   use types
   
   implicit none
-
-  interface quadrature1
-     module procedure quadrature1_t,quadrature1_c_alpha,quadrature1_reconstruction
-  end interface quadrature1
-  
-  interface quadrature3
-     module procedure quadrature3_t,quadrature3_c_alpha,quadrature3_reconstruction
-  end interface quadrature3
   
 contains
 
@@ -28,29 +20,31 @@ contains
     return
   end subroutine exactSol
   
-  subroutine exactTab(t,mesh,tab)
+  subroutine exactTab(t,mesh,tab,quad_t)
     real(dp), intent(in) :: t
     type (meshStruct), intent(in) :: mesh
     real(dp), dimension(:,:), intent(inout) :: tab
+    procedure (quadrature_t), pointer, intent(in) :: quad_t
     integer :: k
     real(dp) :: dx,dy
 
     do k=1,mesh%nc
        dx=mesh%cell(k)%dx
        dy=mesh%cell(k)%dy
-       call quadrature3(exactSol,mesh,t,k,tab(k,1))
+       call quad_t(exactSol,mesh,t,k,tab(k,1))
        tab(k,1)=tab(k,1)/(dx*dy)
     enddo
     
     return
   end subroutine exactTab
 
-  subroutine userSol(t,mesh,sol)
+  subroutine userSol(t,mesh,sol,quad_t)
     real(dp), intent(in) :: t
     type(meshStruct), intent(in) :: mesh
     type(solStruct), intent(inout) :: sol
+    procedure (quadrature_t), pointer, intent(in) :: quad_t
 
-    call exactTab(t,mesh,sol%user(:,1:1))
+    call exactTab(t,mesh,sol%user(:,1:1),quad_t)
     sol%user(:,2:2)=abs(sol%user(:,1:1)-sol%val(:,2:2))
 
     return
@@ -124,11 +118,12 @@ contains
     return
   end subroutine quadrature1_c_alpha
 
-  subroutine quadrature1_reconstruction(func,mesh,sol,order,normal,k,int)
+  subroutine quadrature1_reconstruction(func,mesh,sol,order,quad_c_alpha,normal,k,int)
     procedure(sub_reconstruction) :: func
     type(meshStruct), intent(in) :: mesh
     type(solStruct), intent(in) :: sol
     integer, intent(in) :: order,normal,k
+    procedure (quadrature_c_alpha), pointer, intent(in) :: quad_c_alpha
     real(dp), dimension(:), intent(inout) :: int
     real(dp) :: x,y,dx,dy
 
@@ -139,17 +134,16 @@ contains
 
     select case (normal)
     case(1)
-       call func(mesh,sol,k,order,x-dx/2.0_dp,y,int)
-       print*,int,dy
+       call func(mesh,sol,k,order,quad_c_alpha,x-dx/2.0_dp,y,int)
        int=int*dy
     case(2)
-       call func(mesh,sol,k,order,x,y-dy/2.0_dp,int)
+       call func(mesh,sol,k,order,quad_c_alpha,x,y-dy/2.0_dp,int)
        int=int*dx
     case(3)
-       call func(mesh,sol,k,order,x+dx/2.0_dp,y,int)
+       call func(mesh,sol,k,order,quad_c_alpha,x+dx/2.0_dp,y,int)
        int=int*dy
     case(4)
-       call func(mesh,sol,k,order,x,y+dy/2.0_dp,int)
+       call func(mesh,sol,k,order,quad_c_alpha,x,y+dy/2.0_dp,int)
        int=int*dx
     end select
     
@@ -242,11 +236,12 @@ contains
   end subroutine quadrature3_c_alpha
 
   ! /!\ quadrature3_reconstruction est une moyenne
-  subroutine quadrature3_reconstruction(func,mesh,sol,order,normal,k,int)
+  subroutine quadrature3_reconstruction(func,mesh,sol,order,quad_c_alpha,normal,k,int)
     procedure(sub_reconstruction) :: func
     type(meshStruct), intent(in) :: mesh
     type(solStruct), intent(in) :: sol
     integer, intent(in) :: order,normal,k
+    procedure (quadrature_c_alpha), pointer, intent(in) :: quad_c_alpha
     real(dp), dimension(:), intent(inout) :: int
     real(dp) :: x,y,dx,dy,ax,ay,bx,by,sq
     real(dp), dimension(:), allocatable :: f
@@ -266,32 +261,32 @@ contains
 
     select case (normal)
     case(1)
-       call func(mesh,sol,k,order,ax,ay+dy/2.0_dp*(1.0_dp-sq),f)
+       call func(mesh,sol,k,order,quad_c_alpha,ax,ay+dy/2.0_dp*(1.0_dp-sq),f)
        int=int+5.0_dp*f
-       call func(mesh,sol,k,order,ax,ay+dy/2.0_dp*(1.0_dp),f)
+       call func(mesh,sol,k,order,quad_c_alpha,ax,ay+dy/2.0_dp*(1.0_dp),f)
        int=int+8.0_dp*f
-       call func(mesh,sol,k,order,ax,ay+dy/2.0_dp*(1.0_dp+sq),f)
+       call func(mesh,sol,k,order,quad_c_alpha,ax,ay+dy/2.0_dp*(1.0_dp+sq),f)
        int=int+5.0_dp*f
     case(2)
-       call func(mesh,sol,k,order,ax+dx/2.0_dp*(1.0_dp-sq),ay,f)
+       call func(mesh,sol,k,order,quad_c_alpha,ax+dx/2.0_dp*(1.0_dp-sq),ay,f)
        int=5.0_dp*f
-       call func(mesh,sol,k,order,ax+dx/2.0_dp*(1.0_dp),ay,f)
+       call func(mesh,sol,k,order,quad_c_alpha,ax+dx/2.0_dp*(1.0_dp),ay,f)
        int=int+8.0_dp*f
-       call func(mesh,sol,k,order,ax+dx/2.0_dp*(1.0_dp+sq),ay,f)
+       call func(mesh,sol,k,order,quad_c_alpha,ax+dx/2.0_dp*(1.0_dp+sq),ay,f)
        int=int+5.0_dp*f
     case(3)
-       call func(mesh,sol,k,order,bx,ay+dy/2.0_dp*(1.0_dp-sq),f)
+       call func(mesh,sol,k,order,quad_c_alpha,bx,ay+dy/2.0_dp*(1.0_dp-sq),f)
        int=int+5.0_dp*f
-       call func(mesh,sol,k,order,bx,ay+dy/2.0_dp*(1.0_dp),f)
+       call func(mesh,sol,k,order,quad_c_alpha,bx,ay+dy/2.0_dp*(1.0_dp),f)
        int=int+8.0_dp*f
-       call func(mesh,sol,k,order,bx,ay+dy/2.0_dp*(1.0_dp+sq),f)
+       call func(mesh,sol,k,order,quad_c_alpha,bx,ay+dy/2.0_dp*(1.0_dp+sq),f)
        int=int+5.0_dp*f
     case(4)
-       call func(mesh,sol,k,order,ax+dx/2.0_dp*(1.0_dp-sq),by,f)
+       call func(mesh,sol,k,order,quad_c_alpha,ax+dx/2.0_dp*(1.0_dp-sq),by,f)
        int=int+5.0_dp*f
-       call func(mesh,sol,k,order,ax+dx/2.0_dp*(1.0_dp),by,f)
+       call func(mesh,sol,k,order,quad_c_alpha,ax+dx/2.0_dp*(1.0_dp),by,f)
        int=int+8.0_dp*f
-       call func(mesh,sol,k,order,ax+dx/2.0_dp*(1.0_dp+sq),by,f)
+       call func(mesh,sol,k,order,quad_c_alpha,ax+dx/2.0_dp*(1.0_dp+sq),by,f)
        int=int+5.0_dp*f       
     end select
     int=int/18.0_dp

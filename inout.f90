@@ -62,9 +62,10 @@ contains
     return
   end subroutine IC_func
   
-  subroutine IC(mesh,sol)
+  subroutine IC(mesh,sol,quad_t)
     type(meshStruct), intent(in) :: mesh
     type(solStruct), intent(inout) :: sol
+    procedure (quadrature_t), pointer, intent(in) :: quad_t
     integer :: k
     real(dp) :: x,y,dx,dy,rho
     !real(dp) :: u,v,p,gamma
@@ -75,8 +76,7 @@ contains
        y=mesh%cell(k)%yc
        dx=mesh%cell(k)%dx
        dy=mesh%cell(k)%dy
-       !call IC_func(x,y,0.0_dp,rho)
-       call quadrature3(IC_func,mesh,0.0_dp,k,rho)
+       call quad_t(IC_func,mesh,0.0_dp,k,rho)
        rho=rho/(dx*dy)
        sol%val(k,1)=rho
        sol%val(k,2)=rho

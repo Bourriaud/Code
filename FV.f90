@@ -11,9 +11,11 @@ module FV
   
 contains
 
-  subroutine boundary(flux_ptr,f_equa,neigh,u,mesh,sol,boundtype,bound,normal,order,F,S)
+  subroutine boundary(flux_ptr,f_equa,quad_c_alpha,quad_reconstruct,neigh,u,mesh,sol,boundtype,bound,normal,order,F,S)
     procedure (sub_flux), pointer, intent(in) :: flux_ptr
     procedure (sub_f), pointer, intent(in) :: f_equa
+    procedure (quadrature_c_alpha), pointer, intent(in) :: quad_c_alpha
+    procedure (quadrature_reconstruction), pointer, intent(in) :: quad_reconstruct
     integer, intent(in) :: neigh
     real(dp), dimension(:), intent(in) :: u
     type(meshStruct), intent(in) :: mesh
@@ -65,20 +67,20 @@ contains
 
     case ('PERIODIC')
        allocate(v(size(u)))
-       func => evaluate2
+       func => evaluate
        k=abs(neigh)
        select case (normal)
        case (1)
-          call quadrature3(func,mesh,sol,order,3,k,v)
+          call quad_reconstruct(func,mesh,sol,order,quad_c_alpha,3,k,v)
           call flux_ptr(v,u,f_equa,1,F,S)
        case (2)
-          call quadrature3(func,mesh,sol,order,4,k,v)
+          call quad_reconstruct(func,mesh,sol,order,quad_c_alpha,4,k,v)
           call flux_ptr(v,u,f_equa,2,F,S)
        case (3)
-          call quadrature3(func,mesh,sol,order,1,k,v)
+          call quad_reconstruct(func,mesh,sol,order,quad_c_alpha,1,k,v)
           call flux_ptr(u,v,f_equa,1,F,S)
        case (4)
-          call quadrature3(func,mesh,sol,order,2,k,v)
+          call quad_reconstruct(func,mesh,sol,order,quad_c_alpha,2,k,v)
           call flux_ptr(u,v,f_equa,2,F,S)
        end select
        deallocate(v)
