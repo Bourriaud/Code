@@ -25,6 +25,8 @@ contains
     real(dp), dimension(:), intent(inout) :: F
     real(dp), intent(out) :: S
     real(dp), dimension(:), allocatable :: v
+    integer :: k
+    procedure (sub_reconstruction), pointer :: func
 
     select case (trim(boundtype))
     case ('DIRICHLET')
@@ -63,18 +65,20 @@ contains
 
     case ('PERIODIC')
        allocate(v(size(u)))
+       func => evaluate2
+       k=abs(neigh)
        select case (normal)
        case (1)
-          call reconstruct_boundary(mesh,sol,abs(neigh),order,3,v)
+          call quadrature3(func,mesh,sol,order,3,k,v)
           call flux_ptr(v,u,f_equa,1,F,S)
        case (2)
-          call reconstruct_boundary(mesh,sol,abs(neigh),order,4,v)
+          call quadrature3(func,mesh,sol,order,4,k,v)
           call flux_ptr(v,u,f_equa,2,F,S)
        case (3)
-          call reconstruct_boundary(mesh,sol,abs(neigh),order,1,v)
+          call quadrature3(func,mesh,sol,order,1,k,v)
           call flux_ptr(u,v,f_equa,1,F,S)
        case (4)
-          call reconstruct_boundary(mesh,sol,abs(neigh),order,2,v)
+          call quadrature3(func,mesh,sol,order,2,k,v)
           call flux_ptr(u,v,f_equa,2,F,S)
        end select
        deallocate(v)
@@ -111,7 +115,7 @@ contains
     
     call RS_advection(u1,u2,f_equa,ustar,dir,Smax)
     call f_equa(ustar,Fvect)
-    
+
     F(:)=Fvect(:,dir)
 
     deallocate(ustar,Fvect)
@@ -152,7 +156,7 @@ contains
           ustar(i)=u1(i)
        endif
     enddo
-    
+
     return
   end subroutine RS_advection
 

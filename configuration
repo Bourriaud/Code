@@ -2,18 +2,19 @@
 10.	xR
 0.	yL
 10.	yR
-20	nx
-20	ny
+80	nx
+80	ny
 0.5	cfl
 1.	tf
 transport	equation
 godunov		flux
 SSPRK3	time scheme
-2	space order
+3	space order
 1	save frequency
 test	namefile
 2	nvar
 var1	var 1
 var2	var 2
-1	nsolUser
+2	nsolUser
 SolAnal	userSol 1
+Error	userSol 2

@@ -20,6 +20,8 @@ module types
   type :: cellStruct
      real(dp) :: dx,dy
      real(dp) :: xc,yc
+     real(dp), dimension(:,:), allocatable :: polCoef
+     integer, dimension(:), allocatable :: neigh
      type(edgeStruct), dimension(:), allocatable :: edge
   end type cellStruct
   
@@ -52,24 +54,43 @@ module types
        real(dp), intent(out) :: Smax
      end subroutine sub_flux
 
-     subroutine sub_time (mesh,sol,f_ptr,flux_ptr,order,cfl,t)
+     subroutine sub_time (mesh,sol,f_ptr,flux_ptr,order,cfl,t,tf)
        use constant
        import meshStruct
        import solStruct
-       type(meshStruct), intent(in) :: mesh
+       type(meshStruct), intent(inout) :: mesh
        type(solStruct), intent(inout) :: sol
        procedure (sub_f), pointer, intent(in) :: f_ptr
        procedure (sub_flux), pointer, intent(in) :: flux_ptr
        integer, intent(in) :: order
-       real(dp), intent(in) :: cfl
+       real(dp), intent(in) :: cfl,tf
        real(dp), intent(inout) :: t
      end subroutine sub_time
 
-     subroutine sub_fquadra (x,y,t,s)
+     subroutine sub_quadra_t (x,y,t,s)
        use constant
        real(dp), intent(in) :: x,y,t
        real(dp), intent(out) :: s
-     end subroutine sub_fquadra
+     end subroutine sub_quadra_t
+
+     subroutine sub_quadra_c_alpha (x,y,c,alpha,s)
+       use constant
+       real(dp), intent(in) :: x,y
+       real(dp), dimension(2), intent(in) :: c
+       integer, dimension(2), intent(in) :: alpha
+       real(dp), intent(out) :: s
+     end subroutine sub_quadra_c_alpha
+
+     subroutine sub_reconstruction (mesh,sol,k,order,x,y,u)
+       use constant
+       import meshStruct
+       import solStruct
+       type(meshStruct), intent(in) :: mesh
+       type(solStruct), intent(in) :: sol
+       integer, intent(in) :: k,order
+       real(dp), intent(in) :: x,y
+       real(dp), dimension(:), intent(inout) :: u
+     end subroutine sub_reconstruction
      
   end interface
 

@@ -94,7 +94,7 @@ contains
     t=0.0_dp
     n=1
     do while (t<tf)
-       call time_scheme(mesh,sol,f_equa,flux,order,cfl,t)
+       call time_scheme(mesh,sol,f_equa,flux,order,cfl,t,tf)
        if (mod(n,fs)==0) then
           call userSol(t,mesh,sol)
           call writeSol(mesh,sol,namefile,n/fs)

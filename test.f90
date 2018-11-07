@@ -13,7 +13,7 @@ program test
 
   type(meshStruct) :: mesh
   type(solStruct) :: sol
-  real(dp) :: xL,xR,yL,yR,cfl,tf,error,error1,error2
+  real(dp) :: xL,xR,yL,yR,cfl,tf,error,error1,error2,dx,dy
   integer :: nx,ny,nx2,ny2,nvar,fs
   character(len=20) :: namefile,str_equa,str_flux,str_time_scheme
   real(dp), dimension(:), allocatable :: X,U,Xstencil,Ustencil
@@ -22,6 +22,11 @@ program test
   integer :: i,j,k,kpos,order,dir,neigh
   real(dp), dimension(2) :: ul,ur
   real(dp) :: val
+  real(dp), dimension(3,2) :: A
+  real(dp), dimension(3) :: b
+  real(dp), dimension(2) :: vect
+  real(dp), dimension(:,:), allocatable :: R
+  procedure (sub_reconstruction), pointer :: func
 
   
   call init(xL,xR,yL,yR,nx,ny,nvar,cfl,tf,fs,namefile,mesh,sol,str_equa,str_flux,str_time_scheme,order)
@@ -55,11 +60,13 @@ program test
   
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-  !do i=1,100
-     !do j=1,100
+  !do i=1,10
+     !do j=1,10
         !sol%val(i+(j-1)*100,1)=((50.5_dp-i)*0.1_dp)**1
-        !sol%val(i+(j-1)*100,1)=((i-0.5_dp)*0.1_dp)**10
-        !sol%val(i+(j-1)*100,2)=((i-0.5_dp)*0.1_dp)**1
+        !sol%val(i+(j-1)*100,1)=((i-0.5_dp)*0.1_dp)**2
+        !sol%val(i+(j-1)*100,2)=((j-0.5_dp)*0.1_dp)**2
+        !sol%val(i+(j-1)*10,1)=(i**3/3.0_dp-(i-1)**3/3.0_dp)
+        !sol%val(i+(j-1)*10,2)=(j**3/3.0_dp-(j-1)**3/3.0_dp)
         !if(i<100)then
            !sol%val(i+(j-1)*100,1)=1.0_dp
         !else
@@ -100,6 +107,40 @@ program test
   !call evaluate(3.0_dp,1,X2,U2,val)
   !print*,val
 
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+  !call init(xL,xR,yL,yR,nx,ny,nvar,cfl,tf,fs,namefile,mesh,sol,str_equa,str_flux,str_time_scheme,order)
+  !call buildmesh(xL,xR,yL,yR,nx,ny,mesh)
+  !call IC(mesh,sol)
+
+  !order=3
+  !k=11
+  !dx=mesh%cell(k)%dx
+  !dy=mesh%cell(k)%dy
+  !func => evaluate2
+  
+  !call reconstruct2(mesh,sol,k,order)
+  !print*,mesh%cell(k)%polCoef(:,1)
+  !call quadrature3(func,mesh,sol,order,1,k,ul)
+  !call evaluate2(mesh,sol,k,order,mesh%cell(k)%xc-dx/2.0_dp,mesh%cell(k)%yc,ul)
+
+  !print*,"En x = ",mesh%cell(k)%xc-dx/2.0_dp," y = ",mesh%cell(k)%yc
+  !print*,ul
+
+  !deallocate(mesh%cell(k)%polCoef)
+  
+  !A(1,1)=0.0_dp
+  !A(1,2)=-10.0_dp
+  !A(2,1)=10.0_dp
+  !A(2,2)=-10.0_dp
+  !A(3,1)=10.0_dp
+  !A(3,2)=0.0_dp
+  !b(1)=10.0_dp
+  !b(2)=10.0_dp
+  !b(3)=0.0_dp
+
+  !call QR(A,b,vect)
+  !print*,vect
 
   contains
 
@@ -160,7 +201,7 @@ program test
     t=0.0_dp
     n=1
     do while (t<tf)
-       call time_scheme(mesh,sol,f_equa,flux,order,cfl,t)
+       call time_scheme(mesh,sol,f_equa,flux,order,cfl,t,tf)
        if (mod(n,fs)==0) then
           call userSol(t,mesh,sol)
           call writeSol(mesh,sol,namefile,n/fs)

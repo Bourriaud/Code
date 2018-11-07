@@ -34,7 +34,7 @@ FV.o: constant.o types.o phys.o inout.o efficiency.o reconstruction.o
 
 time.o: constant.o types.o FV.o reconstruction.o
 
-reconstruction.o: constant.o types.o
+reconstruction.o: constant.o types.o efficiency.o
 
 test: test.o constant.o reconstruction.o types.o inout.o efficiency.o phys.o FV.o time.o
 	$(F90) -o test test.o reconstruction.o types.o inout.o efficiency.o phys.o FV.o time.o

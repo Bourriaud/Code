@@ -66,15 +66,18 @@ contains
     type(meshStruct), intent(in) :: mesh
     type(solStruct), intent(inout) :: sol
     integer :: k
-    real(dp) :: x,y,rho
+    real(dp) :: x,y,dx,dy,rho
     !real(dp) :: u,v,p,gamma
 
     !gamma=1.4_dp
     do k=1,mesh%nc
        x=mesh%cell(k)%xc
        y=mesh%cell(k)%yc
+       dx=mesh%cell(k)%dx
+       dy=mesh%cell(k)%dy
        !call IC_func(x,y,0.0_dp,rho)
        call quadrature3(IC_func,mesh,0.0_dp,k,rho)
+       rho=rho/(dx*dy)
        sol%val(k,1)=rho
        sol%val(k,2)=rho
        !sol%val(k,3)=rho*v
@@ -157,7 +160,16 @@ contains
           mesh%cell(k)%xc=xL+i*dx-dx/2.0_dp
           mesh%cell(k)%yc=yL+j*dy-dy/2.0_dp
 
-          allocate(mesh%cell(k)%edge(4))
+          allocate(mesh%cell(k)%edge(4),mesh%cell(k)%neigh(8))
+
+          mesh%cell(k)%neigh(1)=k-nx-1
+          mesh%cell(k)%neigh(2)=k-1
+          mesh%cell(k)%neigh(3)=k+nx-1
+          mesh%cell(k)%neigh(4)=k+nx
+          mesh%cell(k)%neigh(5)=k+nx+1
+          mesh%cell(k)%neigh(6)=k+1
+          mesh%cell(k)%neigh(7)=k-nx+1
+          mesh%cell(k)%neigh(8)=k-nx
 
           mesh%cell(k)%edge(1)%node1=(j-1)*(nx+1)+i
           mesh%cell(k)%edge(1)%node2=j*(nx+1)+i
@@ -165,6 +177,9 @@ contains
           mesh%cell(k)%edge(1)%neigh=k-1
           if (i==1) then
              mesh%cell(k)%edge(1)%neigh=-(j*nx)
+             mesh%cell(k)%neigh(1)=-1
+             mesh%cell(k)%neigh(2)=-1
+             mesh%cell(k)%neigh(3)=-1
           endif
 
           mesh%cell(k)%edge(2)%node1=(j-1)*(nx+1)+i
@@ -173,6 +188,9 @@ contains
           mesh%cell(k)%edge(2)%neigh=k-nx
           if (j==1) then
              mesh%cell(k)%edge(2)%neigh=-(nx*(ny-1)+i)
+             mesh%cell(k)%neigh(7)=-1
+             mesh%cell(k)%neigh(8)=-1
+             mesh%cell(k)%neigh(1)=-1
           endif
           
           mesh%cell(k)%edge(3)%node1=(j-1)*(nx+1)+i+1
@@ -181,6 +199,9 @@ contains
           mesh%cell(k)%edge(3)%neigh=k+1
           if (i==nx) then
              mesh%cell(k)%edge(3)%neigh=-((j-1)*nx+1)
+             mesh%cell(k)%neigh(5)=-1
+             mesh%cell(k)%neigh(6)=-1
+             mesh%cell(k)%neigh(7)=-1
           endif
 
           mesh%cell(k)%edge(4)%node1=j*(nx+1)+i
@@ -189,6 +210,9 @@ contains
           mesh%cell(k)%edge(4)%neigh=k+nx
           if (j==ny) then
              mesh%cell(k)%edge(4)%neigh=-i
+             mesh%cell(k)%neigh(3)=-1
+             mesh%cell(k)%neigh(4)=-1
+             mesh%cell(k)%neigh(5)=-1
           endif
        enddo
     enddo
