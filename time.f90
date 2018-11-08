@@ -43,15 +43,14 @@ contains
     return
   end subroutine compute_timestep
 
-  subroutine advance(mesh,sol,sol2,f_equa,flux,order,cfl,dt,tf,quad_t,quad_c_alpha,quad_reconstruct)
+  subroutine advance(mesh,sol,sol2,f_equa,flux,order,dt,quad_c_alpha,quad_reconstruct)
     type(meshStruct), intent(inout) :: mesh
     type(solStruct), intent(in) :: sol
     type(solStruct), intent(inout) :: sol2
     procedure (sub_f), pointer, intent(in) :: f_equa
     procedure (sub_flux), pointer, intent(in) :: flux
     integer, intent(in) :: order
-    real(dp), intent(in) :: cfl,tf,dt
-    procedure (quadrature_t), pointer, intent(in) :: quad_t
+    real(dp), intent(in) :: dt
     procedure (quadrature_c_alpha), pointer, intent(in) :: quad_c_alpha
     procedure (quadrature_reconstruction), pointer, intent(in) :: quad_reconstruct
     integer :: k,i,neigh,normal
@@ -59,7 +58,7 @@ contains
     real(dp), dimension(:), allocatable :: Ftemp,u1,u2
     type(cellStruct) :: cell
     type(edgeStruct) :: edge
-    real(dp) :: xi,yi,dx,dy,S
+    real(dp) :: xi,yi,dx,dy
     procedure (sub_reconstruction), pointer :: func
 
     allocate(F(mesh%nc,sol%nvar,4),Ftemp(sol%nvar),u1(sol%nvar),u2(sol%nvar))
@@ -84,14 +83,14 @@ contains
           call quad_reconstruct(func,mesh,sol,order,quad_c_alpha,normal,k,u1)
           if (neigh<0) then  
              call boundary(flux,f_equa,quad_c_alpha,quad_reconstruct,neigh, &
-                  u1,mesh,sol,edge%boundType,edge%bound,normal,order,Ftemp(:),S)
+                  u1,mesh,sol,edge%boundType,edge%bound,normal,order,Ftemp(:))
           else
              if ((normal==1).or.(normal==2)) then
                 call quad_reconstruct(func,mesh,sol,order,quad_c_alpha,normal+2,neigh,u2)
-                call flux(u2,u1,f_equa,normal,Ftemp(:),S)
+                call flux(u2,u1,f_equa,normal,Ftemp(:))
              else
                 call quad_reconstruct(func,mesh,sol,order,quad_c_alpha,normal-2,neigh,u2)
-                call flux(u1,u2,f_equa,normal,Ftemp(:),S)
+                call flux(u1,u2,f_equa,normal,Ftemp(:))
              endif
           endif
           F(k,:,normal)=F(k,:,normal)+Ftemp(:)
@@ -109,7 +108,7 @@ contains
     return
   end subroutine advance
 
-  subroutine euler_exp(mesh,sol,f_equa,flux,speed,order,cfl,t,tf,quad_t,quad_c_alpha,quad_reconstruct)
+  subroutine euler_exp(mesh,sol,f_equa,flux,speed,order,cfl,t,tf,quad_c_alpha,quad_reconstruct)
     type(meshStruct), intent(inout) :: mesh
     type(solStruct), intent(inout) :: sol
     procedure (sub_f), pointer, intent(in) :: f_equa
@@ -118,7 +117,6 @@ contains
     integer, intent(in) :: order
     real(dp), intent(in) :: cfl,tf
     real(dp), intent(inout) :: t
-    procedure (quadrature_t), pointer, intent(in) :: quad_t
     procedure (quadrature_c_alpha), pointer, intent(in) :: quad_c_alpha
     procedure (quadrature_reconstruction), pointer, intent(in) :: quad_reconstruct
     type(solStruct) :: sol1
@@ -129,7 +127,7 @@ contains
 
     call compute_timestep(mesh,sol,f_equa,speed,cfl,tf,t,dt)
 
-    call advance(mesh,sol,sol1,f_equa,flux,order,cfl,dt,tf,quad_t,quad_c_alpha,quad_reconstruct)
+    call advance(mesh,sol,sol1,f_equa,flux,order,dt,quad_c_alpha,quad_reconstruct)
     sol%val=sol1%val
 
     t=t+dt
@@ -139,7 +137,7 @@ contains
     return
   end subroutine euler_exp
 
-  subroutine SSPRK2(mesh,sol,f_equa,flux,speed,order,cfl,t,tf,quad_t,quad_c_alpha,quad_reconstruct)
+  subroutine SSPRK2(mesh,sol,f_equa,flux,speed,order,cfl,t,tf,quad_c_alpha,quad_reconstruct)
     type(meshStruct), intent(inout) :: mesh
     type(solStruct), intent(inout) :: sol
     procedure (sub_f), pointer, intent(in) :: f_equa
@@ -148,7 +146,6 @@ contains
     integer, intent(in) :: order
     real(dp), intent(in) :: cfl,tf
     real(dp), intent(inout) :: t
-    procedure (quadrature_t), pointer, intent(in) :: quad_t
     procedure (quadrature_c_alpha), pointer, intent(in) :: quad_c_alpha
     procedure (quadrature_reconstruction), pointer, intent(in) :: quad_reconstruct
     type(solStruct) :: sol1,sol2
@@ -160,8 +157,8 @@ contains
 
     call compute_timestep(mesh,sol,f_equa,speed,cfl,tf,t,dt)
 
-    call advance(mesh,sol,sol1,f_equa,flux,order,cfl,dt,tf,quad_t,quad_c_alpha,quad_reconstruct)
-    call advance(mesh,sol1,sol2,f_equa,flux,order,cfl,dt,tf,quad_t,quad_c_alpha,quad_reconstruct)
+    call advance(mesh,sol,sol1,f_equa,flux,order,dt,quad_c_alpha,quad_reconstruct)
+    call advance(mesh,sol1,sol2,f_equa,flux,order,dt,quad_c_alpha,quad_reconstruct)
     sol%val=0.5_dp*(sol%val+sol2%val)
 
     t=t+dt
@@ -171,7 +168,7 @@ contains
     return
   end subroutine SSPRK2
 
-  subroutine SSPRK3(mesh,sol,f_equa,flux,speed,order,cfl,t,tf,quad_t,quad_c_alpha,quad_reconstruct)
+  subroutine SSPRK3(mesh,sol,f_equa,flux,speed,order,cfl,t,tf,quad_c_alpha,quad_reconstruct)
     type(meshStruct), intent(inout) :: mesh
     type(solStruct), intent(inout) :: sol
     procedure (sub_f), pointer, intent(in) :: f_equa
@@ -180,7 +177,6 @@ contains
     integer, intent(in) :: order
     real(dp), intent(in) :: cfl,tf
     real(dp), intent(inout) :: t
-    procedure (quadrature_t), pointer, intent(in) :: quad_t
     procedure (quadrature_c_alpha), pointer, intent(in) :: quad_c_alpha
     procedure (quadrature_reconstruction), pointer, intent(in) :: quad_reconstruct
     type(solStruct) :: sol1,sol2,sol3
@@ -193,10 +189,10 @@ contains
 
     call compute_timestep(mesh,sol,f_equa,speed,cfl,tf,t,dt)
 
-    call advance(mesh,sol,sol1,f_equa,flux,order,cfl,dt,tf,quad_t,quad_c_alpha,quad_reconstruct)
-    call advance(mesh,sol1,sol2,f_equa,flux,order,cfl,dt,tf,quad_t,quad_c_alpha,quad_reconstruct)
+    call advance(mesh,sol,sol1,f_equa,flux,order,dt,quad_c_alpha,quad_reconstruct)
+    call advance(mesh,sol1,sol2,f_equa,flux,order,dt,quad_c_alpha,quad_reconstruct)
     sol2%val=0.75_dp*sol%val+0.25_dp*sol2%val    
-    call advance(mesh,sol2,sol3,f_equa,flux,order,cfl,dt,tf,quad_t,quad_c_alpha,quad_reconstruct)
+    call advance(mesh,sol2,sol3,f_equa,flux,order,dt,quad_c_alpha,quad_reconstruct)
     sol%val=1.0_dp/3.0_dp*sol%val+2.0_dp/3.0_dp*sol3%val
 
     t=t+dt

@@ -45,13 +45,12 @@ module types
        real(dp), dimension(:,:), intent(inout) :: f
      end subroutine sub_f
      
-     subroutine sub_flux (u1,u2,f_equa,dir,F,Smax)
+     subroutine sub_flux (u1,u2,f_equa,dir,F)
        use constant
        real(dp), dimension(:), intent(in) :: u1,u2
        procedure (sub_f), pointer, intent(in) :: f_equa
        integer, intent(in) :: dir
        real(dp), dimension(:), intent(inout) :: F
-       real(dp), intent(out) :: Smax
      end subroutine sub_flux
 
      subroutine sub_speed (u1,u2,f_equa,dir,Smax)
@@ -62,7 +61,7 @@ module types
        real(dp), intent(out) :: Smax
      end subroutine sub_speed
 
-     subroutine sub_time (mesh,sol,f_equa,flux,speed,order,cfl,t,tf,quad_t,quad_c_alpha,quad_reconstruct)
+     subroutine sub_time (mesh,sol,f_equa,flux,speed,order,cfl,t,tf,quad_c_alpha,quad_reconstruct)
        use constant
        import meshStruct
        import solStruct
@@ -74,7 +73,6 @@ module types
        integer, intent(in) :: order
        real(dp), intent(in) :: cfl,tf
        real(dp), intent(inout) :: t
-       procedure (quadrature_t), pointer, intent(in) :: quad_t
        procedure (quadrature_c_alpha), pointer, intent(in) :: quad_c_alpha
        procedure (quadrature_reconstruction), pointer, intent(in) :: quad_reconstruct
      end subroutine sub_time

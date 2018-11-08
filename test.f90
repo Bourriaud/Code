@@ -236,7 +236,7 @@ program test
     t=0.0_dp
     n=1
     do while (t<tf)
-       call time_scheme(mesh,sol,f_equa,flux,speed,order,cfl,t,tf,quad_t,quad_c_alpha,quad_reconstruct)
+       call time_scheme(mesh,sol,f_equa,flux,speed,order,cfl,t,tf,quad_c_alpha,quad_reconstruct)
        if (mod(n,fs)==0) then
           call userSol(t,mesh,sol,quad_t)
           call writeSol(mesh,sol,namefile,n/fs)
