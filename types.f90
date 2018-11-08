@@ -54,14 +54,23 @@ module types
        real(dp), intent(out) :: Smax
      end subroutine sub_flux
 
-     subroutine sub_time (mesh,sol,f_ptr,flux_ptr,order,cfl,t,tf,quad_t,quad_c_alpha,quad_reconstruct)
+     subroutine sub_speed (u1,u2,f_equa,dir,Smax)
+       use constant
+       real(dp), dimension(:), intent(in) :: u1,u2
+       procedure (sub_f), pointer, intent(in) :: f_equa
+       integer, intent(in) :: dir
+       real(dp), intent(out) :: Smax
+     end subroutine sub_speed
+
+     subroutine sub_time (mesh,sol,f_equa,flux,speed,order,cfl,t,tf,quad_t,quad_c_alpha,quad_reconstruct)
        use constant
        import meshStruct
        import solStruct
        type(meshStruct), intent(inout) :: mesh
        type(solStruct), intent(inout) :: sol
-       procedure (sub_f), pointer, intent(in) :: f_ptr
-       procedure (sub_flux), pointer, intent(in) :: flux_ptr
+       procedure (sub_f), pointer, intent(in) :: f_equa
+       procedure (sub_flux), pointer, intent(in) :: flux
+       procedure (sub_speed), pointer, intent(in) :: speed
        integer, intent(in) :: order
        real(dp), intent(in) :: cfl,tf
        real(dp), intent(inout) :: t
