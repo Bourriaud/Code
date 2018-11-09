@@ -11,8 +11,11 @@ module types
 
   type :: edgeStruct
      integer :: node1,node2
+     integer :: cell1,cell2
      integer :: neigh
      integer :: normal    !1=left 2=bottom 3=right 4=top
+     integer :: dir
+     real(dp) :: length
      character(len=20) :: boundType
      real(dp), dimension(:), allocatable :: bound
   end type edgeStruct
@@ -26,8 +29,9 @@ module types
   end type cellStruct
   
   type :: meshStruct
-     integer :: np,nc
+     integer :: np,ne,nc
      type(nodeStruct), dimension(:), allocatable :: node
+     type(edgeStruct), dimension(:), allocatable :: edge
      type(cellStruct), dimension(:), allocatable :: cell
   end type meshStruct
 

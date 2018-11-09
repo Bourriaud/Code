@@ -44,10 +44,11 @@ contains
     close(11)
     
     mesh%nc=nx*ny
+    mesh%ne=nx*(nx+1)+ny*(ny+1)
     mesh%np=(nx+1)*(ny+1)
     sol%nvar=nvar
     
-    allocate(mesh%node(mesh%np),mesh%cell(mesh%nc))
+    allocate(mesh%node(mesh%np),mesh%edge(mesh%ne),mesh%cell(mesh%nc))
     allocate(sol%val(mesh%nc,sol%nvar),sol%user(mesh%nc,sol%nsolUser))
 
     return
@@ -92,27 +93,25 @@ contains
     type(meshStruct), intent(inout) :: mesh
     integer :: i,j,k
 
-    do k=1,mesh%nc
-       do i=1,size(mesh%cell(k)%edge)
-          mesh%cell(k)%edge(i)%boundType='NOT A BOUNDARY'
-          allocate(mesh%cell(k)%edge(i)%bound(nvar))
-       enddo
+    do i=1,mesh%ne
+       mesh%edge(i)%boundType='NOT A BOUNDARY'
+       allocate(mesh%edge(i)%bound(nvar))
     enddo
     
     do j=1,ny
-       mesh%cell((j-1)*nx+1)%edge(1)%boundType='PERIODIC'
-       mesh%cell((j-1)*nx+1)%edge(1)%bound(:)=0.0_dp
+       mesh%edge((j-1)*(nx+1)+1)%boundType='PERIODIC'
+       mesh%edge((j-1)*(nx+1)+1)%bound(:)=0.0_dp
        
-       mesh%cell((j-1)*nx+nx)%edge(3)%boundType='PERIODIC'
-       mesh%cell((j-1)*nx+nx)%edge(3)%bound(:)=0.0_dp
+       mesh%edge(j*(nx+1))%boundType='PERIODIC'
+       mesh%edge(j*(nx+1))%bound(:)=0.0_dp
     enddo
     
     do i=1,nx
-       mesh%cell(i)%edge(2)%boundType='PERIODIC'
-       mesh%cell(i)%edge(2)%bound(:)=0.0_dp
+       mesh%edge((i-1)*(ny+1)+1+(nx+1)*ny)%boundType='PERIODIC'
+       mesh%edge((i-1)*(ny+1)+1+(nx+1)*ny)%bound(:)=0.0_dp
        
-       mesh%cell((ny-1)*nx+i)%edge(4)%boundType='PERIODIC'
-       mesh%cell((ny-1)*nx+i)%edge(4)%bound(:)=0.0_dp
+       mesh%edge(i*(ny+1)+(nx+1)*ny)%boundType='PERIODIC'
+       mesh%edge(i*(ny+1)+(nx+1)*ny)%bound(:)=0.0_dp
     enddo
     return   
   end subroutine BC
@@ -215,6 +214,33 @@ contains
              mesh%cell(k)%neigh(5)=-1
           endif
        enddo
+    enddo
+
+    do j=1,ny
+       do i=1,nx+1
+          k=(j-1)*(nx+1)+i
+          mesh%edge(k)%node1=k
+          mesh%edge(k)%node2=k+nx+1
+          mesh%edge(k)%cell1=(j-1)*nx+i-1
+          mesh%edge(k)%cell2=(j-1)*nx+i
+          mesh%edge(k)%dir=1
+          mesh%edge(k)%length=dy
+       enddo
+       mesh%edge((j-1)*(nx+1)+1)%cell1=-j*nx
+       mesh%edge((j-1)*(nx+1)+nx+1)%cell2=-((j-1)*nx+1)
+    enddo
+    do i=1,nx
+       do j=1,ny+1
+          k=(i-1)*(ny+1)+j+(nx+1)*ny
+          mesh%edge(k)%node1=i+(j-1)*(nx+1)
+          mesh%edge(k)%node2=i+(j-1)*(nx+1)+1
+          mesh%edge(k)%cell1=i+(j-1)*nx-nx
+          mesh%edge(k)%cell2=i+(j-1)*nx
+          mesh%edge(k)%dir=2
+          mesh%edge(k)%length=dx
+       enddo
+       mesh%edge((i-1)*(ny+1)+1+(nx+1)*ny)%cell1=-(nx*(ny-1)+i)
+       mesh%edge((i-1)*(ny+1)+ny+1+(nx+1)*ny)%cell2=-i
     enddo
     
     return

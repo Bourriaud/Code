@@ -38,7 +38,7 @@ program main
   call errorL2(mesh,sol%val(:,2),sol%user(:,1),error)
   print*, "errorL2 = ",error
   
-  deallocate(mesh%node,mesh%cell,sol%val,sol%user,sol%name,sol%nameUser)
+  deallocate(mesh%node,mesh%edge,mesh%cell,sol%val,sol%user,sol%name,sol%nameUser)
 
 contains
 

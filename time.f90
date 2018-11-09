@@ -16,30 +16,27 @@ contains
     procedure (sub_speed), pointer, intent(in) :: speed
     real(dp), intent(in) :: cfl,tf,t
     real(dp), intent(out) :: dt
-    real(dp) :: S
-    integer :: k,i,normal,neigh
+    real(dp) :: S,dx,dy
+    integer :: i,cell1,cell2
 
     dt=tf-t
-    do k=1,mesh%nc
-       do i=1,size(mesh%cell(k)%edge)
-          normal=mesh%cell(k)%edge(i)%normal
-          neigh=mesh%cell(k)%edge(i)%neigh
-          if (neigh>0) then
-             select case (normal)
-             case (1)
-                call speed(sol%val(neigh,:),sol%val(k,:),f_equa,1,S)
-             case (2)
-                call speed(sol%val(neigh,:),sol%val(k,:),f_equa,2,S)
-             case (3)
-                call speed(sol%val(k,:),sol%val(neigh,:),f_equa,1,S)
-             case (4)
-                call speed(sol%val(k,:),sol%val(neigh,:),f_equa,2,S)
-             end select
-             dt=min(dt,cfl*min(mesh%cell(k)%dx,mesh%cell(k)%dy)/S)
-          endif
-       enddo
-    enddo
 
+    do i=1,mesh%ne
+       cell1=mesh%edge(i)%cell1
+       cell2=mesh%edge(i)%cell2
+       if ((cell1>0).and.(cell2>0)) then
+          select case (mesh%edge(i)%dir)
+          case (1)
+             call speed(sol%val(cell1,:),sol%val(cell2,:),f_equa,1,S)
+          case (2)
+             call speed(sol%val(cell1,:),sol%val(cell2,:),f_equa,2,S)
+          end select
+          dx=min(mesh%cell(cell1)%dx,mesh%cell(cell2)%dx)
+          dy=min(mesh%cell(cell1)%dy,mesh%cell(cell2)%dy)
+          dt=min(dt,cfl*min(dx,dy)/S)
+       end if
+    end do       
+    
     return
   end subroutine compute_timestep
 
@@ -53,7 +50,7 @@ contains
     real(dp), intent(in) :: dt
     procedure (quadrature_c_alpha), pointer, intent(in) :: quad_c_alpha
     procedure (quadrature_reconstruction), pointer, intent(in) :: quad_reconstruct
-    integer :: k,i,neigh,normal
+    integer :: k,i,neigh,normal,cell1,cell2,dir
     real(dp), dimension(:,:,:), allocatable :: F   !F(k,var,dir)
     real(dp), dimension(:), allocatable :: Ftemp,u1,u2
     type(cellStruct) :: cell
@@ -61,49 +58,44 @@ contains
     real(dp) :: xi,yi,dx,dy
     procedure (sub_reconstruction), pointer :: func
 
-    allocate(F(mesh%nc,sol%nvar,4),Ftemp(sol%nvar),u1(sol%nvar),u2(sol%nvar))
-
-    F=0.0_dp
+    allocate(Ftemp(sol%nvar),u1(sol%nvar),u2(sol%nvar))
+    
     func => evaluate
-
+    sol2%val=sol%val
+    
     do k=1,mesh%nc
        call reconstruct(mesh,sol,k,order,quad_c_alpha)
     enddo
-    
-    do k=1,mesh%nc
-       cell=mesh%cell(k)
-       dx=cell%dx
-       dy=cell%dy
-       do i=1,size(cell%edge)
-          edge=cell%edge(i)
-          neigh=edge%neigh
-          normal=edge%normal
-          xi=(mesh%node(cell%edge(i)%node1)%x+mesh%node(cell%edge(i)%node2)%x)/2.0_dp
-          yi=(mesh%node(cell%edge(i)%node1)%y+mesh%node(cell%edge(i)%node2)%y)/2.0_dp
-          call quad_reconstruct(func,mesh,sol,order,quad_c_alpha,normal,k,u1)
-          if (neigh<0) then  
-             call boundary(flux,f_equa,quad_c_alpha,quad_reconstruct,neigh, &
-                  u1,mesh,sol,edge%boundType,edge%bound,normal,order,Ftemp(:))
-          else
-             if ((normal==1).or.(normal==2)) then
-                call quad_reconstruct(func,mesh,sol,order,quad_c_alpha,normal+2,neigh,u2)
-                call flux(u2,u1,f_equa,normal,Ftemp(:))
-             else
-                call quad_reconstruct(func,mesh,sol,order,quad_c_alpha,normal-2,neigh,u2)
-                call flux(u1,u2,f_equa,normal,Ftemp(:))
-             endif
-          endif
-          F(k,:,normal)=F(k,:,normal)+Ftemp(:)
-       enddo
+
+    do i=1,mesh%ne
+       edge=mesh%edge(i)
+       cell1=edge%cell1
+       cell2=edge%cell2
+       dir=edge%dir
+       if (cell1<0) then
+          call quad_reconstruct(func,mesh,sol,order,quad_c_alpha,dir,cell2,u2)
+          call boundary(flux,f_equa,quad_c_alpha,quad_reconstruct,cell1, &
+               u2,mesh,sol,edge%boundType,edge%bound,dir,order,Ftemp(:))
+          sol2%val(cell2,:)=sol2%val(cell2,:)+Ftemp(:)*dt/edge%length
+       elseif (cell2<0) then
+          call quad_reconstruct(func,mesh,sol,order,quad_c_alpha,dir+2,cell1,u1)
+          call boundary(flux,f_equa,quad_c_alpha,quad_reconstruct,cell2, &
+               u1,mesh,sol,edge%boundType,edge%bound,dir+2,order,Ftemp(:))
+          sol2%val(cell1,:)=sol2%val(cell1,:)-Ftemp(:)*dt/edge%length
+       else
+          call quad_reconstruct(func,mesh,sol,order,quad_c_alpha,dir+2,cell1,u1)
+          call quad_reconstruct(func,mesh,sol,order,quad_c_alpha,dir,cell2,u2)
+          call flux(u1,u2,f_equa,dir,Ftemp(:))
+          sol2%val(cell1,:)=sol2%val(cell1,:)-Ftemp(:)*dt/edge%length
+          sol2%val(cell2,:)=sol2%val(cell2,:)+Ftemp(:)*dt/edge%length
+       endif
     enddo
-    
-    sol2%val(1:mesh%nc,:)=sol%val(1:mesh%nc,:)-dt/dx*(F(1:mesh%nc,:,3)-F(1:mesh%nc,:,1))-dt/dy*(F(1:mesh%nc,:,4)-F(1:mesh%nc,:,2))
 
     do k=1,mesh%nc
        deallocate(mesh%cell(k)%polCoef)
     enddo
     
-    deallocate(F,Ftemp,u1,u2)
+    deallocate(Ftemp,u1,u2)
     
     return
   end subroutine advance

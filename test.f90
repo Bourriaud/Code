@@ -51,10 +51,11 @@ program test
   nx2=nx*2
   ny2=ny*2
   mesh%nc=nx2*ny2
+  mesh%ne=nx2*(nx2+1)+ny2*(ny2+1)
   mesh%np=(nx2+1)*(ny2+1)
 
-  deallocate(mesh%node,mesh%cell,sol%val,sol%user)
-  allocate(mesh%node(mesh%np),mesh%cell(mesh%nc))
+  deallocate(mesh%node,mesh%edge,mesh%cell,sol%val,sol%user)
+  allocate(mesh%node(mesh%np),mesh%edge(mesh%ne),mesh%cell(mesh%nc))
   allocate(sol%val(mesh%nc,sol%nvar),sol%user(mesh%nc,sol%nsolUser))
 
   call init_FV(str_equa,str_flux,str_time_scheme,order,f_equa,flux,speed,time_scheme,quad_t,quad_c_alpha,quad_reconstruct)
@@ -70,7 +71,7 @@ program test
 
   print*,"ordre : ",(log(error1)-log(error2))/(log((xR-xL)/nx)-log((xR-xL)/nx2))
 
-  deallocate(mesh%node,mesh%cell,sol%val,sol%user,sol%name,sol%nameUser)
+  deallocate(mesh%node,mesh%edge,mesh%cell,sol%val,sol%user,sol%name,sol%nameUser)
   
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 

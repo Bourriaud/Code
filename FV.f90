@@ -123,27 +123,15 @@ contains
     return
   end subroutine RS_advection
   
-  subroutine flux_godunov(u1,u2,f_equa,normal,F)
+  subroutine flux_godunov(u1,u2,f_equa,dir,F)
     real(dp), dimension(:), intent(in) :: u1,u2
     procedure (sub_f), pointer, intent(in) :: f_equa
-    integer, intent(in) :: normal     !1=left 2=bottom 3=right 4=top
+    integer, intent(in) :: dir     !1=vertical 2=horizontal
     real(dp), dimension(:), intent(inout) :: F
     real(dp), dimension(:), allocatable :: ustar
     real(dp), dimension(:,:), allocatable :: Fvect
-    integer :: dir
 
     allocate (ustar(size(u1)),Fvect(size(u1),2))
-
-    select case (normal)
-    case (1)
-       dir=1
-    case (2)
-       dir=2
-    case (3)
-       dir=1
-    case (4)
-       dir=2
-    end select
     
     call RS_advection(u1,u2,f_equa,ustar,dir)
     call f_equa(ustar,Fvect)
@@ -183,27 +171,15 @@ contains
     return
   end subroutine speed_godunov
 
-  subroutine flux_HLL(u1,u2,f_equa,normal,F)
+  subroutine flux_HLL(u1,u2,f_equa,dir,F)
     real(dp), dimension(:), intent(in) :: u1,u2
     procedure (sub_f), pointer, intent(in) :: f_equa
-    integer, intent(in) :: normal     !1=left 2=bottom 3=right 4=top
+    integer, intent(in) :: dir     !1=vertical 2=horizontal
     real(dp), dimension(:), intent(inout) :: F
     real(dp), dimension(:,:), allocatable :: F1vect,F2vect
-    integer :: dir
     real(dp) :: SL,SR,p1,p2,a1,a2,gamma
 
     allocate (F1vect(size(u1),2),F2vect(size(u2),2))
-
-    select case (normal)
-    case (1)
-       dir=1
-    case (2)
-       dir=2
-    case (3)
-       dir=1
-    case (4)
-       dir=2
-    end select
 
     gamma=1.4
     p1=(u1(4)-u1(1)*(0.5_dp*((u1(2)/u1(1))**2+(u1(3)/u1(1))**2)))*(gamma-1)

@@ -2,8 +2,8 @@
 10.	xR
 0.	yL
 10.	yR
-20	nx
-20	ny
+40	nx
+40	ny
 0.95	cfl
 1.	tf
 transport	equation
