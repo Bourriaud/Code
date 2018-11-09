@@ -143,11 +143,10 @@ contains
     return
   end subroutine flux_godunov
 
-  subroutine speed_godunov(u1,u2,f_equa,dir,Smax)
+  subroutine speed_godunov(u1,u2,f_equa,Smax)
     real(dp), dimension(:), intent(in) :: u1,u2
     procedure (sub_f), pointer, intent(in) :: f_equa
-    integer, intent(in) :: dir
-    real(dp), intent(out) :: Smax
+    real(dp), dimension(2), intent(out) :: Smax
     real(dp) :: s
     real(dp), dimension(:,:), allocatable :: f1vect,f2vect
     integer :: i
@@ -161,8 +160,10 @@ contains
     
     do i=1,size(u1)
        if (u1(i)/=u2(i)) then
-          s=(F2vect(i,dir)-F1vect(i,dir))/(u2(i)-u1(i))
-          Smax=max(abs(s),Smax)
+          s=(F2vect(i,1)-F1vect(i,1))/(u2(i)-u1(i))
+          Smax(1)=max(abs(s),Smax(1))
+          s=(F2vect(i,2)-F1vect(i,2))/(u2(i)-u1(i))
+          Smax(2)=max(abs(s),Smax(2))
        endif
     enddo
 
@@ -206,12 +207,11 @@ contains
     return
   end subroutine flux_HLL
 
-  subroutine speed_HLL(u1,u2,f_equa,dir,Smax)
+  subroutine speed_HLL(u1,u2,f_equa,Smax)
     use constant
     real(dp), dimension(:), intent(in) :: u1,u2
     procedure (sub_f), pointer, intent(in) :: f_equa
-    integer, intent(in) :: dir
-    real(dp), intent(out) :: Smax
+    real(dp), dimension(2), intent(out) :: Smax
     real(dp) :: SL,SR,p1,p2,a1,a2,gamma
 
     gamma=1.4
@@ -219,10 +219,15 @@ contains
     p2=(u2(4)-u2(1)*(0.5_dp*((u2(2)/u2(1))**2+(u2(3)/u2(1))**2)))*(gamma-1)
     a1=sqrt(gamma*p1/u1(1))
     a2=sqrt(gamma*p2/u2(1))
-    SL=min(u1(1+dir)/u1(1)-a1,u2(1+dir)/u2(1)-a2)
-    SR=max(u1(1+dir)/u1(1)+a1,u2(1+dir)/u2(1)+a2)
+    SL=min(u1(2)/u1(1)-a1,u2(2)/u2(1)-a2)
+    SR=max(u1(2)/u1(1)+a1,u2(2)/u2(1)+a2)
     
-    Smax=max(abs(SL),abs(SR))
+    Smax(1)=max(abs(SL),abs(SR))
+
+    SL=min(u1(3)/u1(1)-a1,u2(3)/u2(1)-a2)
+    SR=max(u1(3)/u1(1)+a1,u2(3)/u2(1)+a2)
+
+    Smax(2)=max(abs(SL),abs(SR))
 
     return
   end subroutine speed_HLL

@@ -13,7 +13,7 @@ contains
     real(dp) :: a1,a2
 
     a1=1.0_dp
-    a2=0.0_dp
+    a2=1.0_dp
 
     s=cos((x-a1*t-5.0_dp)*pi/5.0_dp)+cos((y-a2*t-5.0_dp)*pi/5.0_dp)
 

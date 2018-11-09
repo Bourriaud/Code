@@ -55,12 +55,11 @@ module types
        real(dp), dimension(:), intent(inout) :: F
      end subroutine sub_flux
 
-     subroutine sub_speed (u1,u2,f_equa,dir,Smax)
+     subroutine sub_speed (u1,u2,f_equa,Smax)
        use constant
        real(dp), dimension(:), intent(in) :: u1,u2
        procedure (sub_f), pointer, intent(in) :: f_equa
-       integer, intent(in) :: dir
-       real(dp), intent(out) :: Smax
+       real(dp), dimension(2), intent(out) :: Smax
      end subroutine sub_speed
 
      subroutine sub_time (mesh,sol,f_equa,flux,speed,order,cfl,t,tf,quad_c_alpha,quad_reconstruct)

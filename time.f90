@@ -16,7 +16,8 @@ contains
     procedure (sub_speed), pointer, intent(in) :: speed
     real(dp), intent(in) :: cfl,tf,t
     real(dp), intent(out) :: dt
-    real(dp) :: S,dx,dy
+    real(dp) :: dx,dy
+    real(dp), dimension(2) :: S
     integer :: i,cell1,cell2
 
     dt=tf-t
@@ -25,15 +26,10 @@ contains
        cell1=mesh%edge(i)%cell1
        cell2=mesh%edge(i)%cell2
        if ((cell1>0).and.(cell2>0)) then
-          select case (mesh%edge(i)%dir)
-          case (1)
-             call speed(sol%val(cell1,:),sol%val(cell2,:),f_equa,1,S)
-          case (2)
-             call speed(sol%val(cell1,:),sol%val(cell2,:),f_equa,2,S)
-          end select
+          call speed(sol%val(cell1,:),sol%val(cell2,:),f_equa,S)
           dx=min(mesh%cell(cell1)%dx,mesh%cell(cell2)%dx)
           dy=min(mesh%cell(cell1)%dy,mesh%cell(cell2)%dy)
-          dt=min(dt,cfl*min(dx,dy)/S)
+          dt=min(dt,cfl/(S(1)/dx+S(2)/dy))
        end if
     end do       
     
