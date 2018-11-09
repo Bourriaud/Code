@@ -91,7 +91,7 @@ contains
   subroutine BC(nx,ny,nvar,mesh)
     integer, intent(in) :: nx,ny,nvar
     type(meshStruct), intent(inout) :: mesh
-    integer :: i,j,k
+    integer :: i,j
 
     do i=1,mesh%ne
        mesh%edge(i)%boundType='NOT A BOUNDARY'
@@ -126,6 +126,8 @@ contains
     dx=(xR-xL)/nx
     dy=(yR-yL)/ny
 
+    !Initialisation des points
+    
     do j=0,ny
        do i=0,nx
           k=j*(nx+1)+i+1
@@ -151,6 +153,8 @@ contains
        enddo
     enddo
 
+    !Initialisation des cells
+    
     do j=1,ny
        do i=1,nx
           k=(j-1)*nx+i
@@ -172,10 +176,7 @@ contains
 
           mesh%cell(k)%edge(1)%node1=(j-1)*(nx+1)+i
           mesh%cell(k)%edge(1)%node2=j*(nx+1)+i
-          mesh%cell(k)%edge(1)%normal=1
-          mesh%cell(k)%edge(1)%neigh=k-1
           if (i==1) then
-             mesh%cell(k)%edge(1)%neigh=-(j*nx)
              mesh%cell(k)%neigh(1)=-1
              mesh%cell(k)%neigh(2)=-1
              mesh%cell(k)%neigh(3)=-1
@@ -183,10 +184,7 @@ contains
 
           mesh%cell(k)%edge(2)%node1=(j-1)*(nx+1)+i
           mesh%cell(k)%edge(2)%node2=(j-1)*(nx+1)+i+1
-          mesh%cell(k)%edge(2)%normal=2
-          mesh%cell(k)%edge(2)%neigh=k-nx
           if (j==1) then
-             mesh%cell(k)%edge(2)%neigh=-(nx*(ny-1)+i)
              mesh%cell(k)%neigh(7)=-1
              mesh%cell(k)%neigh(8)=-1
              mesh%cell(k)%neigh(1)=-1
@@ -194,10 +192,7 @@ contains
           
           mesh%cell(k)%edge(3)%node1=(j-1)*(nx+1)+i+1
           mesh%cell(k)%edge(3)%node2=j*(nx+1)+i+1
-          mesh%cell(k)%edge(3)%normal=3
-          mesh%cell(k)%edge(3)%neigh=k+1
           if (i==nx) then
-             mesh%cell(k)%edge(3)%neigh=-((j-1)*nx+1)
              mesh%cell(k)%neigh(5)=-1
              mesh%cell(k)%neigh(6)=-1
              mesh%cell(k)%neigh(7)=-1
@@ -205,10 +200,7 @@ contains
 
           mesh%cell(k)%edge(4)%node1=j*(nx+1)+i
           mesh%cell(k)%edge(4)%node2=j*(nx+1)+i+1
-          mesh%cell(k)%edge(4)%normal=4
-          mesh%cell(k)%edge(4)%neigh=k+nx
           if (j==ny) then
-             mesh%cell(k)%edge(4)%neigh=-i
              mesh%cell(k)%neigh(3)=-1
              mesh%cell(k)%neigh(4)=-1
              mesh%cell(k)%neigh(5)=-1
@@ -216,6 +208,8 @@ contains
        enddo
     enddo
 
+    !Initialisation des edges
+    
     do j=1,ny
        do i=1,nx+1
           k=(j-1)*(nx+1)+i

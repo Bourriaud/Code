@@ -50,12 +50,9 @@ contains
     real(dp), intent(in) :: dt
     procedure (quadrature_c_alpha), pointer, intent(in) :: quad_c_alpha
     procedure (quadrature_reconstruction), pointer, intent(in) :: quad_reconstruct
-    integer :: k,i,neigh,normal,cell1,cell2,dir
-    real(dp), dimension(:,:,:), allocatable :: F   !F(k,var,dir)
+    integer :: k,i,cell1,cell2,dir
     real(dp), dimension(:), allocatable :: Ftemp,u1,u2
-    type(cellStruct) :: cell
     type(edgeStruct) :: edge
-    real(dp) :: xi,yi,dx,dy
     procedure (sub_reconstruction), pointer :: func
 
     allocate(Ftemp(sol%nvar),u1(sol%nvar),u2(sol%nvar))
