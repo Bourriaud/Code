@@ -134,16 +134,16 @@ contains
 
     select case (normal)
     case(1)
-       call func(mesh,sol,k,order,quad_c_alpha,x-dx/2.0_dp,y,int)
+       call func(mesh,sol,k,normal,order,quad_c_alpha,x-dx/2.0_dp,y,int)
        int=int*dy
     case(2)
-       call func(mesh,sol,k,order,quad_c_alpha,x,y-dy/2.0_dp,int)
+       call func(mesh,sol,k,normal,order,quad_c_alpha,x,y-dy/2.0_dp,int)
        int=int*dx
     case(3)
-       call func(mesh,sol,k,order,quad_c_alpha,x+dx/2.0_dp,y,int)
+       call func(mesh,sol,k,normal,order,quad_c_alpha,x+dx/2.0_dp,y,int)
        int=int*dy
     case(4)
-       call func(mesh,sol,k,order,quad_c_alpha,x,y+dy/2.0_dp,int)
+       call func(mesh,sol,k,normal,order,quad_c_alpha,x,y+dy/2.0_dp,int)
        int=int*dx
     end select
     
@@ -261,32 +261,32 @@ contains
 
     select case (normal)
     case(1)
-       call func(mesh,sol,k,order,quad_c_alpha,ax,ay+dy/2.0_dp*(1.0_dp-sq),f)
+       call func(mesh,sol,k,normal,order,quad_c_alpha,ax,ay+dy/2.0_dp*(1.0_dp-sq),f)
        int=int+5.0_dp*f
-       call func(mesh,sol,k,order,quad_c_alpha,ax,ay+dy/2.0_dp*(1.0_dp),f)
+       call func(mesh,sol,k,normal,order,quad_c_alpha,ax,ay+dy/2.0_dp*(1.0_dp),f)
        int=int+8.0_dp*f
-       call func(mesh,sol,k,order,quad_c_alpha,ax,ay+dy/2.0_dp*(1.0_dp+sq),f)
+       call func(mesh,sol,k,normal,order,quad_c_alpha,ax,ay+dy/2.0_dp*(1.0_dp+sq),f)
        int=int+5.0_dp*f
     case(2)
-       call func(mesh,sol,k,order,quad_c_alpha,ax+dx/2.0_dp*(1.0_dp-sq),ay,f)
+       call func(mesh,sol,k,normal,order,quad_c_alpha,ax+dx/2.0_dp*(1.0_dp-sq),ay,f)
        int=5.0_dp*f
-       call func(mesh,sol,k,order,quad_c_alpha,ax+dx/2.0_dp*(1.0_dp),ay,f)
+       call func(mesh,sol,k,normal,order,quad_c_alpha,ax+dx/2.0_dp*(1.0_dp),ay,f)
        int=int+8.0_dp*f
-       call func(mesh,sol,k,order,quad_c_alpha,ax+dx/2.0_dp*(1.0_dp+sq),ay,f)
+       call func(mesh,sol,k,normal,order,quad_c_alpha,ax+dx/2.0_dp*(1.0_dp+sq),ay,f)
        int=int+5.0_dp*f
     case(3)
-       call func(mesh,sol,k,order,quad_c_alpha,bx,ay+dy/2.0_dp*(1.0_dp-sq),f)
+       call func(mesh,sol,k,normal,order,quad_c_alpha,bx,ay+dy/2.0_dp*(1.0_dp-sq),f)
        int=int+5.0_dp*f
-       call func(mesh,sol,k,order,quad_c_alpha,bx,ay+dy/2.0_dp*(1.0_dp),f)
+       call func(mesh,sol,k,normal,order,quad_c_alpha,bx,ay+dy/2.0_dp*(1.0_dp),f)
        int=int+8.0_dp*f
-       call func(mesh,sol,k,order,quad_c_alpha,bx,ay+dy/2.0_dp*(1.0_dp+sq),f)
+       call func(mesh,sol,k,normal,order,quad_c_alpha,bx,ay+dy/2.0_dp*(1.0_dp+sq),f)
        int=int+5.0_dp*f
     case(4)
-       call func(mesh,sol,k,order,quad_c_alpha,ax+dx/2.0_dp*(1.0_dp-sq),by,f)
+       call func(mesh,sol,k,normal,order,quad_c_alpha,ax+dx/2.0_dp*(1.0_dp-sq),by,f)
        int=int+5.0_dp*f
-       call func(mesh,sol,k,order,quad_c_alpha,ax+dx/2.0_dp*(1.0_dp),by,f)
+       call func(mesh,sol,k,normal,order,quad_c_alpha,ax+dx/2.0_dp*(1.0_dp),by,f)
        int=int+8.0_dp*f
-       call func(mesh,sol,k,order,quad_c_alpha,ax+dx/2.0_dp*(1.0_dp+sq),by,f)
+       call func(mesh,sol,k,normal,order,quad_c_alpha,ax+dx/2.0_dp*(1.0_dp+sq),by,f)
        int=int+5.0_dp*f       
     end select
     int=int/18.0_dp

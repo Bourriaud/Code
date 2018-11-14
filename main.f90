@@ -15,7 +15,9 @@ program main
   type(solStruct) :: sol
   real(dp) :: xL,xR,yL,yR,cfl,tf,error
   integer :: nx,ny,nvar,fs,order
+  integer, dimension(:), allocatable :: L_var_criteria
   character(len=20) :: namefile,str_equa,str_flux,str_time_scheme
+  character(len=20), dimension(:), allocatable :: L_str_criteria
   procedure (sub_f), pointer :: f_equa
   procedure (sub_flux), pointer :: flux
   procedure (sub_speed), pointer :: speed
@@ -24,21 +26,24 @@ program main
   procedure (quadrature_c_alpha), pointer :: quad_c_alpha
   procedure (quadrature_reconstruction), pointer :: quad_reconstruct
 
-  call init(xL,xR,yL,yR,nx,ny,nvar,cfl,tf,fs,namefile,mesh,sol,str_equa,str_flux,str_time_scheme,order)
-  call init_FV(str_equa,str_flux,str_time_scheme,order,f_equa,flux,speed,time_scheme,quad_t,quad_c_alpha,quad_reconstruct)
+  call init(xL,xR,yL,yR,nx,ny,nvar,cfl,tf,fs,namefile,mesh,sol,str_equa,str_flux,str_time_scheme, &
+       order,L_str_criteria,L_var_criteria)
+  call init_FV(str_equa,str_flux,str_time_scheme,order,f_equa,flux,speed,time_scheme, &
+       quad_t,quad_c_alpha,quad_reconstruct)
   call buildmesh(xL,xR,yL,yR,nx,ny,mesh)
   call IC(mesh,sol,quad_t)
   call BC(nx,ny,nvar,mesh)
   call userSol(0.0_dp,mesh,sol,quad_t)
   call writeSol(mesh,sol,namefile,0)
-  call calculation(mesh,sol,order,cfl,tf,fs,namefile,f_equa,flux,speed,time_scheme,quad_t,quad_c_alpha,quad_reconstruct)
+  call calculation(mesh,sol,order,cfl,tf,fs,namefile,f_equa,flux,speed,time_scheme, &
+       L_str_criteria,L_var_criteria,quad_t,quad_c_alpha,quad_reconstruct)
   
   call errorL1(mesh,sol%val(:,2),sol%user(:,1),error)
   print*, "errorL1 = ",error
   call errorL2(mesh,sol%val(:,2),sol%user(:,1),error)
   print*, "errorL2 = ",error
   
-  deallocate(mesh%node,mesh%edge,mesh%cell,sol%val,sol%user,sol%name,sol%nameUser)
+  deallocate(mesh%node,mesh%edge,mesh%cell,sol%val,sol%user,sol%name,sol%nameUser,L_str_criteria,L_var_criteria)
 
 contains
 
@@ -85,7 +90,7 @@ contains
     case default
        print*,trim(str_time_scheme)," time scheme not implemented"
        call exit()
-    end select
+    end select          
 
     quad_t => quadrature3_t
     select case (order)
@@ -100,7 +105,8 @@ contains
     return
   end subroutine init_FV
 
-  subroutine calculation(mesh,sol,order,cfl,tf,fs,namefile,f_equa,flux,speed,time_scheme,quad_t,quad_c_alpha,quad_reconstruct)
+  subroutine calculation(mesh,sol,order,cfl,tf,fs,namefile,f_equa,flux,speed,time_scheme, &
+       L_str_criteria,L_var_criteria,quad_t,quad_c_alpha,quad_reconstruct)
     type(meshStruct), intent(inout) :: mesh
     type(solStruct), intent(inout) :: sol
     integer, intent(in) :: order
@@ -111,6 +117,8 @@ contains
     procedure (sub_flux), pointer, intent(in) :: flux
     procedure (sub_speed), pointer, intent(in) :: speed
     procedure (sub_time), pointer, intent(in) :: time_scheme
+    character(len=20), dimension(:), intent(in) :: L_str_criteria
+    integer, dimension(:), intent(in) :: L_var_criteria
     procedure (quadrature_t), pointer, intent(in) :: quad_t
     procedure (quadrature_c_alpha), pointer, intent(in) :: quad_c_alpha
     procedure (quadrature_reconstruction), pointer, intent(in) :: quad_reconstruct
@@ -120,7 +128,7 @@ contains
     t=0.0_dp
     n=1
     do while (t<tf)
-       call time_scheme(mesh,sol,f_equa,flux,speed,order,cfl,t,tf,quad_c_alpha,quad_reconstruct)
+       call time_scheme(mesh,sol,f_equa,flux,speed,order,cfl,t,tf,quad_c_alpha,quad_reconstruct,L_str_criteria,L_var_criteria)
        if (mod(n,fs)==0) then
           call userSol(t,mesh,sol,quad_t)
           call writeSol(mesh,sol,namefile,n/fs)

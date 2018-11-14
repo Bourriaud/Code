@@ -8,10 +8,10 @@ module reconstruction
 
 contains
   
-  subroutine evaluate(mesh,sol,k,order,quad_c_alpha,x,y,u)
+  subroutine evaluate(mesh,sol,k,normal,order,quad_c_alpha,x,y,u)
     type(meshStruct), intent(in) :: mesh
     type(solStruct), intent(in) :: sol
-    integer, intent(in) :: k,order
+    integer, intent(in) :: k,normal,order
     procedure (quadrature_c_alpha), pointer, intent(in) :: quad_c_alpha
     real(dp), intent(in) :: x,y
     real(dp), dimension(:), intent(inout) :: u
@@ -20,7 +20,23 @@ contains
     real(dp), dimension(2) :: c
     integer, dimension(2) :: alpha    
     procedure(sub_quadra_c_alpha), pointer :: func
+    real(dp), dimension(:,:), allocatable :: pol
     
+    select case (normal)
+    case(1)
+       allocate(pol(size(mesh%cell(k)%polCoefL(:,1)),size(mesh%cell(k)%polCoefL(1,:))))
+       pol=mesh%cell(k)%polCoefL
+    case(2)
+       allocate(pol(size(mesh%cell(k)%polCoefB(:,1)),size(mesh%cell(k)%polCoefB(1,:))))
+       pol=mesh%cell(k)%polCoefB
+    case(3)
+       allocate(pol(size(mesh%cell(k)%polCoefR(:,1)),size(mesh%cell(k)%polCoefR(1,:))))
+       pol=mesh%cell(k)%polCoefR
+    case(4)
+       allocate(pol(size(mesh%cell(k)%polCoefT(:,1)),size(mesh%cell(k)%polCoefT(1,:))))
+       pol=mesh%cell(k)%polCoefT
+    end select
+
     u=sol%val(k,:)
     xc=mesh%cell(k)%xc
     yc=mesh%cell(k)%yc
@@ -38,28 +54,30 @@ contains
              alpha(2)=i2
              call quad_c_alpha(func,mesh,c,alpha,k,intk)
              intk=intk/Kk
-             u(isol)=u(isol)+mesh%cell(k)%polCoef(i,isol)*((x-xc)**alpha(1)*(y-yc)**alpha(2)-intk)
+             u(isol)=u(isol)+pol(i,isol)*((x-xc)**alpha(1)*(y-yc)**alpha(2)-intk)
              i=i+1
           enddo
        enddo
-       
+
        do i1=1,d
           alpha(1)=i1
           alpha(2)=0
           call quad_c_alpha(func,mesh,c,alpha,k,intk)
           intk=intk/Kk
-          u(isol)=u(isol)+mesh%cell(k)%polCoef(i,isol)*((x-xc)**alpha(1)*(y-yc)**alpha(2)-intk)
+          u(isol)=u(isol)+pol(i,isol)*((x-xc)**alpha(1)*(y-yc)**alpha(2)-intk)
           i=i+1
        enddo
     enddo
 
+    deallocate(pol)
+
     return
   end subroutine evaluate
   
-  subroutine reconstruct(mesh,sol,k,order,quad_c_alpha)
+  subroutine reconstruct(mesh,sol,k,normal,order,quad_c_alpha)
     type(meshStruct), intent(inout) :: mesh
     type(solStruct), intent(in) :: sol
-    integer, intent(in) :: k,order
+    integer, intent(in) :: k,normal,order
     procedure (quadrature_c_alpha), pointer, intent(in) :: quad_c_alpha
     integer, dimension(:), allocatable :: stencil
     real(dp), dimension(:,:), allocatable :: X,U
@@ -68,14 +86,14 @@ contains
     real(dp), dimension(2) :: c
     integer, dimension(2) :: alpha
     procedure(sub_quadra_c_alpha), pointer :: func
-
+    
     d=order-1
     call Nequa(d,N)
     call buildStencil(mesh,k,N,stencil)
     Ni=size(stencil)-1
     Nj=d*(d+1)/2+d
 
-    allocate(X(Ni,Nj),mesh%cell(k)%polCoef(Nj,sol%nvar),U(Ni,sol%nvar))
+    allocate(X(Ni,Nj),U(Ni,sol%nvar))
 
     func => polynomialProduct
     Kk=mesh%cell(k)%dx*mesh%cell(k)%dy
@@ -118,11 +136,34 @@ contains
           U(i,isol)=sol%val(stencil(i+1),isol)-sol%val(k,isol)
        enddo
     enddo
-    
-    do isol=1,sol%nvar
-       call solve(X,U(:,isol),mesh%cell(k)%polCoef(:,isol))
-    enddo
-    
+
+    select case (normal)
+    case(1)
+       if (allocated(mesh%cell(k)%polCoefL)) deallocate(mesh%cell(k)%polCoefL)
+       allocate(mesh%cell(k)%polCoefL(Nj,sol%nvar))
+       do isol=1,sol%nvar
+          call solve(X,U(:,isol),mesh%cell(k)%polCoefL(:,isol))
+       enddo
+    case(2)
+       if (allocated(mesh%cell(k)%polCoefB)) deallocate(mesh%cell(k)%polCoefB)
+       allocate(mesh%cell(k)%polCoefB(Nj,sol%nvar))
+       do isol=1,sol%nvar
+          call solve(X,U(:,isol),mesh%cell(k)%polCoefB(:,isol))
+       enddo
+    case(3)
+       if (allocated(mesh%cell(k)%polCoefR)) deallocate(mesh%cell(k)%polCoefR)
+       allocate(mesh%cell(k)%polCoefR(Nj,sol%nvar))
+       do isol=1,sol%nvar
+          call solve(X,U(:,isol),mesh%cell(k)%polCoefR(:,isol))
+       enddo
+    case(4)
+       if (allocated(mesh%cell(k)%polCoefT)) deallocate(mesh%cell(k)%polCoefT)
+       allocate(mesh%cell(k)%polCoefT(Nj,sol%nvar))
+       do isol=1,sol%nvar
+          call solve(X,U(:,isol),mesh%cell(k)%polCoefT(:,isol))
+       enddo
+    end select
+
     deallocate(stencil,X,U)
 
     return

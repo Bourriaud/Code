@@ -18,7 +18,7 @@ contains
     procedure (quadrature_reconstruction), pointer, intent(in) :: quad_reconstruct
     integer, intent(in) :: neigh
     real(dp), dimension(:), intent(in) :: u
-    type(meshStruct), intent(in) :: mesh
+    type(meshStruct), intent(inout) :: mesh
     type(solStruct), intent(in) :: sol
     character(len=20), intent(in) :: boundtype
     real(dp), dimension(:), intent(in) :: bound
@@ -67,7 +67,7 @@ contains
     case ('PERIODIC')
        allocate(v(size(u)))
        func => evaluate
-       k=abs(neigh)
+       k=abs(neigh)      
        select case (normal)
        case (1)
           call quad_reconstruct(func,mesh,sol,order,quad_c_alpha,3,k,v)

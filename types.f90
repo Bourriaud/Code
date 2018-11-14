@@ -15,15 +15,19 @@ module types
      integer :: dir
      real(dp) :: length
      character(len=20) :: boundType
-     real(dp), dimension(:), allocatable :: bound
+     real(dp), dimension(:), allocatable :: bound,flux
+     integer :: deg
   end type edgeStruct
 
   type :: cellStruct
      real(dp) :: dx,dy
      real(dp) :: xc,yc
-     real(dp), dimension(:,:), allocatable :: polCoef
+     real(dp), dimension(:,:), allocatable :: polCoefL,polCoefB,polCoefR,polCoefT
+     integer, dimension(4) :: corner
      integer, dimension(:), allocatable :: neigh
-     type(edgeStruct), dimension(:), allocatable :: edge
+     integer, dimension(:), allocatable :: edge
+     logical :: accept
+     integer :: deg
   end type cellStruct
   
   type :: meshStruct
@@ -62,7 +66,7 @@ module types
        real(dp), dimension(2), intent(out) :: Smax
      end subroutine sub_speed
 
-     subroutine sub_time (mesh,sol,f_equa,flux,speed,order,cfl,t,tf,quad_c_alpha,quad_reconstruct)
+     subroutine sub_time (mesh,sol,f_equa,flux,speed,order,cfl,t,tf,quad_c_alpha,quad_reconstruct,L_str_criteria,L_var_criteria)
        use constant
        import meshStruct
        import solStruct
@@ -76,6 +80,8 @@ module types
        real(dp), intent(inout) :: t
        procedure (quadrature_c_alpha), pointer, intent(in) :: quad_c_alpha
        procedure (quadrature_reconstruction), pointer, intent(in) :: quad_reconstruct
+       character(len=20), dimension(:), intent(in) :: L_str_criteria
+       integer, dimension(:), intent(in) :: L_var_criteria
      end subroutine sub_time
 
      subroutine sub_quadra_t (x,y,t,s)
@@ -92,17 +98,26 @@ module types
        real(dp), intent(out) :: s
      end subroutine sub_quadra_c_alpha
 
-     subroutine sub_reconstruction (mesh,sol,k,order,quad_c_alpha,x,y,u)
+     subroutine sub_reconstruction (mesh,sol,k,normal,order,quad_c_alpha,x,y,u)
        use constant
        import meshStruct
        import solStruct
        type(meshStruct), intent(in) :: mesh
        type(solStruct), intent(in) :: sol
-       integer, intent(in) :: k,order
+       integer, intent(in) :: k,normal,order
        procedure (quadrature_c_alpha), pointer, intent(in) :: quad_c_alpha
        real(dp), intent(in) :: x,y
        real(dp), dimension(:), intent(inout) :: u
      end subroutine sub_reconstruction
+
+     subroutine sub_criteria(mesh,sol,sol2,k,isol)
+       use constant
+       import meshStruct
+       import solStruct
+       type(meshStruct), intent(inout) :: mesh
+       type(solStruct), intent(in) :: sol,sol2
+       integer, intent(in) :: k,isol
+     end subroutine sub_criteria
 
      subroutine quadrature_t(func,mesh,t,k,int)
        use constant

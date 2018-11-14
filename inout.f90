@@ -8,13 +8,16 @@ module inout
 
 contains
 
-  subroutine init(xL,xR,yL,yR,nx,ny,nvar,cfl,tf,fs,namefile,mesh,sol,str_equa,str_flux,str_time_scheme,order)
+  subroutine init(xL,xR,yL,yR,nx,ny,nvar,cfl,tf,fs,namefile,mesh,sol,str_equa,str_flux, &
+       str_time_scheme,order,L_str_criteria,L_var_criteria)
     real(dp), intent(out) :: xL,xR,yL,yR,cfl,tf
     integer, intent(out) :: nx,ny,nvar,fs,order
     character(len=20), intent(out) :: namefile,str_equa,str_flux,str_time_scheme
     type(meshStruct), intent(out) :: mesh
     type(solStruct), intent(out) :: sol
-    integer :: i
+    character(len=20), dimension(:), allocatable, intent(out) :: L_str_criteria
+    integer, dimension(:), allocatable, intent(out) :: L_var_criteria
+    integer :: i,ncriteria
 
     open(11,file="configuration",form="formatted")
     read(11,*)xL
@@ -29,6 +32,11 @@ contains
     read(11,*)str_flux
     read(11,*)str_time_scheme
     read(11,*)order
+    read(11,*)ncriteria
+    allocate(L_str_criteria(ncriteria),L_var_criteria(ncriteria))
+    do i=1,ncriteria
+       read(11,*)L_str_criteria(i),L_var_criteria(i)
+    enddo
     read(11,*)fs
     read(11,*)namefile
     read(11,*)nvar
@@ -50,6 +58,9 @@ contains
     
     allocate(mesh%node(mesh%np),mesh%edge(mesh%ne),mesh%cell(mesh%nc))
     allocate(sol%val(mesh%nc,sol%nvar),sol%user(mesh%nc,sol%nsolUser))
+    do i=1,mesh%ne
+       allocate(mesh%edge(i)%flux(nvar))
+    enddo
 
     return
   end subroutine init
@@ -165,6 +176,16 @@ contains
 
           allocate(mesh%cell(k)%edge(4),mesh%cell(k)%neigh(8))
 
+          mesh%cell(k)%corner(1)=(j-1)*(nx+1)+i
+          mesh%cell(k)%corner(2)=(j-1)*(nx+1)+i+1
+          mesh%cell(k)%corner(3)=j*(nx+1)+i
+          mesh%cell(k)%corner(4)=j*(nx+1)+i+1
+
+          mesh%cell(k)%edge(1)=k+j-1
+          mesh%cell(k)%edge(2)=(nx+1)*ny+j+(i-1)*(ny+1)
+          mesh%cell(k)%edge(3)=k+j
+          mesh%cell(k)%edge(4)=(nx+1)*ny+j+(i-1)*(ny+1)+1
+          
           mesh%cell(k)%neigh(1)=k-nx-1
           mesh%cell(k)%neigh(2)=k-1
           mesh%cell(k)%neigh(3)=k+nx-1
@@ -173,40 +194,36 @@ contains
           mesh%cell(k)%neigh(6)=k+1
           mesh%cell(k)%neigh(7)=k-nx+1
           mesh%cell(k)%neigh(8)=k-nx
-
-          mesh%cell(k)%edge(1)%node1=(j-1)*(nx+1)+i
-          mesh%cell(k)%edge(1)%node2=j*(nx+1)+i
+          
           if (i==1) then
-             mesh%cell(k)%neigh(1)=-1
-             mesh%cell(k)%neigh(2)=-1
-             mesh%cell(k)%neigh(3)=-1
+             mesh%cell(k)%neigh(1)=-((j-1)*nx)
+             mesh%cell(k)%neigh(2)=-(j*nx)
+             mesh%cell(k)%neigh(3)=-((j+1)*nx)
           endif
 
-          mesh%cell(k)%edge(2)%node1=(j-1)*(nx+1)+i
-          mesh%cell(k)%edge(2)%node2=(j-1)*(nx+1)+i+1
           if (j==1) then
-             mesh%cell(k)%neigh(7)=-1
-             mesh%cell(k)%neigh(8)=-1
-             mesh%cell(k)%neigh(1)=-1
+             mesh%cell(k)%neigh(7)=-(i+(ny-1)*nx+1)
+             mesh%cell(k)%neigh(8)=-(i+(ny-1)*nx)
+             mesh%cell(k)%neigh(1)=-(i+(ny-1)*nx-1)
           endif
           
-          mesh%cell(k)%edge(3)%node1=(j-1)*(nx+1)+i+1
-          mesh%cell(k)%edge(3)%node2=j*(nx+1)+i+1
           if (i==nx) then
-             mesh%cell(k)%neigh(5)=-1
-             mesh%cell(k)%neigh(6)=-1
-             mesh%cell(k)%neigh(7)=-1
+             mesh%cell(k)%neigh(5)=-(j*nx+1)
+             mesh%cell(k)%neigh(6)=-((j-1)*nx+1)
+             mesh%cell(k)%neigh(7)=-((j-2)*nx+1)
           endif
 
-          mesh%cell(k)%edge(4)%node1=j*(nx+1)+i
-          mesh%cell(k)%edge(4)%node2=j*(nx+1)+i+1
           if (j==ny) then
-             mesh%cell(k)%neigh(3)=-1
-             mesh%cell(k)%neigh(4)=-1
-             mesh%cell(k)%neigh(5)=-1
+             mesh%cell(k)%neigh(3)=-(i-1)
+             mesh%cell(k)%neigh(4)=-i
+             mesh%cell(k)%neigh(5)=-(i+1)
           endif
        enddo
     enddo
+    mesh%cell(1)%neigh(1)=-nx*ny
+    mesh%cell(nx*ny)%neigh(5)=-1
+    mesh%cell(nx)%neigh(7)=-((ny-1)*nx+1)
+    mesh%cell((ny-1)*nx+1)%neigh(3)=-nx
 
     !Initialisation des edges
     
@@ -264,10 +281,10 @@ contains
 
     write(11,'(a,i8,i9)')"CELLS ",mesh%nc,5*mesh%nc
     do k=1,mesh%nc
-       i1=mesh%cell(k)%edge(1)%node1-1
-       i2=mesh%cell(k)%edge(3)%node1-1
-       i3=mesh%cell(k)%edge(3)%node2-1
-       i4=mesh%cell(k)%edge(1)%node2-1
+       i1=mesh%edge(mesh%cell(k)%edge(1))%node1-1
+       i2=mesh%edge(mesh%cell(k)%edge(3))%node1-1
+       i3=mesh%edge(mesh%cell(k)%edge(3))%node2-1
+       i4=mesh%edge(mesh%cell(k)%edge(1))%node2-1
        write(11,'(i1,i8,i8,i8,i8)')4,i1,i2,i3,i4
     enddo
 
