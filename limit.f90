@@ -8,10 +8,11 @@ module limit
 
 contains
 
-  subroutine decrement(mesh,sol,soltemp,dt,L_str_criteria,L_var_criteria,NOT_ACCEPTED_CELL,NOT_ACCEPTED_EDGE)
+  subroutine decrement(mesh,sol,soltemp,deg,dt,L_str_criteria,L_var_criteria,NOT_ACCEPTED_CELL,NOT_ACCEPTED_EDGE)
     type(meshStruct), intent(inout) :: mesh
     type(solStruct), intent(in) :: sol
     type(solStruct), intent(inout) :: soltemp
+    integer, intent(in) :: deg
     real(dp), intent(in) :: dt
     integer, dimension(:), intent(in) :: L_var_criteria
     character(len=20), dimension(:), intent(in) :: L_str_criteria
@@ -19,6 +20,7 @@ contains
     integer, dimension(:), allocatable :: NAC,NAE
     integer :: i,j,k,n,isol,nc,ne,cell1,cell2,edge
     procedure (sub_criteria), pointer :: criteria
+    logical :: accept
 
     allocate(NAC(mesh%nc),NAE(mesh%ne))
 
@@ -43,8 +45,8 @@ contains
        
        do i=1,size(NOT_ACCEPTED_CELL)
           k=NOT_ACCEPTED_CELL(i)
-          call criteria(mesh,sol,soltemp,k,isol)
-          if (.not.mesh%cell(k)%accept) then
+          call criteria(mesh,sol,soltemp,k,isol,accept)
+          if (.not.accept) then
              do j=1,size(mesh%cell(k)%edge)
                 edge=mesh%cell(k)%edge(j)
                 cell1=mesh%edge(edge)%cell1
@@ -52,22 +54,22 @@ contains
                 if (all(NAE/=edge)) then
                    ne=ne+1
                    NAE(ne)=edge
-                   if (cell1>0) then
-                      soltemp%val(cell1,:)=soltemp%val(cell1,:)+mesh%edge(edge)%flux(:)*dt/mesh%edge(edge)%length
+                   if (cell1*cell2<0) then
+                      ne=ne+1
+                      NAE(ne)=mesh%edge(edge)%period
                    endif
-                   if (cell2>0) then
-                      soltemp%val(cell2,:)=soltemp%val(cell2,:)-mesh%edge(edge)%flux(:)*dt/mesh%edge(edge)%length
-                   endif
+                   soltemp%val(abs(cell1),:)=soltemp%val(abs(cell1),:)+mesh%edge(edge)%flux(:)*dt/mesh%edge(edge)%length
+                   soltemp%val(abs(cell2),:)=soltemp%val(abs(cell2),:)-mesh%edge(edge)%flux(:)*dt/mesh%edge(edge)%length
                 endif
                 cell1=abs(cell1)
                 cell2=abs(cell2)
                 if (all(NAC/=cell1)) then
-                   mesh%cell(cell1)%deg=0
+                   mesh%cell(cell1)%deg=deg
                    nc=nc+1
                    NAC(nc)=cell1
                 endif
                 if (all(NAC/=cell2)) then
-                   mesh%cell(cell2)%deg=0
+                   mesh%cell(cell2)%deg=deg
                    nc=nc+1
                    NAC(nc)=cell2
                 endif
@@ -76,7 +78,7 @@ contains
        enddo
        
     enddo
-    
+
     deallocate(NOT_ACCEPTED_CELL,NOT_ACCEPTED_EDGE)
     allocate(NOT_ACCEPTED_CELL(nc),NOT_ACCEPTED_EDGE(ne))
 
@@ -88,10 +90,11 @@ contains
     return
   end subroutine decrement
 
-  subroutine DMP(mesh,sol,sol2,k,isol)
+  subroutine DMP(mesh,sol,sol2,k,isol,accept)
     type(meshStruct), intent(inout) :: mesh
     type(solStruct), intent(in) :: sol,sol2
     integer, intent(in) :: k,isol
+    logical, intent(out) :: accept
     integer :: j,neigh
     real(dp) :: min,max
 
@@ -107,16 +110,19 @@ contains
     enddo
 
     if ((sol2%val(k,isol)-min>=-eps).and.(sol2%val(k,isol)-max<=eps)) then
-       mesh%cell(k)%accept=.true.
+       accept=.true.
+    else
+       accept=.false.
     endif
 
     return
   end subroutine DMP
 
-  subroutine DMPu2(mesh,sol,sol2,k,isol)
+  subroutine DMPu2(mesh,sol,sol2,k,isol,accept)
     type(meshStruct), intent(inout) :: mesh
     type(solStruct), intent(in) :: sol,sol2
     integer, intent(in) :: k,isol
+    logical, intent(out) :: accept
     integer :: j,neigh
     real(dp) :: min,max
     logical :: extrema
@@ -133,11 +139,13 @@ contains
     enddo
 
     if ((sol2%val(k,isol)-min>=-eps).and.(sol2%val(k,isol)-max<=eps)) then
-       mesh%cell(k)%accept=.true.
+       accept=.true.
     else
        call u2(mesh,sol2,k,isol,extrema)
        if (extrema) then
-          mesh%cell(k)%accept=.true.
+          accept=.true.
+       else
+          accept=.false.
        endif
     endif
 

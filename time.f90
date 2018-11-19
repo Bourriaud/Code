@@ -49,12 +49,13 @@ contains
     procedure (quadrature_reconstruction), pointer, intent(in) :: quad_reconstruct
     character(len=20), dimension(:), intent(in) :: L_str_criteria
     integer, dimension(:), intent(in) :: L_var_criteria
-    integer :: k,i,j,cell1,cell2,dir,count
+    integer :: k,i,j,cell1,cell2,dir,count,deg
     real(dp), dimension(:), allocatable :: u1,u2
     type(edgeStruct) :: edge
     procedure (sub_reconstruction), pointer :: func
     integer, dimension(:), allocatable :: NOT_ACCEPTED_CELL,NOT_ACCEPTED_EDGE
     type(solStruct) :: soltemp
+    integer, dimension(2) :: L_deg
 
     allocate(u1(sol%nvar),u2(sol%nvar))
     allocate(NOT_ACCEPTED_CELL(mesh%nc),NOT_ACCEPTED_EDGE(mesh%ne),soltemp%val(mesh%nc,sol%nvar))
@@ -64,7 +65,6 @@ contains
     soltemp=sol
     
     do k=1,mesh%nc
-       mesh%cell(k)%accept=.false.
        mesh%cell(k)%deg=order-1
        NOT_ACCEPTED_CELL(k)=k
     enddo
@@ -72,25 +72,21 @@ contains
        NOT_ACCEPTED_EDGE(k)=k
     enddo
 
+    L_deg(1)=1
+    L_deg(2)=0
+    
     count=0
     do while (size(NOT_ACCEPTED_CELL)>0)
        count=count+1
        do i=1,size(NOT_ACCEPTED_EDGE)
           j=NOT_ACCEPTED_EDGE(i)
-          cell1=abs(mesh%edge(j)%cell1)
-          cell2=abs(mesh%edge(j)%cell2)
           dir=mesh%edge(j)%dir
-          mesh%edge(j)%deg=min(mesh%cell(cell1)%deg,mesh%cell(cell2)%deg)
-          call reconstruct(mesh,sol,cell1,dir+2,mesh%edge(j)%deg+1,quad_c_alpha)
-          call reconstruct(mesh,sol,cell2,dir,mesh%edge(j)%deg+1,quad_c_alpha)
-       enddo
-
-       do i=1,size(NOT_ACCEPTED_EDGE)
-          j=NOT_ACCEPTED_EDGE(i)
+          cell1=mesh%edge(j)%cell1
+          cell2=mesh%edge(j)%cell2
+          mesh%edge(j)%deg=min(mesh%cell(abs(cell1))%deg,mesh%cell(abs(cell2))%deg)
           edge=mesh%edge(j)
-          cell1=edge%cell1
-          cell2=edge%cell2
-          dir=edge%dir
+          call reconstruct(mesh,sol,abs(cell1),dir+2,mesh%edge(j)%deg+1,quad_c_alpha)
+          call reconstruct(mesh,sol,abs(cell2),dir,mesh%edge(j)%deg+1,quad_c_alpha)
           if (cell1<0) then
              call quad_reconstruct(func,mesh,sol,edge%deg+1,quad_c_alpha,dir,cell2,u2)
              call boundary(flux,f_equa,quad_c_alpha,quad_reconstruct,cell1, &
@@ -123,17 +119,19 @@ contains
           endif
        enddo
 
-       call decrement(mesh,sol,soltemp,dt,L_str_criteria,L_var_criteria,NOT_ACCEPTED_CELL,NOT_ACCEPTED_EDGE)
+       deg=L_deg(min(count,size(L_deg)))
+       call decrement(mesh,sol,soltemp,deg,dt,L_str_criteria,L_var_criteria,NOT_ACCEPTED_CELL,NOT_ACCEPTED_EDGE)
+
+       !if(count>19)call exit()      
        !print*,NOT_ACCEPTED_CELL
        !print*,"-----------------------------------"
-       !if(count>3)call exit()
 
     enddo
 
     sol2%val=soltemp%val
     
     deallocate(u1,u2,NOT_ACCEPTED_CELL,NOT_ACCEPTED_EDGE,soltemp%val)
-    
+
     return
   end subroutine advance
 

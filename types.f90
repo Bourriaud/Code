@@ -13,6 +13,7 @@ module types
      integer :: node1,node2
      integer :: cell1,cell2
      integer :: dir
+     integer :: period
      real(dp) :: length
      character(len=20) :: boundType
      real(dp), dimension(:), allocatable :: bound,flux
@@ -110,13 +111,14 @@ module types
        real(dp), dimension(:), intent(inout) :: u
      end subroutine sub_reconstruction
 
-     subroutine sub_criteria(mesh,sol,sol2,k,isol)
+     subroutine sub_criteria(mesh,sol,sol2,k,isol,accept)
        use constant
        import meshStruct
        import solStruct
        type(meshStruct), intent(inout) :: mesh
        type(solStruct), intent(in) :: sol,sol2
        integer, intent(in) :: k,isol
+       logical, intent(out) :: accept
      end subroutine sub_criteria
 
      subroutine quadrature_t(func,mesh,t,k,int)

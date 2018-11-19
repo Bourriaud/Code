@@ -37,11 +37,10 @@ program main
   call writeSol(mesh,sol,namefile,0)
   call calculation(mesh,sol,order,cfl,tf,fs,namefile,f_equa,flux,speed,time_scheme, &
        L_str_criteria,L_var_criteria,quad_t,quad_c_alpha,quad_reconstruct)
-  
+
+  call userSol(tf,mesh,sol,quad_t)
   call errorL1(mesh,sol%val(:,2),sol%user(:,1),error)
-  print*, "errorL1 = ",error
   call errorL2(mesh,sol%val(:,2),sol%user(:,1),error)
-  print*, "errorL2 = ",error
   
   deallocate(mesh%node,mesh%edge,mesh%cell,sol%val,sol%user,sol%name,sol%nameUser,L_str_criteria,L_var_criteria)
 
@@ -127,12 +126,13 @@ contains
     
     t=0.0_dp
     n=1
+    call check_conservativity(mesh,sol)
     do while (t<tf)
        call time_scheme(mesh,sol,f_equa,flux,speed,order,cfl,t,tf,quad_c_alpha,quad_reconstruct,L_str_criteria,L_var_criteria)
        if (mod(n,fs)==0) then
           call userSol(t,mesh,sol,quad_t)
           call writeSol(mesh,sol,namefile,n/fs)
-          call print(t,n)
+          call print(mesh,sol,t,n)
        endif
        n=n+1
     enddo

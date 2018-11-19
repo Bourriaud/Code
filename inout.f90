@@ -70,6 +70,11 @@ contains
     real(dp), intent(out) :: s
 
     s=cos((x-5.0_dp)*pi/5.0_dp)+cos((y-5.0_dp)*pi/5.0_dp)
+    if(s>1.5_dp)then
+       s=1.0_dp
+    else
+       s=0.0_dp
+    endif
     
     return
   end subroutine IC_func
@@ -236,9 +241,12 @@ contains
           mesh%edge(k)%cell2=(j-1)*nx+i
           mesh%edge(k)%dir=1
           mesh%edge(k)%length=dy
+          mesh%edge(k)%period=k
        enddo
        mesh%edge((j-1)*(nx+1)+1)%cell1=-j*nx
+       mesh%edge((j-1)*(nx+1)+1)%period=(j-1)*(nx+1)+nx+1
        mesh%edge((j-1)*(nx+1)+nx+1)%cell2=-((j-1)*nx+1)
+       mesh%edge((j-1)*(nx+1)+nx+1)%period=(j-1)*(nx+1)+1
     enddo
     do i=1,nx
        do j=1,ny+1
@@ -249,9 +257,12 @@ contains
           mesh%edge(k)%cell2=i+(j-1)*nx
           mesh%edge(k)%dir=2
           mesh%edge(k)%length=dx
+          mesh%edge(k)%period=k
        enddo
        mesh%edge((i-1)*(ny+1)+1+(nx+1)*ny)%cell1=-(nx*(ny-1)+i)
+       mesh%edge((i-1)*(ny+1)+1+(nx+1)*ny)%period=(i-1)*(ny+1)+ny+1+(nx+1)*ny
        mesh%edge((i-1)*(ny+1)+ny+1+(nx+1)*ny)%cell2=-i
+       mesh%edge((i-1)*(ny+1)+ny+1+(nx+1)*ny)%period=(i-1)*(ny+1)+1+(nx+1)*ny
     enddo
     
     return
@@ -315,11 +326,15 @@ contains
     return
   end subroutine writeSol
 
-  subroutine print(t,n)
+  subroutine print(mesh,sol,t,n)
+    type(meshStruct), intent(in) :: mesh
+    type(solStruct), intent(in) :: sol
     real(dp), intent(in) :: t
     integer, intent(in) :: n
 
     print*,"t=",t,"itération ",n
+    call check_conservativity(mesh,sol)
+    print*,"-----------------------------------------"
     
     return
   end subroutine print

@@ -11,9 +11,9 @@ godunov		flux
 SSPRK3	time scheme
 3	space order
 1	number of detection criterias
-DMPu2 1	detection criteria + variable 1
+DMPu2 2	detection criteria + variable 1
 1	save frequency
-test	namefile
+ordre1	namefile
 2	nvar
 var1	var 1
 var2	var 2

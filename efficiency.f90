@@ -16,6 +16,11 @@ contains
     a2=1.0_dp
 
     s=cos((x-a1*t-5.0_dp)*pi/5.0_dp)+cos((y-a2*t-5.0_dp)*pi/5.0_dp)
+    if(s>1.5_dp)then
+       s=1.0_dp
+    else
+       s=0.0_dp
+    endif
 
     return
   end subroutine exactSol
@@ -64,6 +69,8 @@ contains
        eL1=eL1+abs(sol(k)-exactsol(k))*dx*dy
     enddo
 
+    print*, "errorL1 = ",eL1
+
     return
   end subroutine errorL1
 
@@ -82,8 +89,35 @@ contains
     enddo
     eL2=sqrt(eL2)
 
+    print*, "errorL2 = ",eL2
+
     return
   end subroutine errorL2
+
+  subroutine check_conservativity(mesh,sol)
+    type(meshStruct), intent(in) :: mesh
+    type(solStruct), intent(in) :: sol
+    real(dp) :: dx,dy
+    real(dp), dimension(:), allocatable :: total
+    integer :: isol,k
+
+    allocate(total(sol%nvar))
+    
+    total=0.0_dp
+    do k=1,mesh%nc
+       dx=mesh%cell(k)%dx
+       dy=mesh%cell(k)%dy
+       do isol=1,sol%nvar
+          total(isol)=total(isol)+sol%val(k,isol)*dx*dy
+       enddo
+    enddo
+
+    print*,"Total quantities : ",total
+
+    deallocate(total)
+
+    return
+  end subroutine check_conservativity
 
   subroutine quadrature1_t(func,mesh,t,k,int)
     procedure(sub_quadra_t) :: func

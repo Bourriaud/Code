@@ -38,7 +38,7 @@ reconstruction.o: constant.o types.o efficiency.o
 
 limit.o: constant.o types.o reconstruction.o
 
-test: test.o constant.o reconstruction.o types.o inout.o efficiency.o phys.o FV.o time.o
-	$(F90) -o test test.o reconstruction.o types.o inout.o efficiency.o phys.o FV.o time.o
+test: test.o constant.o reconstruction.o types.o inout.o efficiency.o phys.o FV.o time.o limit.o
+	$(F90) -o test test.o reconstruction.o types.o inout.o efficiency.o phys.o FV.o time.o limit.o
 
-test.o : constant.o reconstruction.o types.o inout.o efficiency.o phys.o FV.o time.o
+test.o : constant.o reconstruction.o types.o inout.o efficiency.o phys.o FV.o time.o limit.o
