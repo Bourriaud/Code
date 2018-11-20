@@ -10,8 +10,7 @@ transport	equation
 godunov		flux
 SSPRK3	time scheme
 3	space order
-1	number of detection criterias
-DMPu2 2	detection criteria + variable 1
+0	number of detection criteriasDMPu2 2	detection criteria + variable 1
 1	save frequency
 ordre1	namefile
 2	nvar

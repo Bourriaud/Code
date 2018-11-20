@@ -37,7 +37,7 @@ contains
     return
   end subroutine compute_timestep
 
-  subroutine advance(mesh,sol,sol2,f_equa,flux,order,dt,quad_c_alpha,quad_reconstruct,L_str_criteria,L_var_criteria)
+  subroutine advance(mesh,sol,sol2,f_equa,flux,order,dt,L_str_criteria,L_var_criteria,gauss_weight)
     type(meshStruct), intent(inout) :: mesh
     type(solStruct), intent(in) :: sol
     type(solStruct), intent(inout) :: sol2
@@ -45,22 +45,19 @@ contains
     procedure (sub_flux), pointer, intent(in) :: flux
     integer, intent(in) :: order
     real(dp), intent(in) :: dt
-    procedure (quadrature_c_alpha), pointer, intent(in) :: quad_c_alpha
-    procedure (quadrature_reconstruction), pointer, intent(in) :: quad_reconstruct
     character(len=20), dimension(:), intent(in) :: L_str_criteria
     integer, dimension(:), intent(in) :: L_var_criteria
-    integer :: k,i,j,cell1,cell2,dir,count,deg
-    real(dp), dimension(:), allocatable :: u1,u2
+    real(dp), dimension(:), intent(in) :: gauss_weight
+    integer :: k,i,j,p,cell1,cell2,dir,count,deg
+    real(dp), dimension(:,:), allocatable :: U1,U2
     type(edgeStruct) :: edge
-    procedure (sub_reconstruction), pointer :: func
     integer, dimension(:), allocatable :: NOT_ACCEPTED_CELL,NOT_ACCEPTED_EDGE
     type(solStruct) :: soltemp
     integer, dimension(2) :: L_deg
 
-    allocate(u1(sol%nvar),u2(sol%nvar))
+    allocate(U1(order,sol%nvar),U2(order,sol%nvar))
     allocate(NOT_ACCEPTED_CELL(mesh%nc),NOT_ACCEPTED_EDGE(mesh%ne),soltemp%val(mesh%nc,sol%nvar))
     
-    func => evaluate
     sol2=sol
     soltemp=sol
     
@@ -85,24 +82,30 @@ contains
           cell2=mesh%edge(j)%cell2
           mesh%edge(j)%deg=min(mesh%cell(abs(cell1))%deg,mesh%cell(abs(cell2))%deg)
           edge=mesh%edge(j)
-          call reconstruct(mesh,sol,abs(cell1),dir+2,mesh%edge(j)%deg+1,quad_c_alpha)
-          call reconstruct(mesh,sol,abs(cell2),dir,mesh%edge(j)%deg+1,quad_c_alpha)
+          call reconstruct(mesh,sol,abs(cell1),mesh%edge(j)%deg+1,gauss_weight)
+          call reconstruct(mesh,sol,abs(cell2),mesh%edge(j)%deg+1,gauss_weight)
           if (cell1<0) then
-             call quad_reconstruct(func,mesh,sol,edge%deg+1,quad_c_alpha,dir,cell2,u2)
-             call boundary(flux,f_equa,quad_c_alpha,quad_reconstruct,cell1, &
-                  u2,mesh,sol,edge%boundType,edge%bound,dir,edge%deg+1,mesh%edge(j)%flux(:))
-             soltemp%val(cell2,:)=soltemp%val(cell2,:)+mesh%edge(j)%flux(:)*dt/edge%length
+             call evaluate(mesh,sol,cell2,order,gauss_weight,edge%X_gauss,edge%Y_gauss,U2)
+             call boundary(flux,f_equa,gauss_weight,cell1, &
+                  U2(:,:),mesh,sol,j,edge%boundType,edge%bound,dir,edge%deg+1,mesh%edge(j)%flux(:,:))
+             do p=1,order
+                soltemp%val(cell2,:)=soltemp%val(cell2,:)+gauss_weight(p)*mesh%edge(j)%flux(p,:)*dt/(mesh%edge(j)%length*2.0_dp)
+             enddo
           elseif (cell2<0) then
-             call quad_reconstruct(func,mesh,sol,edge%deg+1,quad_c_alpha,dir+2,cell1,u1)
-             call boundary(flux,f_equa,quad_c_alpha,quad_reconstruct,cell2, &
-                  u1,mesh,sol,edge%boundType,edge%bound,dir+2,edge%deg+1,mesh%edge(j)%flux(:))
-             soltemp%val(cell1,:)=soltemp%val(cell1,:)-mesh%edge(j)%flux(:)*dt/edge%length
+             call evaluate(mesh,sol,cell1,order,gauss_weight,edge%X_gauss,edge%Y_gauss,U1)
+             call boundary(flux,f_equa,gauss_weight,cell2, &
+                  U1(:,:),mesh,sol,j,edge%boundType,edge%bound,dir+2,edge%deg+1,mesh%edge(j)%flux(:,:))
+             do p=1,order
+                soltemp%val(cell1,:)=soltemp%val(cell1,:)-gauss_weight(p)*mesh%edge(j)%flux(p,:)*dt/(mesh%edge(j)%length*2.0_dp)
+             enddo
           else
-             call quad_reconstruct(func,mesh,sol,edge%deg+1,quad_c_alpha,dir+2,cell1,u1)
-             call quad_reconstruct(func,mesh,sol,edge%deg+1,quad_c_alpha,dir,cell2,u2)
-             call flux(u1,u2,f_equa,dir,mesh%edge(j)%flux(:))
-             soltemp%val(cell1,:)=soltemp%val(cell1,:)-mesh%edge(j)%flux(:)*dt/edge%length
-             soltemp%val(cell2,:)=soltemp%val(cell2,:)+mesh%edge(j)%flux(:)*dt/edge%length
+             call evaluate(mesh,sol,cell1,order,gauss_weight,edge%X_gauss,edge%Y_gauss,U1)
+             call evaluate(mesh,sol,cell2,order,gauss_weight,edge%X_gauss,edge%Y_gauss,U2)
+             do p=1,order
+                call flux(U1(p,:),U2(p,:),f_equa,dir,mesh%edge(j)%flux(p,:))
+                soltemp%val(cell1,:)=soltemp%val(cell1,:)-gauss_weight(p)*mesh%edge(j)%flux(p,:)*dt/(mesh%edge(j)%length*2.0_dp)
+                soltemp%val(cell2,:)=soltemp%val(cell2,:)+gauss_weight(p)*mesh%edge(j)%flux(p,:)*dt/(mesh%edge(j)%length*2.0_dp)
+             enddo
           endif
        enddo
 
@@ -110,17 +113,15 @@ contains
           cell1=mesh%edge(NOT_ACCEPTED_EDGE(k))%cell1
           cell2=mesh%edge(NOT_ACCEPTED_EDGE(k))%cell2
           if (cell2>0) then
-             if(allocated(mesh%cell(cell2)%polCoefL))deallocate(mesh%cell(cell2)%polCoefL)
-             if(allocated(mesh%cell(cell2)%polCoefB))deallocate(mesh%cell(cell2)%polCoefB)
+             if(allocated(mesh%cell(cell2)%polCoef))deallocate(mesh%cell(cell2)%polCoef)
           endif
           if (cell1>0) then
-             if(allocated(mesh%cell(cell1)%polCoefR))deallocate(mesh%cell(cell1)%polCoefR)
-             if(allocated(mesh%cell(cell1)%polCoefT))deallocate(mesh%cell(cell1)%polCoefT)
+             if(allocated(mesh%cell(cell1)%polCoef))deallocate(mesh%cell(cell1)%polCoef)
           endif
        enddo
 
        deg=L_deg(min(count,size(L_deg)))
-       call decrement(mesh,sol,soltemp,deg,dt,L_str_criteria,L_var_criteria,NOT_ACCEPTED_CELL,NOT_ACCEPTED_EDGE)
+       call decrement(mesh,sol,soltemp,deg,dt,L_str_criteria,L_var_criteria,gauss_weight,NOT_ACCEPTED_CELL,NOT_ACCEPTED_EDGE)
 
        !if(count>19)call exit()      
        !print*,NOT_ACCEPTED_CELL
@@ -129,13 +130,12 @@ contains
     enddo
 
     sol2%val=soltemp%val
-    
     deallocate(u1,u2,NOT_ACCEPTED_CELL,NOT_ACCEPTED_EDGE,soltemp%val)
 
     return
   end subroutine advance
 
-  subroutine euler_exp(mesh,sol,f_equa,flux,speed,order,cfl,t,tf,quad_c_alpha,quad_reconstruct,L_str_criteria,L_var_criteria)
+  subroutine euler_exp(mesh,sol,f_equa,flux,speed,order,cfl,t,tf,L_str_criteria,L_var_criteria,gauss_weight)
     type(meshStruct), intent(inout) :: mesh
     type(solStruct), intent(inout) :: sol
     procedure (sub_f), pointer, intent(in) :: f_equa
@@ -144,10 +144,9 @@ contains
     integer, intent(in) :: order
     real(dp), intent(in) :: cfl,tf
     real(dp), intent(inout) :: t
-    procedure (quadrature_c_alpha), pointer, intent(in) :: quad_c_alpha
-    procedure (quadrature_reconstruction), pointer, intent(in) :: quad_reconstruct
     character(len=20), dimension(:), intent(in) :: L_str_criteria
     integer, dimension(:), intent(in) :: L_var_criteria
+    real(dp), dimension(:), intent(in) :: gauss_weight
     type(solStruct) :: sol1
     real(dp) :: dt
 
@@ -156,7 +155,7 @@ contains
 
     call compute_timestep(mesh,sol,f_equa,speed,cfl,tf,t,dt)
 
-    call advance(mesh,sol,sol1,f_equa,flux,order,dt,quad_c_alpha,quad_reconstruct,L_str_criteria,L_var_criteria)
+    call advance(mesh,sol,sol1,f_equa,flux,order,dt,L_str_criteria,L_var_criteria,gauss_weight)
     sol%val=sol1%val
 
     t=t+dt
@@ -166,7 +165,7 @@ contains
     return
   end subroutine euler_exp
 
-  subroutine SSPRK2(mesh,sol,f_equa,flux,speed,order,cfl,t,tf,quad_c_alpha,quad_reconstruct,L_str_criteria,L_var_criteria)
+  subroutine SSPRK2(mesh,sol,f_equa,flux,speed,order,cfl,t,tf,L_str_criteria,L_var_criteria,gauss_weight)
     type(meshStruct), intent(inout) :: mesh
     type(solStruct), intent(inout) :: sol
     procedure (sub_f), pointer, intent(in) :: f_equa
@@ -175,10 +174,9 @@ contains
     integer, intent(in) :: order
     real(dp), intent(in) :: cfl,tf
     real(dp), intent(inout) :: t
-    procedure (quadrature_c_alpha), pointer, intent(in) :: quad_c_alpha
-    procedure (quadrature_reconstruction), pointer, intent(in) :: quad_reconstruct
     character(len=20), dimension(:), intent(in) :: L_str_criteria
     integer, dimension(:), intent(in) :: L_var_criteria
+    real(dp), dimension(:), intent(in) :: gauss_weight
     type(solStruct) :: sol1,sol2
     real(dp) :: dt
 
@@ -188,8 +186,8 @@ contains
 
     call compute_timestep(mesh,sol,f_equa,speed,cfl,tf,t,dt)
 
-    call advance(mesh,sol,sol1,f_equa,flux,order,dt,quad_c_alpha,quad_reconstruct,L_str_criteria,L_var_criteria)
-    call advance(mesh,sol1,sol2,f_equa,flux,order,dt,quad_c_alpha,quad_reconstruct,L_str_criteria,L_var_criteria)
+    call advance(mesh,sol,sol1,f_equa,flux,order,dt,L_str_criteria,L_var_criteria,gauss_weight)
+    call advance(mesh,sol1,sol2,f_equa,flux,order,dt,L_str_criteria,L_var_criteria,gauss_weight)
     sol%val=0.5_dp*(sol%val+sol2%val)
 
     t=t+dt
@@ -199,7 +197,7 @@ contains
     return
   end subroutine SSPRK2
 
-  subroutine SSPRK3(mesh,sol,f_equa,flux,speed,order,cfl,t,tf,quad_c_alpha,quad_reconstruct,L_str_criteria,L_var_criteria)
+  subroutine SSPRK3(mesh,sol,f_equa,flux,speed,order,cfl,t,tf,L_str_criteria,L_var_criteria,gauss_weight)
     type(meshStruct), intent(inout) :: mesh
     type(solStruct), intent(inout) :: sol
     procedure (sub_f), pointer, intent(in) :: f_equa
@@ -208,10 +206,9 @@ contains
     integer, intent(in) :: order
     real(dp), intent(in) :: cfl,tf
     real(dp), intent(inout) :: t
-    procedure (quadrature_c_alpha), pointer, intent(in) :: quad_c_alpha
-    procedure (quadrature_reconstruction), pointer, intent(in) :: quad_reconstruct
     character(len=20), dimension(:), intent(in) :: L_str_criteria
     integer, dimension(:), intent(in) :: L_var_criteria
+    real(dp), dimension(:), intent(in) :: gauss_weight
     type(solStruct) :: sol1,sol2,sol3
     real(dp) :: dt
 
@@ -222,10 +219,10 @@ contains
 
     call compute_timestep(mesh,sol,f_equa,speed,cfl,tf,t,dt)
 
-    call advance(mesh,sol,sol1,f_equa,flux,order,dt,quad_c_alpha,quad_reconstruct,L_str_criteria,L_var_criteria)
-    call advance(mesh,sol1,sol2,f_equa,flux,order,dt,quad_c_alpha,quad_reconstruct,L_str_criteria,L_var_criteria)
+    call advance(mesh,sol,sol1,f_equa,flux,order,dt,L_str_criteria,L_var_criteria,gauss_weight)
+    call advance(mesh,sol1,sol2,f_equa,flux,order,dt,L_str_criteria,L_var_criteria,gauss_weight)
     sol2%val=0.75_dp*sol%val+0.25_dp*sol2%val    
-    call advance(mesh,sol2,sol3,f_equa,flux,order,dt,quad_c_alpha,quad_reconstruct,L_str_criteria,L_var_criteria)
+    call advance(mesh,sol2,sol3,f_equa,flux,order,dt,L_str_criteria,L_var_criteria,gauss_weight)
     sol%val=1.0_dp/3.0_dp*sol%val+2.0_dp/3.0_dp*sol3%val
 
     t=t+dt

@@ -8,7 +8,7 @@ module limit
 
 contains
 
-  subroutine decrement(mesh,sol,soltemp,deg,dt,L_str_criteria,L_var_criteria,NOT_ACCEPTED_CELL,NOT_ACCEPTED_EDGE)
+  subroutine decrement(mesh,sol,soltemp,deg,dt,L_str_criteria,L_var_criteria,gauss_weight,NOT_ACCEPTED_CELL,NOT_ACCEPTED_EDGE)
     type(meshStruct), intent(inout) :: mesh
     type(solStruct), intent(in) :: sol
     type(solStruct), intent(inout) :: soltemp
@@ -16,9 +16,10 @@ contains
     real(dp), intent(in) :: dt
     integer, dimension(:), intent(in) :: L_var_criteria
     character(len=20), dimension(:), intent(in) :: L_str_criteria
+    real(dp), dimension(:), intent(in) :: gauss_weight
     integer, dimension(:), allocatable, intent(inout) :: NOT_ACCEPTED_CELL,NOT_ACCEPTED_EDGE
     integer, dimension(:), allocatable :: NAC,NAE
-    integer :: i,j,k,n,isol,nc,ne,cell1,cell2,edge
+    integer :: i,j,k,n,p,isol,nc,ne,cell1,cell2,edge
     procedure (sub_criteria), pointer :: criteria
     logical :: accept
 
@@ -45,7 +46,7 @@ contains
        
        do i=1,size(NOT_ACCEPTED_CELL)
           k=NOT_ACCEPTED_CELL(i)
-          call criteria(mesh,sol,soltemp,k,isol,accept)
+          call criteria(mesh,sol,soltemp,k,isol,gauss_weight,accept)
           if (.not.accept) then
              do j=1,size(mesh%cell(k)%edge)
                 edge=mesh%cell(k)%edge(j)
@@ -58,8 +59,12 @@ contains
                       ne=ne+1
                       NAE(ne)=mesh%edge(edge)%period
                    endif
-                   soltemp%val(abs(cell1),:)=soltemp%val(abs(cell1),:)+mesh%edge(edge)%flux(:)*dt/mesh%edge(edge)%length
-                   soltemp%val(abs(cell2),:)=soltemp%val(abs(cell2),:)-mesh%edge(edge)%flux(:)*dt/mesh%edge(edge)%length
+                   do p=1,deg+1
+                      soltemp%val(abs(cell1),:)=soltemp%val(abs(cell1),:)+ &
+                           gauss_weight(p)*mesh%edge(edge)%flux(p,:)*dt/(mesh%edge(j)%length*2.0_dp)
+                      soltemp%val(abs(cell2),:)=soltemp%val(abs(cell2),:)- &
+                           gauss_weight(p)*mesh%edge(edge)%flux(p,:)*dt/(mesh%edge(j)%length*2.0_dp)
+                   enddo
                 endif
                 cell1=abs(cell1)
                 cell2=abs(cell2)
@@ -90,10 +95,11 @@ contains
     return
   end subroutine decrement
 
-  subroutine DMP(mesh,sol,sol2,k,isol,accept)
+  subroutine DMP(mesh,sol,sol2,k,isol,gauss_weight,accept)
     type(meshStruct), intent(inout) :: mesh
     type(solStruct), intent(in) :: sol,sol2
     integer, intent(in) :: k,isol
+    real(dp), dimension(:), intent(in) :: gauss_weight
     logical, intent(out) :: accept
     integer :: j,neigh
     real(dp) :: min,max
@@ -118,10 +124,11 @@ contains
     return
   end subroutine DMP
 
-  subroutine DMPu2(mesh,sol,sol2,k,isol,accept)
+  subroutine DMPu2(mesh,sol,sol2,k,isol,gauss_weight,accept)
     type(meshStruct), intent(inout) :: mesh
     type(solStruct), intent(in) :: sol,sol2
     integer, intent(in) :: k,isol
+    real(dp), dimension(:), intent(in) :: gauss_weight
     logical, intent(out) :: accept
     integer :: j,neigh
     real(dp) :: min,max
@@ -141,7 +148,7 @@ contains
     if ((sol2%val(k,isol)-min>=-eps).and.(sol2%val(k,isol)-max<=eps)) then
        accept=.true.
     else
-       call u2(mesh,sol2,k,isol,extrema)
+       call u2(mesh,sol2,k,isol,gauss_weight,extrema)
        if (extrema) then
           accept=.true.
        else
@@ -152,41 +159,39 @@ contains
     return
   end subroutine DMPu2
 
-  subroutine u2(mesh,sol,k,isol,extrema)
+  subroutine u2(mesh,sol,k,isol,gauss_weight,extrema)
     type(meshStruct), intent(inout) :: mesh
     type(solStruct), intent(in) :: sol
     integer, intent(in) :: k,isol
+    real(dp), dimension(:), intent(in) :: gauss_weight
+    logical, intent(out) :: extrema
     integer :: j,neigh
     real(dp) :: Xmin,Xmax,Ymin,Ymax
-    logical :: extrema
-    procedure (quadrature_c_alpha), pointer :: quad_c_alpha
 
-    quad_c_alpha => quadrature3_c_alpha
-
-    call reconstruct(mesh,sol,k,1,3,quad_c_alpha)
+    call reconstruct(mesh,sol,k,3,gauss_weight)
     do j=1,size(mesh%cell(k)%neigh)
        neigh=mesh%cell(k)%neigh(j)
        if (neigh>0) then
-          call reconstruct(mesh,sol,neigh,1,3,quad_c_alpha)
+          call reconstruct(mesh,sol,neigh,3,gauss_weight)
        endif
     enddo
 
-    Xmin=mesh%cell(k)%polCoefL(5,isol)
-    Xmax=mesh%cell(k)%polCoefL(5,isol)
-    Ymin=mesh%cell(k)%polCoefL(3,isol)
-    Ymax=mesh%cell(k)%polCoefL(3,isol)
+    Xmin=mesh%cell(k)%polCoef(5,isol)
+    Xmax=mesh%cell(k)%polCoef(5,isol)
+    Ymin=mesh%cell(k)%polCoef(3,isol)
+    Ymax=mesh%cell(k)%polCoef(3,isol)
     do j=1,size(mesh%cell(k)%neigh)
        neigh=mesh%cell(k)%neigh(j)
        if (neigh>0) then
-          if (mesh%cell(neigh)%polCoefL(5,isol)<Xmin) then
-             Xmin=mesh%cell(neigh)%polCoefL(5,isol)
-          else if (mesh%cell(neigh)%polCoefL(5,isol)>Xmax) then
-             Xmax=mesh%cell(neigh)%polCoefL(5,isol)
+          if (mesh%cell(neigh)%polCoef(5,isol)<Xmin) then
+             Xmin=mesh%cell(neigh)%polCoef(5,isol)
+          else if (mesh%cell(neigh)%polCoef(5,isol)>Xmax) then
+             Xmax=mesh%cell(neigh)%polCoef(5,isol)
           endif
-          if (mesh%cell(neigh)%polCoefL(3,isol)<Ymin) then
-             Ymin=mesh%cell(neigh)%polCoefL(3,isol)
-          else if (mesh%cell(neigh)%polCoefL(3,isol)>Ymax) then
-             Ymax=mesh%cell(neigh)%polCoefL(3,isol)
+          if (mesh%cell(neigh)%polCoef(3,isol)<Ymin) then
+             Ymin=mesh%cell(neigh)%polCoef(3,isol)
+          else if (mesh%cell(neigh)%polCoef(3,isol)>Ymax) then
+             Ymax=mesh%cell(neigh)%polCoef(3,isol)
           endif
        endif
     enddo
@@ -197,11 +202,11 @@ contains
        extrema=.false.
     endif
 
-    deallocate(mesh%cell(k)%polCoefL)
+    deallocate(mesh%cell(k)%polCoef)
     do j=1,size(mesh%cell(k)%neigh)
        neigh=mesh%cell(k)%neigh(j)
        if (neigh>0) then
-          deallocate(mesh%cell(neigh)%polCoefL)
+          deallocate(mesh%cell(neigh)%polCoef)
        endif
     enddo
 

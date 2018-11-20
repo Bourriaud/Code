@@ -11,78 +11,93 @@ module FV
   
 contains
 
-  subroutine boundary(flux,f_equa,quad_c_alpha,quad_reconstruct,neigh,u,mesh,sol,boundtype,bound,normal,order,F)
+  subroutine boundary(flux,f_equa,gauss_weight,neigh,U,mesh,sol,edge,boundtype,bound,normal,order,F)
     procedure (sub_flux), pointer, intent(in) :: flux
     procedure (sub_f), pointer, intent(in) :: f_equa
-    procedure (quadrature_c_alpha), pointer, intent(in) :: quad_c_alpha
-    procedure (quadrature_reconstruction), pointer, intent(in) :: quad_reconstruct
-    integer, intent(in) :: neigh
-    real(dp), dimension(:), intent(in) :: u
+    real(dp), dimension(:), intent(in) :: gauss_weight
+    integer, intent(in) :: neigh,edge
+    real(dp), dimension(:,:), intent(in) :: U   !U(gauss_point,var)
     type(meshStruct), intent(inout) :: mesh
     type(solStruct), intent(in) :: sol
     character(len=20), intent(in) :: boundtype
     real(dp), dimension(:), intent(in) :: bound
     integer, intent(in) :: normal      !1=left 2=bottom 3=right 4=top
     integer, intent(in) :: order
-    real(dp), dimension(:), intent(inout) :: F
-    real(dp), dimension(:), allocatable :: v
-    integer :: k
-    procedure (sub_reconstruction), pointer :: func
+    real(dp), dimension(:,:), intent(inout) :: F   !F(gauss_point,var)
+    real(dp), dimension(:,:), allocatable :: V
+    integer :: k,p,period
 
     select case (trim(boundtype))
     case ('DIRICHLET')
        select case (normal)
        case (1)
-          call flux(bound,u,f_equa,1,F)
+          do p=1,order
+             call flux(bound,U(p,:),f_equa,1,F(p,:))
+          enddo
        case (2)
-          call flux(bound,u,f_equa,2,F)
+          do p=1,order
+             call flux(bound,U(p,:),f_equa,2,F(p,:))
+          enddo
        case (3)
-          call flux(u,bound,f_equa,1,F)
+          do p=1,order
+             call flux(U(p,:),bound,f_equa,1,F(p,:))
+          enddo
        case (4)
-          call flux(u,bound,f_equa,2,F)
+          do p=1,order
+             call flux(U(p,:),bound,f_equa,2,F(p,:))
+          enddo
        end select
        
     case ('TRANSMISSIVE')
-       call flux(u,u,f_equa,normal,F)
+       do p=1,order
+          call flux(U(p,:),U(p,:),f_equa,normal,F(p,:))
+       enddo
        
     case ('WALL')
-       allocate(v(size(u)))
-       v=u
-       select case (normal)
-       case (1)
-          v(2)=-u(2)
-          call flux(v,u,f_equa,1,F)
-       case (2)
-          v(3)=-u(3)
-          call flux(v,u,f_equa,2,F)
-       case (3)
-          v(2)=-u(2)
-          call flux(u,v,f_equa,1,F)
-       case (4)
-          v(3)=-u(3)
-          call flux(u,v,f_equa,2,F)
-       end select
-       deallocate(v)
+       allocate(V(order,sol%nvar))
+       V=U
+       do p=1,order
+          select case (normal)
+          case (1)
+             V(p,2)=-U(p,2)
+             call flux(V(p,:),U(p,:),f_equa,1,F(p,:))
+          case (2)
+             V(p,3)=-U(p,3)
+             call flux(V(p,:),U(p,:),f_equa,2,F(p,:))
+          case (3)
+             V(p,2)=-U(p,2)
+             call flux(U(p,:),V(p,:),f_equa,1,F(p,:))
+          case (4)
+             V(p,3)=-U(p,3)
+             call flux(U(p,:),V(p,:),f_equa,2,F(p,:))
+          end select
+       enddo
+       deallocate(V)
 
     case ('PERIODIC')
-       allocate(v(size(u)))
-       func => evaluate
-       k=abs(neigh)      
+       allocate(V(order,sol%nvar))
+       k=abs(neigh)
+       period=mesh%edge(edge)%period
+       call evaluate(mesh,sol,k,order,gauss_weight,mesh%edge(period)%X_gauss,mesh%edge(period)%Y_gauss,V)
        select case (normal)
        case (1)
-          call quad_reconstruct(func,mesh,sol,order,quad_c_alpha,3,k,v)
-          call flux(v,u,f_equa,1,F)
+          do p=1,order
+             call flux(V(p,:),U(p,:),f_equa,1,F(p,:))
+          enddo
        case (2)
-          call quad_reconstruct(func,mesh,sol,order,quad_c_alpha,4,k,v)
-          call flux(v,u,f_equa,2,F)
+          do p=1,order
+             call flux(V(p,:),U(p,:),f_equa,2,F(p,:))
+          enddo
        case (3)
-          call quad_reconstruct(func,mesh,sol,order,quad_c_alpha,1,k,v)
-          call flux(u,v,f_equa,1,F)
+          do p=1,order
+             call flux(U(p,:),V(p,:),f_equa,1,F(p,:))
+          enddo
        case (4)
-          call quad_reconstruct(func,mesh,sol,order,quad_c_alpha,2,k,v)
-          call flux(u,v,f_equa,2,F)
+          do p=1,order
+             call flux(U(p,:),V(p,:),f_equa,2,F(p,:))
+          enddo
        end select
-       deallocate(v)
+       deallocate(V)
        
     case default
        print*,"Boundary condition ",trim(boundtype)," not implemented"

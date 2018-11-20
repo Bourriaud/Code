@@ -9,7 +9,7 @@ module inout
 contains
 
   subroutine init(xL,xR,yL,yR,nx,ny,nvar,cfl,tf,fs,namefile,mesh,sol,str_equa,str_flux, &
-       str_time_scheme,order,L_str_criteria,L_var_criteria)
+       str_time_scheme,order,L_str_criteria,L_var_criteria,gauss_point,gauss_weight)
     real(dp), intent(out) :: xL,xR,yL,yR,cfl,tf
     integer, intent(out) :: nx,ny,nvar,fs,order
     character(len=20), intent(out) :: namefile,str_equa,str_flux,str_time_scheme
@@ -17,6 +17,7 @@ contains
     type(solStruct), intent(out) :: sol
     character(len=20), dimension(:), allocatable, intent(out) :: L_str_criteria
     integer, dimension(:), allocatable, intent(out) :: L_var_criteria
+    real(dp), dimension(:), allocatable, intent(out) :: gauss_point,gauss_weight
     integer :: i,ncriteria
 
     open(11,file="configuration",form="formatted")
@@ -59,32 +60,57 @@ contains
     allocate(mesh%node(mesh%np),mesh%edge(mesh%ne),mesh%cell(mesh%nc))
     allocate(sol%val(mesh%nc,sol%nvar),sol%user(mesh%nc,sol%nsolUser))
     do i=1,mesh%ne
-       allocate(mesh%edge(i)%flux(nvar))
+       allocate(mesh%edge(i)%flux(order,nvar))
     enddo
+
+    allocate(gauss_point(order),gauss_weight(order))
+    select case (order)
+    case (1)
+       gauss_point=gauss_point1
+       gauss_weight=gauss_weight1
+    case(2)
+       gauss_point=gauss_point2
+       gauss_weight=gauss_weight2
+    case(3)
+       gauss_point=gauss_point3
+       gauss_weight=gauss_weight3
+    case(4)
+       gauss_point=gauss_point4
+       gauss_weight=gauss_weight4
+    case(5)
+       gauss_point=gauss_point5
+       gauss_weight=gauss_weight5
+    case(6)
+       gauss_point=gauss_point5
+       gauss_weight=gauss_weight5
+    case default
+       print*,"Space order too high, no good enough quadrature implemented"
+       call exit()
+    end select
 
     return
   end subroutine init
 
-  subroutine IC_func(x,y,t,s)
-    real(dp), intent(in) :: x,y,t
+  subroutine IC_func(x,y,s)
+    real(dp), intent(in) :: x,y
     real(dp), intent(out) :: s
 
     s=cos((x-5.0_dp)*pi/5.0_dp)+cos((y-5.0_dp)*pi/5.0_dp)
-    if(s>1.5_dp)then
-       s=1.0_dp
-    else
-       s=0.0_dp
-    endif
+    !if(s>1.5_dp)then
+       !s=1.0_dp
+    !else
+       !s=0.0_dp
+    !endif
     
     return
   end subroutine IC_func
   
-  subroutine IC(mesh,sol,quad_t)
+  subroutine IC(mesh,sol,gauss_weight)
     type(meshStruct), intent(in) :: mesh
     type(solStruct), intent(inout) :: sol
-    procedure (quadrature_t), pointer, intent(in) :: quad_t
-    integer :: k
-    real(dp) :: x,y,dx,dy,rho
+    real(dp), dimension(:), intent(in) :: gauss_weight
+    integer :: k,p1,p2
+    real(dp) :: x,y,dx,dy,rho,s
     !real(dp) :: u,v,p,gamma
 
     !gamma=1.4_dp
@@ -93,8 +119,13 @@ contains
        y=mesh%cell(k)%yc
        dx=mesh%cell(k)%dx
        dy=mesh%cell(k)%dy
-       call quad_t(IC_func,mesh,0.0_dp,k,rho)
-       rho=rho/(dx*dy)
+       rho=0.0_dp
+       do p1=1,size(mesh%cell(k)%X_gauss)
+          do p2=1,size(mesh%cell(k)%Y_gauss)
+             call IC_func(mesh%cell(k)%X_gauss(p1),mesh%cell(k)%Y_gauss(p2),s)
+             rho=rho+s*gauss_weight(p1)*gauss_weight(p2)/4.0_dp
+          enddo
+       enddo
        sol%val(k,1)=rho
        sol%val(k,2)=rho
        !sol%val(k,3)=rho*v
@@ -132,12 +163,14 @@ contains
     return   
   end subroutine BC
   
-  subroutine buildMesh(xL,xR,yL,yR,nx,ny,mesh)
+  subroutine buildMesh(xL,xR,yL,yR,nx,ny,gauss_point,mesh)
     real(dp), intent(in) :: xL,xR,yL,yR
     integer, intent(in) :: nx,ny
+    real(dp), dimension(:), intent(in) :: gauss_point
     type(meshStruct), intent(inout) :: mesh
-    integer :: i,j,k
-    real(dp) :: dx,dy
+    integer :: i,j,k,p,dir
+    real(dp) :: dx,dy,a,b,c,center,diff,xc,yc
+    type(edgeStruct) :: edge
 
     dx=(xR-xL)/nx
     dy=(yR-yL)/ny
@@ -180,6 +213,7 @@ contains
           mesh%cell(k)%yc=yL+j*dy-dy/2.0_dp
 
           allocate(mesh%cell(k)%edge(4),mesh%cell(k)%neigh(8))
+          allocate(mesh%cell(k)%X_gauss(size(gauss_point)),mesh%cell(k)%Y_gauss(size(gauss_point)))
 
           mesh%cell(k)%corner(1)=(j-1)*(nx+1)+i
           mesh%cell(k)%corner(2)=(j-1)*(nx+1)+i+1
@@ -199,6 +233,13 @@ contains
           mesh%cell(k)%neigh(6)=k+1
           mesh%cell(k)%neigh(7)=k-nx+1
           mesh%cell(k)%neigh(8)=k-nx
+
+          xc=mesh%cell(k)%xc
+          yc=mesh%cell(k)%yc
+          do p=1,size(gauss_point)
+             mesh%cell(k)%X_gauss(p)=xc+dx*gauss_point(p)/2.0_dp
+             mesh%cell(k)%Y_gauss(p)=yc+dy*gauss_point(p)/2.0_dp
+          enddo
           
           if (i==1) then
              mesh%cell(k)%neigh(1)=-((j-1)*nx)
@@ -263,6 +304,34 @@ contains
        mesh%edge((i-1)*(ny+1)+1+(nx+1)*ny)%period=(i-1)*(ny+1)+ny+1+(nx+1)*ny
        mesh%edge((i-1)*(ny+1)+ny+1+(nx+1)*ny)%cell2=-i
        mesh%edge((i-1)*(ny+1)+ny+1+(nx+1)*ny)%period=(i-1)*(ny+1)+1+(nx+1)*ny
+    enddo
+
+    do i=1,mesh%ne
+       edge=mesh%edge(i)
+       dir=edge%dir
+       allocate(mesh%edge(i)%X_gauss(size(gauss_point)),mesh%edge(i)%Y_gauss(size(gauss_point)))
+       select case (dir)
+       case(1)
+          a=mesh%node(edge%node1)%y
+          b=mesh%node(edge%node2)%y
+          c=mesh%node(edge%node1)%x
+          center=(a+b)/2.0_dp
+          diff=(b-a)/2.0_dp
+          do p=1,size(gauss_point)
+             mesh%edge(i)%X_gauss(p)=c
+             mesh%edge(i)%Y_gauss(p)=center+diff*gauss_point(p)
+          enddo
+       case(2)
+          a=mesh%node(edge%node1)%x
+          b=mesh%node(edge%node2)%x
+          c=mesh%node(edge%node1)%y
+          center=(a+b)/2.0_dp
+          diff=(b-a)/2.0_dp
+          do p=1,size(gauss_point)
+             mesh%edge(i)%X_gauss(p)=center+diff*gauss_point(p)
+             mesh%edge(i)%Y_gauss(p)=c
+          enddo
+       end select
     enddo
     
     return
