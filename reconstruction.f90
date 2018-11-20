@@ -8,13 +8,14 @@ module reconstruction
 
 contains
   
-  subroutine evaluate(mesh,sol,k,order,gauss_weight,X,Y,U)
+  subroutine evaluate(mesh,sol,k,order,gauss_weight,x,y,u)
     type(meshStruct), intent(in) :: mesh
     type(solStruct), intent(in) :: sol
     integer, intent(in) :: k,order
-    real(dp), dimension(:), intent(in) :: gauss_weight,X,Y
-    real(dp), dimension(:,:), intent(inout) :: U   !U(p,var)
-    integer :: i1,i2,i,d,isol,p
+    real(dp), dimension(:), intent(in) :: gauss_weight
+    real(dp), intent(in) :: x,y
+    real(dp), dimension(:), intent(inout) :: u
+    integer :: i1,i2,i,d,isol
     real(dp) :: xc,yc,Kk,intk
     real(dp), dimension(2) :: c
     integer, dimension(2) :: alpha    
@@ -30,9 +31,7 @@ contains
     Kk=mesh%cell(k)%dx*mesh%cell(k)%dy
     d=order-1
     
-    do p=1,order
-       u(p,:)=sol%val(k,:)
-    enddo
+    u(:)=sol%val(k,:)
     i=1
 
     do i2=1,d
@@ -41,9 +40,7 @@ contains
           alpha(2)=i2
           call quad_monome(mesh,c,alpha,k,gauss_weight,intk)
           do isol=1,sol%nvar
-             do p=1,order
-                u(p,isol)=u(p,isol)+pol(i,isol)*((X(p)-xc)**alpha(1)*(Y(p)-yc)**alpha(2)-intk)
-             enddo
+             u(isol)=u(isol)+pol(i,isol)*((x-xc)**alpha(1)*(y-yc)**alpha(2)-intk)
           enddo
           i=i+1
        enddo
@@ -54,9 +51,7 @@ contains
        alpha(2)=0
        call quad_monome(mesh,c,alpha,k,gauss_weight,intk)
        do isol=1,sol%nvar
-          do p=1,order
-             u(p,isol)=u(p,isol)+pol(i,isol)*((X(p)-xc)**alpha(1)*(Y(p)-yc)**alpha(2)-intk)
-          enddo
+          u(isol)=u(isol)+pol(i,isol)*((x-xc)**alpha(1)*(y-yc)**alpha(2)-intk)
        enddo
        i=i+1
     enddo

@@ -11,93 +11,73 @@ module FV
   
 contains
 
-  subroutine boundary(flux,f_equa,gauss_weight,neigh,U,mesh,sol,edge,boundtype,bound,normal,order,F)
+  subroutine boundary(flux,f_equa,gauss_weight,neigh,u,mesh,sol,edge,p,boundtype,bound,normal,order,F)
     procedure (sub_flux), pointer, intent(in) :: flux
     procedure (sub_f), pointer, intent(in) :: f_equa
     real(dp), dimension(:), intent(in) :: gauss_weight
-    integer, intent(in) :: neigh,edge
-    real(dp), dimension(:,:), intent(in) :: U   !U(gauss_point,var)
+    integer, intent(in) :: neigh,edge,p
+    real(dp), dimension(:), intent(in) :: u
     type(meshStruct), intent(inout) :: mesh
     type(solStruct), intent(in) :: sol
     character(len=20), intent(in) :: boundtype
     real(dp), dimension(:), intent(in) :: bound
     integer, intent(in) :: normal      !1=left 2=bottom 3=right 4=top
     integer, intent(in) :: order
-    real(dp), dimension(:,:), intent(inout) :: F   !F(gauss_point,var)
-    real(dp), dimension(:,:), allocatable :: V
-    integer :: k,p,period
+    real(dp), dimension(:), intent(inout) :: F
+    real(dp), dimension(:), allocatable :: v
+    integer :: k,period
 
     select case (trim(boundtype))
     case ('DIRICHLET')
        select case (normal)
        case (1)
-          do p=1,order
-             call flux(bound,U(p,:),f_equa,1,F(p,:))
-          enddo
+          call flux(bound,u,f_equa,1,F)
        case (2)
-          do p=1,order
-             call flux(bound,U(p,:),f_equa,2,F(p,:))
-          enddo
+          call flux(bound,u,f_equa,2,F)
        case (3)
-          do p=1,order
-             call flux(U(p,:),bound,f_equa,1,F(p,:))
-          enddo
+          call flux(bound,u,f_equa,1,F)
        case (4)
-          do p=1,order
-             call flux(U(p,:),bound,f_equa,2,F(p,:))
-          enddo
+          call flux(bound,u,f_equa,2,F)
        end select
        
     case ('TRANSMISSIVE')
-       do p=1,order
-          call flux(U(p,:),U(p,:),f_equa,normal,F(p,:))
-       enddo
+       call flux(u,u,f_equa,normal,F)
        
     case ('WALL')
-       allocate(V(order,sol%nvar))
-       V=U
-       do p=1,order
-          select case (normal)
-          case (1)
-             V(p,2)=-U(p,2)
-             call flux(V(p,:),U(p,:),f_equa,1,F(p,:))
-          case (2)
-             V(p,3)=-U(p,3)
-             call flux(V(p,:),U(p,:),f_equa,2,F(p,:))
-          case (3)
-             V(p,2)=-U(p,2)
-             call flux(U(p,:),V(p,:),f_equa,1,F(p,:))
-          case (4)
-             V(p,3)=-U(p,3)
-             call flux(U(p,:),V(p,:),f_equa,2,F(p,:))
-          end select
-       enddo
-       deallocate(V)
-
-    case ('PERIODIC')
-       allocate(V(order,sol%nvar))
-       k=abs(neigh)
-       period=mesh%edge(edge)%period
-       call evaluate(mesh,sol,k,order,gauss_weight,mesh%edge(period)%X_gauss,mesh%edge(period)%Y_gauss,V)
+       allocate(v(sol%nvar))
+       v=u
        select case (normal)
        case (1)
-          do p=1,order
-             call flux(V(p,:),U(p,:),f_equa,1,F(p,:))
-          enddo
+          v(2)=-u(2)
+          call flux(v,u,f_equa,1,F)
        case (2)
-          do p=1,order
-             call flux(V(p,:),U(p,:),f_equa,2,F(p,:))
-          enddo
+          v(3)=-u(3)
+          call flux(v,u,f_equa,2,F)
        case (3)
-          do p=1,order
-             call flux(U(p,:),V(p,:),f_equa,1,F(p,:))
-          enddo
+          v(2)=-u(2)
+          call flux(u,v,f_equa,1,F)
        case (4)
-          do p=1,order
-             call flux(U(p,:),V(p,:),f_equa,2,F(p,:))
-          enddo
+          v(3)=-u(3)
+          call flux(u,v,f_equa,2,F)
        end select
-       deallocate(V)
+       deallocate(v)
+
+    case ('PERIODIC')
+       allocate(v(sol%nvar))
+       k=abs(neigh)
+       period=mesh%edge(edge)%period
+       call evaluate(mesh,sol,k,order,gauss_weight,mesh%edge(period)%X_gauss(p),mesh%edge(period)%Y_gauss(p),v)
+       select case (normal)
+       case (1)
+          call flux(v,u,f_equa,1,F)
+       case (2)
+          call flux(v,u,f_equa,2,F)
+       case (3)
+          call flux(u,v,f_equa,1,F)
+       case (4)
+          call flux(u,v,f_equa,2,F)
+       end select
+       deallocate(v)
        
     case default
        print*,"Boundary condition ",trim(boundtype)," not implemented"

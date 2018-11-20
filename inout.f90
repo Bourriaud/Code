@@ -310,6 +310,8 @@ contains
        edge=mesh%edge(i)
        dir=edge%dir
        allocate(mesh%edge(i)%X_gauss(size(gauss_point)),mesh%edge(i)%Y_gauss(size(gauss_point)))
+       allocate(mesh%edge(i)%flux_acc(size(gauss_point)))
+       mesh%edge(i)%flux_acc=.false.
        select case (dir)
        case(1)
           a=mesh%node(edge%node1)%y

@@ -29,7 +29,7 @@ contains
     ne=0
     NAC=0
     NAE=0
-    
+
     do n=1,size(L_str_criteria)
        
        isol=L_var_criteria(n)
@@ -43,7 +43,7 @@ contains
           print*,trim(L_str_criteria(n))," criteria not implemented"
           call exit()
        end select
-       
+
        do i=1,size(NOT_ACCEPTED_CELL)
           k=NOT_ACCEPTED_CELL(i)
           call criteria(mesh,sol,soltemp,k,isol,gauss_weight,accept)
@@ -59,11 +59,14 @@ contains
                       ne=ne+1
                       NAE(ne)=mesh%edge(edge)%period
                    endif
-                   do p=1,deg+1
-                      soltemp%val(abs(cell1),:)=soltemp%val(abs(cell1),:)+ &
-                           gauss_weight(p)*mesh%edge(edge)%flux(p,:)*dt/(mesh%edge(j)%length*2.0_dp)
-                      soltemp%val(abs(cell2),:)=soltemp%val(abs(cell2),:)- &
-                           gauss_weight(p)*mesh%edge(edge)%flux(p,:)*dt/(mesh%edge(j)%length*2.0_dp)
+                   do p=1,size(gauss_weight)
+                      call criteria_flux(mesh%edge(edge)%flux(p,:),mesh%edge(edge)%flux_acc(p))
+                      if (.not.mesh%edge(edge)%flux_acc(p)) then
+                         soltemp%val(abs(cell1),:)=soltemp%val(abs(cell1),:)+ &
+                              gauss_weight(p)*mesh%edge(edge)%flux(p,:)*dt/(mesh%edge(edge)%length*2.0_dp)
+                         soltemp%val(abs(cell2),:)=soltemp%val(abs(cell2),:)- &
+                              gauss_weight(p)*mesh%edge(edge)%flux(p,:)*dt/(mesh%edge(edge)%length*2.0_dp)
+                      endif
                    enddo
                 endif
                 cell1=abs(cell1)
@@ -81,7 +84,7 @@ contains
              enddo
           endif
        enddo
-       
+
     enddo
 
     deallocate(NOT_ACCEPTED_CELL,NOT_ACCEPTED_EDGE)
@@ -212,5 +215,14 @@ contains
 
     return
   end subroutine u2
+
+  subroutine criteria_flux(flux,accept)
+    real(dp), dimension(:), intent(in) :: flux
+    logical, intent(out) :: accept
+
+    accept=.false.
+    
+    return
+  end subroutine criteria_flux
     
 end module limit

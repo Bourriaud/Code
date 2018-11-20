@@ -19,6 +19,7 @@ module types
      real(dp), dimension(:), allocatable :: bound
      real(dp), dimension(:), allocatable :: X_gauss,Y_gauss
      real(dp), dimension(:,:), allocatable :: flux   !flux(gauss_point,var)
+     logical, dimension(:), allocatable :: flux_acc
      integer :: deg
   end type edgeStruct
 
