@@ -3,7 +3,7 @@ module constant
   implicit none
 
   integer, parameter :: dp=8
-  real(dp), parameter :: eps=10.0_dp**(-2.0_dp*dp+1)
+  real(dp), parameter :: eps=(1.0e1_dp)**(-2*dp+1)
   real(dp), parameter :: pi=4.0_dp*atan(1.0_dp)
   real(dp), dimension(1), parameter :: gauss_point1=(/0.0_dp/)
   real(dp), dimension(1), parameter :: gauss_weight1=(/2.0_dp/)

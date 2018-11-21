@@ -37,13 +37,13 @@ contains
     return
   end subroutine compute_timestep
 
-  subroutine advance(mesh,sol,sol2,f_equa,flux,order,dt,L_str_criteria,L_var_criteria,gauss_weight)
+  subroutine advance(mesh,sol,sol2,f_equa,flux,order,dt,n,L_str_criteria,L_var_criteria,gauss_weight)
     type(meshStruct), intent(inout) :: mesh
     type(solStruct), intent(in) :: sol
     type(solStruct), intent(inout) :: sol2
     procedure (sub_f), pointer, intent(in) :: f_equa
     procedure (sub_flux), pointer, intent(in) :: flux
-    integer, intent(in) :: order
+    integer, intent(in) :: order,n
     real(dp), intent(in) :: dt
     character(len=20), dimension(:), intent(in) :: L_str_criteria
     integer, dimension(:), intent(in) :: L_var_criteria
@@ -69,7 +69,7 @@ contains
        NOT_ACCEPTED_EDGE(k)=k
     enddo
 
-    L_deg(1)=1
+    L_deg(1)=0
     L_deg(2)=0
     
     count=0
@@ -118,13 +118,14 @@ contains
              if(allocated(mesh%cell(cell1)%polCoef))deallocate(mesh%cell(cell1)%polCoef)
           endif
        enddo
-
+       
        deg=L_deg(min(count,size(L_deg)))
        call decrement(mesh,sol,soltemp,deg,dt,L_str_criteria,L_var_criteria,gauss_weight,NOT_ACCEPTED_CELL,NOT_ACCEPTED_EDGE)
 
-       !if(count>5)call exit()      
-       !print*,NOT_ACCEPTED_CELL
+       !if(count>10)call exit()
+       !print*,size(NOT_ACCEPTED_CELL)
        !print*,"-----------------------------------"
+       !call write_accept(mesh,sol,NOT_ACCEPTED_CELL,n,count)
 
     enddo
 
@@ -134,13 +135,13 @@ contains
     return
   end subroutine advance
 
-  subroutine euler_exp(mesh,sol,f_equa,flux,speed,order,cfl,t,tf,L_str_criteria,L_var_criteria,gauss_weight)
+  subroutine euler_exp(mesh,sol,f_equa,flux,speed,order,cfl,t,n,tf,L_str_criteria,L_var_criteria,gauss_weight)
     type(meshStruct), intent(inout) :: mesh
     type(solStruct), intent(inout) :: sol
     procedure (sub_f), pointer, intent(in) :: f_equa
     procedure (sub_flux), pointer, intent(in) :: flux
     procedure (sub_speed), pointer, intent(in) :: speed
-    integer, intent(in) :: order
+    integer, intent(in) :: order,n
     real(dp), intent(in) :: cfl,tf
     real(dp), intent(inout) :: t
     character(len=20), dimension(:), intent(in) :: L_str_criteria
@@ -154,7 +155,7 @@ contains
 
     call compute_timestep(mesh,sol,f_equa,speed,cfl,tf,t,dt)
 
-    call advance(mesh,sol,sol1,f_equa,flux,order,dt,L_str_criteria,L_var_criteria,gauss_weight)
+    call advance(mesh,sol,sol1,f_equa,flux,order,dt,n,L_str_criteria,L_var_criteria,gauss_weight)
     sol%val=sol1%val
 
     t=t+dt
@@ -164,13 +165,13 @@ contains
     return
   end subroutine euler_exp
 
-  subroutine SSPRK2(mesh,sol,f_equa,flux,speed,order,cfl,t,tf,L_str_criteria,L_var_criteria,gauss_weight)
+  subroutine SSPRK2(mesh,sol,f_equa,flux,speed,order,cfl,t,n,tf,L_str_criteria,L_var_criteria,gauss_weight)
     type(meshStruct), intent(inout) :: mesh
     type(solStruct), intent(inout) :: sol
     procedure (sub_f), pointer, intent(in) :: f_equa
     procedure (sub_flux), pointer, intent(in) :: flux
     procedure (sub_speed), pointer, intent(in) :: speed
-    integer, intent(in) :: order
+    integer, intent(in) :: order,n
     real(dp), intent(in) :: cfl,tf
     real(dp), intent(inout) :: t
     character(len=20), dimension(:), intent(in) :: L_str_criteria
@@ -185,8 +186,8 @@ contains
 
     call compute_timestep(mesh,sol,f_equa,speed,cfl,tf,t,dt)
 
-    call advance(mesh,sol,sol1,f_equa,flux,order,dt,L_str_criteria,L_var_criteria,gauss_weight)
-    call advance(mesh,sol1,sol2,f_equa,flux,order,dt,L_str_criteria,L_var_criteria,gauss_weight)
+    call advance(mesh,sol,sol1,f_equa,flux,order,dt,n,L_str_criteria,L_var_criteria,gauss_weight)
+    call advance(mesh,sol1,sol2,f_equa,flux,order,dt,n,L_str_criteria,L_var_criteria,gauss_weight)
     sol%val=0.5_dp*(sol%val+sol2%val)
 
     t=t+dt
@@ -196,13 +197,13 @@ contains
     return
   end subroutine SSPRK2
 
-  subroutine SSPRK3(mesh,sol,f_equa,flux,speed,order,cfl,t,tf,L_str_criteria,L_var_criteria,gauss_weight)
+  subroutine SSPRK3(mesh,sol,f_equa,flux,speed,order,cfl,t,n,tf,L_str_criteria,L_var_criteria,gauss_weight)
     type(meshStruct), intent(inout) :: mesh
     type(solStruct), intent(inout) :: sol
     procedure (sub_f), pointer, intent(in) :: f_equa
     procedure (sub_flux), pointer, intent(in) :: flux
     procedure (sub_speed), pointer, intent(in) :: speed
-    integer, intent(in) :: order
+    integer, intent(in) :: order,n
     real(dp), intent(in) :: cfl,tf
     real(dp), intent(inout) :: t
     character(len=20), dimension(:), intent(in) :: L_str_criteria
@@ -218,10 +219,10 @@ contains
 
     call compute_timestep(mesh,sol,f_equa,speed,cfl,tf,t,dt)
 
-    call advance(mesh,sol,sol1,f_equa,flux,order,dt,L_str_criteria,L_var_criteria,gauss_weight)
-    call advance(mesh,sol1,sol2,f_equa,flux,order,dt,L_str_criteria,L_var_criteria,gauss_weight)
+    call advance(mesh,sol,sol1,f_equa,flux,order,dt,n,L_str_criteria,L_var_criteria,gauss_weight)
+    call advance(mesh,sol1,sol2,f_equa,flux,order,dt,n,L_str_criteria,L_var_criteria,gauss_weight)
     sol2%val=0.75_dp*sol%val+0.25_dp*sol2%val    
-    call advance(mesh,sol2,sol3,f_equa,flux,order,dt,L_str_criteria,L_var_criteria,gauss_weight)
+    call advance(mesh,sol2,sol3,f_equa,flux,order,dt,n,L_str_criteria,L_var_criteria,gauss_weight)
     sol%val=1.0_dp/3.0_dp*sol%val+2.0_dp/3.0_dp*sol3%val
 
     t=t+dt

@@ -17,6 +17,7 @@ contains
     integer, dimension(:), intent(in) :: L_var_criteria
     character(len=20), dimension(:), intent(in) :: L_str_criteria
     real(dp), dimension(:), intent(in) :: gauss_weight
+    type(solStruct) :: sol2
     integer, dimension(:), allocatable, intent(inout) :: NOT_ACCEPTED_CELL,NOT_ACCEPTED_EDGE
     integer, dimension(:), allocatable :: NAC,NAE
     integer :: i,j,k,n,p,isol,nc,ne,cell1,cell2,edge
@@ -29,6 +30,7 @@ contains
     ne=0
     NAC=0
     NAE=0
+    sol2=soltemp
 
     do n=1,size(L_str_criteria)
        
@@ -46,7 +48,7 @@ contains
 
        do i=1,size(NOT_ACCEPTED_CELL)
           k=NOT_ACCEPTED_CELL(i)
-          call criteria(mesh,sol,soltemp,k,isol,gauss_weight,accept)
+          call criteria(mesh,sol,sol2,k,isol,gauss_weight,accept)
           if (.not.accept) then
              do j=1,size(mesh%cell(k)%edge)
                 edge=mesh%cell(k)%edge(j)
@@ -105,20 +107,21 @@ contains
     real(dp), dimension(:), intent(in) :: gauss_weight
     logical, intent(out) :: accept
     integer :: j,neigh
-    real(dp) :: min,max
+    real(dp) :: mini,maxi,eps2
 
-    min=sol%val(k,isol)
-    max=sol%val(k,isol)
+    mini=sol%val(k,isol)
+    maxi=sol%val(k,isol)
     do j=1,size(mesh%cell(k)%neigh)
        neigh=abs(mesh%cell(k)%neigh(j))
-       if (sol%val(neigh,isol)<min) then
-          min=sol%val(neigh,isol)
-       else if (sol%val(neigh,isol)>max) then
-          max=sol%val(neigh,isol)
+       if (sol%val(neigh,isol)<mini) then
+          mini=sol%val(neigh,isol)
+       else if (sol%val(neigh,isol)>maxi) then
+          maxi=sol%val(neigh,isol)
        endif
     enddo
 
-    if ((sol2%val(k,isol)-min>=-eps).and.(sol2%val(k,isol)-max<=eps)) then
+    eps2=max((maxi-mini)*1.0e-6_dp,eps)
+    if ((sol2%val(k,isol)-mini>=-eps2).and.(sol2%val(k,isol)-maxi<=eps2)) then
        accept=.true.
     else
        accept=.false.
@@ -134,21 +137,22 @@ contains
     real(dp), dimension(:), intent(in) :: gauss_weight
     logical, intent(out) :: accept
     integer :: j,neigh
-    real(dp) :: min,max
+    real(dp) :: mini,maxi,eps2
     logical :: extrema
 
-    min=sol%val(k,isol)
-    max=sol%val(k,isol)
+    mini=sol%val(k,isol)
+    maxi=sol%val(k,isol)
     do j=1,size(mesh%cell(k)%neigh)
        neigh=abs(mesh%cell(k)%neigh(j))
-       if (sol%val(neigh,isol)<min) then
-          min=sol%val(neigh,isol)
-       else if (sol%val(neigh,isol)>max) then
-          max=sol%val(neigh,isol)
+       if (sol%val(neigh,isol)<mini) then
+          mini=sol%val(neigh,isol)
+       else if (sol%val(neigh,isol)>maxi) then
+          maxi=sol%val(neigh,isol)
        endif
     enddo
 
-    if ((sol2%val(k,isol)-min>=-eps).and.(sol2%val(k,isol)-max<=eps)) then
+    eps2=max((maxi-mini)*1.0e-6_dp,eps)
+    if ((sol2%val(k,isol)-mini>=-eps2).and.(sol2%val(k,isol)-maxi<=eps2)) then
        accept=.true.
     else
        call u2(mesh,sol2,k,isol,gauss_weight,extrema)
@@ -199,10 +203,14 @@ contains
        endif
     enddo
 
-    if ((Xmin/Xmax>0.5_dp).and.(Ymin/Ymax>0.5_dp)) then
+    if (Xmax==0.0_dp) then
        extrema=.true.
     else
-       extrema=.false.
+       if ((Xmin/Xmax>0.5_dp).and.(Ymin/Ymax>0.5_dp)) then
+          extrema=.true.
+       else
+          extrema=.false.
+       endif
     endif
 
     deallocate(mesh%cell(k)%polCoef)

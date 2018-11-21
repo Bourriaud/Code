@@ -111,7 +111,7 @@ contains
     n=1
     call check_conservativity(mesh,sol)
     do while (t<tf)
-       call time_scheme(mesh,sol,f_equa,flux,speed,order,cfl,t,tf,L_str_criteria,L_var_criteria,gauss_weight)
+       call time_scheme(mesh,sol,f_equa,flux,speed,order,cfl,t,n,tf,L_str_criteria,L_var_criteria,gauss_weight)
        if (mod(n,fs)==0) then
           call userSol(t,mesh,sol,gauss_weight)
           call writeSol(mesh,sol,namefile,n/fs)

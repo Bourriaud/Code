@@ -96,11 +96,11 @@ contains
     real(dp), intent(out) :: s
 
     s=cos((x-5.0_dp)*pi/5.0_dp)+cos((y-5.0_dp)*pi/5.0_dp)
-    !if(s>1.5_dp)then
-       !s=1.0_dp
-    !else
-       !s=0.0_dp
-    !endif
+    if(s>1.5_dp)then
+       s=1.0_dp
+    else
+       s=0.0_dp
+    endif
     
     return
   end subroutine IC_func
@@ -380,7 +380,11 @@ contains
        write(11,'(a,a,a)')"SCALARS ",sol%name(n)," float 1"
        write(11,'(a)')"LOOKUP_TABLE default"
        do k=1,mesh%nc
-          write(11,'(e15.8)')sol%val(k,n)
+          if (abs(sol%val(k,n))>10.0**(-dp)) then
+             write(11,'(e15.8)')sol%val(k,n)
+          else
+             write(11,'(e15.8)')0.0_dp
+          endif
        enddo
     enddo
     
@@ -409,5 +413,57 @@ contains
     
     return
   end subroutine print
+
+  subroutine write_accept(mesh,sol,NOT_ACCEPTED_CELL,n,count)
+    type(meshStruct), intent(in) :: mesh
+    type(solStruct), intent(in) :: sol
+    integer, dimension(:), intent(in) :: NOT_ACCEPTED_CELL
+    integer, intent(in) :: n,count
+    integer :: k
+    integer :: i1,i2,i3,i4
+    character(len=34) :: completenamefile
+
+    write(completenamefile,'(A,A,I3.3,I3.3,A)')'./results/','accept',n,count,'.vtk'
+    open(11,file=completenamefile,form="formatted")
+    
+    write(11,'(a)')"# vtk DataFile Version 2.0"
+    write(11,'(a)')"Results of the calculation"
+    write(11,'(a)')"ASCII"
+    write(11,'(a)')"DATASET UNSTRUCTURED_GRID"
+    
+    write(11,'(a,i8,a)')"POINTS ",mesh%np," float"
+    do k=1,mesh%np
+       write(11,'(e15.8,a,e15.8,a,e15.8)')mesh%node(k)%x," ",mesh%node(k)%y," ",0.0_dp
+    enddo
+
+    write(11,'(a,i8,i9)')"CELLS ",mesh%nc,5*mesh%nc
+    do k=1,mesh%nc
+       i1=mesh%edge(mesh%cell(k)%edge(1))%node1-1
+       i2=mesh%edge(mesh%cell(k)%edge(3))%node1-1
+       i3=mesh%edge(mesh%cell(k)%edge(3))%node2-1
+       i4=mesh%edge(mesh%cell(k)%edge(1))%node2-1
+       write(11,'(i1,i8,i8,i8,i8)')4,i1,i2,i3,i4
+    enddo
+
+    write(11,'(a,i8)')"CELL_TYPES ",mesh%nc
+    do k=1,mesh%nc
+       write(11,'(i1)')9
+    enddo
+    
+    write(11,'(a,i8)')"CELL_DATA ",mesh%nc
+    write(11,'(a,a,a)')"SCALARS ","accept"," float 1"
+    write(11,'(a)')"LOOKUP_TABLE default"
+    do k=1,mesh%nc
+       if (all(k/=NOT_ACCEPTED_CELL)) then
+          write(11,'(e15.8)')0.0_dp
+       else
+          write(11,'(e15.8)')1.0_dp
+       endif
+    enddo
+    
+    close(11)
+    
+    return
+  end subroutine write_accept
 
 end module inout

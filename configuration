@@ -2,8 +2,8 @@
 10.	xR
 0.	yL
 10.	yR
-40	nx
-40	ny
+80	nx
+80	ny
 0.95	cfl
 1.	tf
 transport	equation
@@ -13,7 +13,7 @@ SSPRK3	time scheme
 1	number of detection criterias
 DMPu2 2	detection criteria + variable 1
 1	save frequency
-ordre1	namefile
+nolimit	namefile
 2	nvar
 var1	var 1
 var2	var 2

@@ -16,11 +16,11 @@ contains
     a2=1.0_dp
 
     s=cos((x-a1*t-5.0_dp)*pi/5.0_dp)+cos((y-a2*t-5.0_dp)*pi/5.0_dp)
-    !if(s>1.5_dp)then
-       !s=1.0_dp
-    !else
-       !s=0.0_dp
-    !endif
+    if(s>1.5_dp)then
+       s=1.0_dp
+    else
+       s=0.0_dp
+    endif
 
     return
   end subroutine exactSol

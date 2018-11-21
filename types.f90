@@ -71,7 +71,7 @@ module types
        real(dp), dimension(2), intent(out) :: Smax
      end subroutine sub_speed
 
-     subroutine sub_time (mesh,sol,f_equa,flux,speed,order,cfl,t,tf,L_str_criteria,L_var_criteria,gauss_weight)
+     subroutine sub_time (mesh,sol,f_equa,flux,speed,order,cfl,t,n,tf,L_str_criteria,L_var_criteria,gauss_weight)
        use constant
        import meshStruct
        import solStruct
@@ -80,7 +80,7 @@ module types
        procedure (sub_f), pointer, intent(in) :: f_equa
        procedure (sub_flux), pointer, intent(in) :: flux
        procedure (sub_speed), pointer, intent(in) :: speed
-       integer, intent(in) :: order
+       integer, intent(in) :: order,n
        real(dp), intent(in) :: cfl,tf
        real(dp), intent(inout) :: t
        character(len=20), dimension(:), intent(in) :: L_str_criteria
