@@ -11,12 +11,11 @@ godunov		flux
 SSPRK3	time scheme
 3	space order
 1	number of detection criterias
-DMPu2 2	detection criteria + variable 1
+DMPu2 1 1.0e-4	detection criteria + variable 1 + sensibility
 1	save frequency
 nolimit	namefile
-2	nvar
+1	nvar
 var1	var 1
-var2	var 2
 2	nsolUser
 SolAnal	userSol 1
 Error	userSol 2

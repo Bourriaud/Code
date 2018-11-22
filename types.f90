@@ -71,7 +71,8 @@ module types
        real(dp), dimension(2), intent(out) :: Smax
      end subroutine sub_speed
 
-     subroutine sub_time (mesh,sol,f_equa,flux,speed,order,cfl,t,n,tf,L_str_criteria,L_var_criteria,gauss_weight)
+     subroutine sub_time (mesh,sol,f_equa,flux,speed,order,cfl,t,n,tf, &
+          L_str_criteria,L_var_criteria,L_eps,gauss_weight)
        use constant
        import meshStruct
        import solStruct
@@ -85,16 +86,18 @@ module types
        real(dp), intent(inout) :: t
        character(len=20), dimension(:), intent(in) :: L_str_criteria
        integer, dimension(:), intent(in) :: L_var_criteria
+       real(dp), dimension(:), intent(in) :: L_eps
        real(dp), dimension(:), intent(in) :: gauss_weight
      end subroutine sub_time
 
-     subroutine sub_criteria(mesh,sol,sol2,k,isol,gauss_weight,accept)
+     subroutine sub_criteria(mesh,sol,sol2,k,isol,eps,gauss_weight,accept)
        use constant
        import meshStruct
        import solStruct
        type(meshStruct), intent(inout) :: mesh
        type(solStruct), intent(in) :: sol,sol2
        integer, intent(in) :: k,isol
+       real(dp), intent(in) :: eps
        real(dp), dimension(:), intent(in) :: gauss_weight
        logical, intent(out) :: accept
      end subroutine sub_criteria

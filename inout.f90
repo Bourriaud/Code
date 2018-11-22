@@ -9,7 +9,7 @@ module inout
 contains
 
   subroutine init(xL,xR,yL,yR,nx,ny,nvar,cfl,tf,fs,namefile,mesh,sol,str_equa,str_flux, &
-       str_time_scheme,order,L_str_criteria,L_var_criteria,gauss_point,gauss_weight)
+       str_time_scheme,order,L_str_criteria,L_var_criteria,L_eps,gauss_point,gauss_weight)
     real(dp), intent(out) :: xL,xR,yL,yR,cfl,tf
     integer, intent(out) :: nx,ny,nvar,fs,order
     character(len=20), intent(out) :: namefile,str_equa,str_flux,str_time_scheme
@@ -17,6 +17,7 @@ contains
     type(solStruct), intent(out) :: sol
     character(len=20), dimension(:), allocatable, intent(out) :: L_str_criteria
     integer, dimension(:), allocatable, intent(out) :: L_var_criteria
+    real(dp), dimension(:), allocatable, intent(out) :: L_eps
     real(dp), dimension(:), allocatable, intent(out) :: gauss_point,gauss_weight
     integer :: i,ncriteria
 
@@ -34,9 +35,9 @@ contains
     read(11,*)str_time_scheme
     read(11,*)order
     read(11,*)ncriteria
-    allocate(L_str_criteria(ncriteria),L_var_criteria(ncriteria))
+    allocate(L_str_criteria(ncriteria),L_var_criteria(ncriteria),L_eps(ncriteria))
     do i=1,ncriteria
-       read(11,*)L_str_criteria(i),L_var_criteria(i)
+       read(11,*)L_str_criteria(i),L_var_criteria(i),L_eps(i)
     enddo
     read(11,*)fs
     read(11,*)namefile
@@ -127,7 +128,7 @@ contains
           enddo
        enddo
        sol%val(k,1)=rho
-       sol%val(k,2)=rho
+       !sol%val(k,2)=rho*u
        !sol%val(k,3)=rho*v
        !sol%val(k,4)=rho*0.5*(u**2+v**2)+p/(gamma-1)
     enddo

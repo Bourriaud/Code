@@ -8,7 +8,7 @@ module limit
 
 contains
 
-  subroutine decrement(mesh,sol,soltemp,deg,dt,L_str_criteria,L_var_criteria,gauss_weight,NOT_ACCEPTED_CELL,NOT_ACCEPTED_EDGE)
+  subroutine decrement(mesh,sol,soltemp,deg,dt,L_str_criteria,L_var_criteria,L_eps,gauss_weight,NOT_ACCEPTED_CELL,NOT_ACCEPTED_EDGE)
     type(meshStruct), intent(inout) :: mesh
     type(solStruct), intent(in) :: sol
     type(solStruct), intent(inout) :: soltemp
@@ -16,6 +16,7 @@ contains
     real(dp), intent(in) :: dt
     integer, dimension(:), intent(in) :: L_var_criteria
     character(len=20), dimension(:), intent(in) :: L_str_criteria
+    real(dp), dimension(:), intent(in) :: L_eps
     real(dp), dimension(:), intent(in) :: gauss_weight
     type(solStruct) :: sol2
     integer, dimension(:), allocatable, intent(inout) :: NOT_ACCEPTED_CELL,NOT_ACCEPTED_EDGE
@@ -48,7 +49,7 @@ contains
 
        do i=1,size(NOT_ACCEPTED_CELL)
           k=NOT_ACCEPTED_CELL(i)
-          call criteria(mesh,sol,sol2,k,isol,gauss_weight,accept)
+          call criteria(mesh,sol,sol2,k,isol,L_eps(n),gauss_weight,accept)
           if (.not.accept) then
              do j=1,size(mesh%cell(k)%edge)
                 edge=mesh%cell(k)%edge(j)
@@ -100,14 +101,15 @@ contains
     return
   end subroutine decrement
 
-  subroutine DMP(mesh,sol,sol2,k,isol,gauss_weight,accept)
+  subroutine DMP(mesh,sol,sol2,k,isol,eps,gauss_weight,accept)
     type(meshStruct), intent(inout) :: mesh
     type(solStruct), intent(in) :: sol,sol2
     integer, intent(in) :: k,isol
+    real(dp), intent(in) :: eps
     real(dp), dimension(:), intent(in) :: gauss_weight
     logical, intent(out) :: accept
     integer :: j,neigh
-    real(dp) :: mini,maxi,eps2
+    real(dp) :: mini,maxi
 
     mini=sol%val(k,isol)
     maxi=sol%val(k,isol)
@@ -120,8 +122,7 @@ contains
        endif
     enddo
 
-    eps2=max((maxi-mini)*1.0e-6_dp,eps)
-    if ((sol2%val(k,isol)-mini>=-eps2).and.(sol2%val(k,isol)-maxi<=eps2)) then
+    if ((sol2%val(k,isol)-mini>=eps).and.(sol2%val(k,isol)-maxi<=eps)) then
        accept=.true.
     else
        accept=.false.
@@ -130,14 +131,15 @@ contains
     return
   end subroutine DMP
 
-  subroutine DMPu2(mesh,sol,sol2,k,isol,gauss_weight,accept)
+  subroutine DMPu2(mesh,sol,sol2,k,isol,eps,gauss_weight,accept)
     type(meshStruct), intent(inout) :: mesh
     type(solStruct), intent(in) :: sol,sol2
     integer, intent(in) :: k,isol
+    real(dp), intent(in) :: eps
     real(dp), dimension(:), intent(in) :: gauss_weight
     logical, intent(out) :: accept
     integer :: j,neigh
-    real(dp) :: mini,maxi,eps2
+    real(dp) :: mini,maxi
     logical :: extrema
 
     mini=sol%val(k,isol)
@@ -151,8 +153,7 @@ contains
        endif
     enddo
 
-    eps2=max((maxi-mini)*1.0e-6_dp,eps)
-    if ((sol2%val(k,isol)-mini>=-eps2).and.(sol2%val(k,isol)-maxi<=eps2)) then
+    if ((sol2%val(k,isol)-mini>=-eps).and.(sol2%val(k,isol)-maxi<=eps)) then
        accept=.true.
     else
        call u2(mesh,sol2,k,isol,gauss_weight,extrema)

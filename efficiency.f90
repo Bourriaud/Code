@@ -53,7 +53,7 @@ contains
     real(dp), dimension(:), intent(in) :: gauss_weight
 
     call exactTab(t,mesh,sol%user(:,1:1),gauss_weight)
-    sol%user(:,2:2)=abs(sol%user(:,1:1)-sol%val(:,2:2))
+    sol%user(:,2:2)=abs(sol%user(:,1:1)-sol%val(:,1:1))
 
     return
   end subroutine userSol
