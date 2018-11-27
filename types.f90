@@ -14,7 +14,7 @@ module types
      integer :: cell1,cell2
      integer :: dir
      integer :: period
-     real(dp) :: length
+     real(dp) :: length,lengthN
      character(len=20) :: boundType
      real(dp), dimension(:), allocatable :: bound
      real(dp), dimension(:), allocatable :: X_gauss,Y_gauss
@@ -46,6 +46,7 @@ module types
      integer :: nvar,nsolUser
      character(len=20), dimension(:), allocatable :: name,nameUser
      real(dp), dimension(:,:), allocatable :: val,user
+     integer(dp), dimension(:,:), allocatable :: conserv_var   !conserv_var(isol,1/2)=index of the first/last component of the conservative vector associated to isol
   end type solStruct
 
   abstract interface

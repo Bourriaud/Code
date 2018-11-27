@@ -3,6 +3,7 @@ module inout
   use constant
   use types
   use efficiency
+  use phys
   
   implicit none
 
@@ -54,12 +55,12 @@ contains
     close(11)
     
     mesh%nc=nx*ny
-    mesh%ne=nx*(nx+1)+ny*(ny+1)
+    mesh%ne=ny*(nx+1)+nx*(ny+1)
     mesh%np=(nx+1)*(ny+1)
     sol%nvar=nvar
     
     allocate(mesh%node(mesh%np),mesh%edge(mesh%ne),mesh%cell(mesh%nc))
-    allocate(sol%val(mesh%nc,sol%nvar),sol%user(mesh%nc,sol%nsolUser))
+    allocate(sol%val(mesh%nc,sol%nvar),sol%user(mesh%nc,sol%nsolUser),sol%conserv_var(sol%nvar,2))
     do i=1,mesh%ne
        allocate(mesh%edge(i)%flux(order,nvar))
     enddo
@@ -92,16 +93,46 @@ contains
     return
   end subroutine init
 
-  subroutine IC_func(x,y,s)
+  subroutine IC_func(x,y,S)
     real(dp), intent(in) :: x,y
-    real(dp), intent(out) :: s
+    real(dp), dimension(:), intent(inout) :: S
+    real(dp), dimension(:), allocatable :: U
+    integer :: i
+    real(dp) :: x0,y0
 
-    s=cos((x-5.0_dp)*pi/5.0_dp)+cos((y-5.0_dp)*pi/5.0_dp)
-    if(s>1.5_dp)then
-       s=1.0_dp
+    allocate(U(size(S)))
+
+    x0=0.3_dp
+    y0=0.5_dp
+    
+    if ((x>=x0).and.(y>=y0)) then
+       U(1)=0.125_dp
+       U(2)=0.0_dp
+       U(3)=0.0_dp
+       U(4)=0.1_dp
+    elseif ((x<x0).and.(y>=y0)) then
+       U(1)=1.0_dp
+       U(2)=0.75_dp
+       U(3)=0.0_dp
+       U(4)=1.0_dp
+    elseif ((x<x0).and.(y<y0)) then
+       U(1)=1.0_dp
+       U(2)=0.75_dp
+       U(3)=0.0_dp
+       U(4)=1.0_dp
     else
-       s=0.0_dp
+       U(1)=0.125_dp
+       U(2)=0.0_dp
+       U(3)=0.0_dp
+       U(4)=0.1_dp
     endif
+    
+    do i=1,4
+       call conserv(U,i,S(i))
+    enddo
+    !S(1)=cos((x-5.0_dp)*pi/5.0_dp)+cos((y-5.0_dp)*pi/5.0_dp)
+
+    deallocate(U)
     
     return
   end subroutine IC_func
@@ -110,28 +141,23 @@ contains
     type(meshStruct), intent(in) :: mesh
     type(solStruct), intent(inout) :: sol
     real(dp), dimension(:), intent(in) :: gauss_weight
+    real(dp), dimension(:), allocatable :: U0,S
     integer :: k,p1,p2
-    real(dp) :: x,y,dx,dy,rho,s
-    !real(dp) :: u,v,p,gamma
 
-    !gamma=1.4_dp
+    allocate(U0(sol%nvar),S(sol%nvar))
+    
     do k=1,mesh%nc
-       x=mesh%cell(k)%xc
-       y=mesh%cell(k)%yc
-       dx=mesh%cell(k)%dx
-       dy=mesh%cell(k)%dy
-       rho=0.0_dp
+       U0=0.0_dp
        do p1=1,size(mesh%cell(k)%X_gauss)
           do p2=1,size(mesh%cell(k)%Y_gauss)
-             call IC_func(mesh%cell(k)%X_gauss(p1),mesh%cell(k)%Y_gauss(p2),s)
-             rho=rho+s*gauss_weight(p1)*gauss_weight(p2)/4.0_dp
+             call IC_func(mesh%cell(k)%X_gauss(p1),mesh%cell(k)%Y_gauss(p2),S)
+             U0=U0+S*gauss_weight(p1)*gauss_weight(p2)/4.0_dp
           enddo
        enddo
-       sol%val(k,1)=rho
-       !sol%val(k,2)=rho*u
-       !sol%val(k,3)=rho*v
-       !sol%val(k,4)=rho*0.5*(u**2+v**2)+p/(gamma-1)
+       sol%val(k,:)=U0
     enddo
+
+    deallocate(U0,S)
     
     return
   end subroutine IC
@@ -147,10 +173,10 @@ contains
     enddo
     
     do j=1,ny
-       mesh%edge((j-1)*(nx+1)+1)%boundType='PERIODIC'
+       mesh%edge((j-1)*(nx+1)+1)%boundType='NEUMANN'
        mesh%edge((j-1)*(nx+1)+1)%bound(:)=0.0_dp
        
-       mesh%edge(j*(nx+1))%boundType='PERIODIC'
+       mesh%edge(j*(nx+1))%boundType='NEUMANN'
        mesh%edge(j*(nx+1))%bound(:)=0.0_dp
     enddo
     
@@ -283,6 +309,7 @@ contains
           mesh%edge(k)%cell2=(j-1)*nx+i
           mesh%edge(k)%dir=1
           mesh%edge(k)%length=dy
+          mesh%edge(k)%lengthN=dx
           mesh%edge(k)%period=k
        enddo
        mesh%edge((j-1)*(nx+1)+1)%cell1=-j*nx
@@ -299,6 +326,7 @@ contains
           mesh%edge(k)%cell2=i+(j-1)*nx
           mesh%edge(k)%dir=2
           mesh%edge(k)%length=dx
+          mesh%edge(k)%lengthN=dy
           mesh%edge(k)%period=k
        enddo
        mesh%edge((i-1)*(ny+1)+1+(nx+1)*ny)%cell1=-(nx*(ny-1)+i)
@@ -415,9 +443,8 @@ contains
     return
   end subroutine print
 
-  subroutine write_accept(mesh,sol,NOT_ACCEPTED_CELL,n,count)
+  subroutine write_accept(mesh,NOT_ACCEPTED_CELL,n,count)
     type(meshStruct), intent(in) :: mesh
-    type(solStruct), intent(in) :: sol
     integer, dimension(:), intent(in) :: NOT_ACCEPTED_CELL
     integer, intent(in) :: n,count
     integer :: k

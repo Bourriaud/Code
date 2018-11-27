@@ -11,11 +11,11 @@ module FV
   
 contains
 
-  subroutine boundary(flux,f_equa,gauss_weight,neigh,u,mesh,sol,edge,p,boundtype,bound,normal,order,F)
+  subroutine boundary(flux,f_equa,gauss_weight,cell,neigh,u,mesh,sol,edge,p,boundtype,bound,normal,order,F)
     procedure (sub_flux), pointer, intent(in) :: flux
     procedure (sub_f), pointer, intent(in) :: f_equa
     real(dp), dimension(:), intent(in) :: gauss_weight
-    integer, intent(in) :: neigh,edge,p
+    integer, intent(in) :: cell,neigh,edge,p
     real(dp), dimension(:), intent(in) :: u
     type(meshStruct), intent(inout) :: mesh
     type(solStruct), intent(in) :: sol
@@ -25,7 +25,7 @@ contains
     integer, intent(in) :: order
     real(dp), dimension(:), intent(inout) :: F
     real(dp), dimension(:), allocatable :: v
-    integer :: k,period
+    integer :: k,period,isol
 
     select case (trim(boundtype))
     case ('DIRICHLET')
@@ -39,6 +39,36 @@ contains
        case (4)
           call flux(bound,u,f_equa,2,F)
        end select
+
+    case ('NEUMANN')
+       allocate(v(sol%nvar))
+       select case (normal)
+       case (1)
+          call evaluate(mesh,sol,cell,order,gauss_weight,mesh%cell(cell)%xc,mesh%edge(edge)%Y_gauss(p),v)
+          do isol=1,sol%nvar
+             v(isol)=sol%val(cell,isol)-bound(isol)*mesh%cell(cell)%dx/2.0_dp
+          enddo
+          call flux(v,v,f_equa,1,F)
+       case (2)
+          call evaluate(mesh,sol,cell,order,gauss_weight,mesh%edge(edge)%X_gauss(p),mesh%cell(cell)%yc,v)
+          do isol=1,sol%nvar
+             v(isol)=sol%val(cell,isol)-bound(isol)*mesh%cell(cell)%dy/2.0_dp
+          enddo
+          call flux(v,v,f_equa,2,F)
+       case (3)
+          call evaluate(mesh,sol,cell,order,gauss_weight,mesh%cell(cell)%xc,mesh%edge(edge)%Y_gauss(p),v)
+          do isol=1,sol%nvar
+             v(isol)=sol%val(cell,isol)+bound(isol)*mesh%cell(cell)%dx/2.0_dp
+          enddo
+          call flux(v,v,f_equa,1,F)
+       case (4)
+          call evaluate(mesh,sol,cell,order,gauss_weight,mesh%edge(edge)%X_gauss(p),mesh%cell(cell)%yc,v)
+          do isol=1,sol%nvar
+             v(isol)=sol%val(cell,isol)+bound(isol)*mesh%cell(cell)%dy/2.0_dp
+          enddo
+          call flux(v,v,f_equa,2,F)
+       end select
+       deallocate(v)          
        
     case ('TRANSMISSIVE')
        call flux(u,u,f_equa,normal,F)
@@ -173,18 +203,17 @@ contains
     integer, intent(in) :: dir     !1=vertical 2=horizontal
     real(dp), dimension(:), intent(inout) :: F
     real(dp), dimension(:,:), allocatable :: F1vect,F2vect
-    real(dp) :: SL,SR,p1,p2,a1,a2,gamma
+    real(dp) :: SL,SR,p1,p2,a1,a2
 
     allocate (F1vect(size(u1),2),F2vect(size(u2),2))
 
-    gamma=1.4
-    p1=(u1(4)-u1(1)*(0.5_dp*((u1(2)/u1(1))**2+(u1(3)/u1(1))**2)))*(gamma-1)
-    p2=(u2(4)-u2(1)*(0.5_dp*((u2(2)/u2(1))**2+(u2(3)/u2(1))**2)))*(gamma-1)
-    a1=sqrt(gamma*p1/u1(1))
-    a2=sqrt(gamma*p2/u2(1))
+    call unconserv(u1,4,p1)
+    call unconserv(u2,4,p2)
+    a1=sqrt(gamma*abs(p1/u1(1)))
+    a2=sqrt(gamma*abs(p2/u2(1)))
     SL=min(u1(1+dir)/u1(1)-a1,u2(1+dir)/u2(1)-a2)
     SR=max(u1(1+dir)/u1(1)+a1,u2(1+dir)/u2(1)+a2)
-    
+
     if (SL>0.0_dp) then
        call f_equa(u1,F1vect)
        F(:)=F1vect(:,dir)
@@ -198,7 +227,7 @@ contains
     endif
     
     deallocate(F1vect,F2vect)
-    
+
     return
   end subroutine flux_HLL
 
@@ -207,13 +236,12 @@ contains
     real(dp), dimension(:), intent(in) :: u1,u2
     procedure (sub_f), pointer, intent(in) :: f_equa
     real(dp), dimension(2), intent(out) :: Smax
-    real(dp) :: SL,SR,p1,p2,a1,a2,gamma
+    real(dp) :: SL,SR,p1,p2,a1,a2
 
-    gamma=1.4
-    p1=(u1(4)-u1(1)*(0.5_dp*((u1(2)/u1(1))**2+(u1(3)/u1(1))**2)))*(gamma-1)
-    p2=(u2(4)-u2(1)*(0.5_dp*((u2(2)/u2(1))**2+(u2(3)/u2(1))**2)))*(gamma-1)
-    a1=sqrt(gamma*p1/u1(1))
-    a2=sqrt(gamma*p2/u2(1))
+    call unconserv(u1,4,p1)
+    call unconserv(u2,4,p2)
+    a1=sqrt(gamma*abs(p1/u1(1)))
+    a2=sqrt(gamma*abs(p2/u2(1)))
     SL=min(u1(2)/u1(1)-a1,u2(2)/u2(1)-a2)
     SR=max(u1(2)/u1(1)+a1,u2(2)/u2(1)+a2)
     

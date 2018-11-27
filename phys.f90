@@ -54,6 +54,49 @@ contains
 
     return
   end subroutine f_euler
-    
 
+  subroutine conserv(U,isol,uc)
+    real(dp), dimension(:), intent(in) :: U
+    integer, intent(in) :: isol
+    real(dp), intent(out) :: uc
+
+    select case (isol)
+    case(1)
+       uc=U(1)
+    case(2)
+       uc=U(1)*U(2)
+    case(3)
+       uc=U(1)*U(3)
+    case(4)
+       uc=U(1)*(0.5_dp*(U(2)**2+U(3)**2)+U(4)/((gamma-1)*U(1)))
+    case default
+       print*, "Change conserv function"
+       call exit()
+    end select
+
+    return
+  end subroutine conserv
+
+  subroutine unconserv(U,isol,uu)
+    real(dp), dimension(:), intent(in) :: U
+    integer, intent(in) :: isol
+    real(dp), intent(out) :: uu
+
+    select case (isol)
+    case(1)
+       uu=U(1)
+    case(2)
+       uu=U(2)/U(1)
+    case(3)
+       uu=U(3)/U(1)
+    case(4)
+       uu=(gamma-1)*(U(4)-0.5_dp*(U(2)**2+U(3)**2)/U(1))
+    case default
+       print*, "Change unconserv function"
+       call exit()
+    end select
+
+    return
+  end subroutine unconserv
+    
 end module phys

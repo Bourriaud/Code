@@ -22,9 +22,9 @@ clean:
 
 main.o: constant.o inout.o efficiency.o types.o phys.o FV.o time.o reconstruction.o
 
-inout.o: constant.o types.o efficiency.o
+inout.o: constant.o types.o efficiency.o phys.o
 
-efficiency.o: constant.o types.o
+efficiency.o: constant.o types.o phys.o
 
 types.o: constant.o
 

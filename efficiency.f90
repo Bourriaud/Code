@@ -2,6 +2,7 @@ module efficiency
 
   use constant
   use types
+  use phys
   
   implicit none
   
@@ -51,9 +52,13 @@ contains
     type(meshStruct), intent(in) :: mesh
     type(solStruct), intent(inout) :: sol
     real(dp), dimension(:), intent(in) :: gauss_weight
+    integer :: k
 
     call exactTab(t,mesh,sol%user(:,1:1),gauss_weight)
     sol%user(:,2:2)=abs(sol%user(:,1:1)-sol%val(:,1:1))
+    do k=1,mesh%nc
+       call unconserv(sol%val(k,:),4,sol%user(k,3))
+    enddo
 
     return
   end subroutine userSol

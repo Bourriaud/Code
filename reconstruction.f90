@@ -134,7 +134,7 @@ contains
     integer, intent(out) :: N
 
     N=(d+1)*(d+2)/2-1
-    
+
     return
   end subroutine Nequa
 

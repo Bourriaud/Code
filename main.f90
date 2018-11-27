@@ -27,7 +27,7 @@ program main
 
   call init(xL,xR,yL,yR,nx,ny,nvar,cfl,tf,fs,namefile,mesh,sol,str_equa,str_flux,str_time_scheme, &
        order,L_str_criteria,L_var_criteria,L_eps,gauss_point,gauss_weight)
-  call init_FV(str_equa,str_flux,str_time_scheme,f_equa,flux,speed,time_scheme)
+  call init_FV(str_equa,str_flux,str_time_scheme,f_equa,flux,speed,time_scheme,sol)
   call buildmesh(xL,xR,yL,yR,nx,ny,gauss_point,mesh)
   call IC(mesh,sol,gauss_weight)
   call BC(nx,ny,nvar,mesh)
@@ -41,24 +41,35 @@ program main
   call errorL2(mesh,sol%val(:,1),sol%user(:,1),error)
   
   deallocate(mesh%node,mesh%edge,mesh%cell)
-  deallocate(sol%val,sol%user,sol%name,sol%nameUser)
+  deallocate(sol%val,sol%user,sol%name,sol%nameUser,sol%conserv_var)
   deallocate(L_str_criteria,L_var_criteria,L_eps)
   deallocate(gauss_point,gauss_weight)
 
 contains
 
-  subroutine init_FV(str_equa,str_flux,str_time_scheme,f_equa,flux,speed,time_scheme)
+  subroutine init_FV(str_equa,str_flux,str_time_scheme,f_equa,flux,speed,time_scheme,sol)
     character(len=20), intent(in) :: str_equa,str_flux,str_time_scheme
     procedure (sub_f), pointer, intent(out) :: f_equa
     procedure (sub_flux), pointer, intent(out) :: flux
     procedure (sub_speed), pointer, intent(out) :: speed
     procedure (sub_time), pointer, intent(out) :: time_scheme
+    type(solStruct), intent(inout) :: sol
+    integer :: i
 
     select case (trim(str_equa))
     case ('transport')
        f_equa => f_transport
+       do i=1,sol%nvar
+          sol%conserv_var(i,1:2)=i
+       enddo
     case ('euler')
        f_equa => f_euler
+       sol%conserv_var(1,1:2)=1
+       sol%conserv_var(2,1)=2
+       sol%conserv_var(2,2)=3
+       sol%conserv_var(3,1)=2
+       sol%conserv_var(3,2)=3
+       sol%conserv_var(4,1:2)=4
     case default
        print*,trim(str_equa)," equation not implemented"
        call exit()

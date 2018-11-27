@@ -55,6 +55,7 @@ contains
     integer, dimension(:), allocatable :: NOT_ACCEPTED_CELL,NOT_ACCEPTED_EDGE
     type(solStruct) :: soltemp
     integer, dimension(2) :: L_deg
+    real(dp) :: test
 
     allocate(u1(sol%nvar),u2(sol%nvar))
     allocate(NOT_ACCEPTED_CELL(mesh%nc),NOT_ACCEPTED_EDGE(mesh%ne),soltemp%val(mesh%nc,sol%nvar))
@@ -90,20 +91,20 @@ contains
              if (.not.edge%flux_acc(p)) then
                 if (cell1<0) then
                    call evaluate(mesh,sol,cell2,deg+1,gauss_weight,edge%X_gauss(p),edge%Y_gauss(p),u2)
-                   call boundary(flux,f_equa,gauss_weight,cell1, &
+                   call boundary(flux,f_equa,gauss_weight,cell2,cell1, &
                         u2,mesh,sol,j,p,edge%boundType,edge%bound,dir,deg+1,mesh%edge(j)%flux(p,:))
-                   soltemp%val(cell2,:)=soltemp%val(cell2,:)+gauss_weight(p)*mesh%edge(j)%flux(p,:)*dt/(mesh%edge(j)%length*2.0_dp)
+                   soltemp%val(cell2,:)=soltemp%val(cell2,:)+gauss_weight(p)*mesh%edge(j)%flux(p,:)*dt/(mesh%edge(j)%lengthN*2.0_dp)
                 elseif (cell2<0) then
                    call evaluate(mesh,sol,cell1,deg+1,gauss_weight,edge%X_gauss(p),edge%Y_gauss(p),u1)
-                   call boundary(flux,f_equa,gauss_weight,cell2, &
+                   call boundary(flux,f_equa,gauss_weight,cell1,cell2, &
                         u1,mesh,sol,j,p,edge%boundType,edge%bound,dir+2,deg+1,mesh%edge(j)%flux(p,:))
-                   soltemp%val(cell1,:)=soltemp%val(cell1,:)-gauss_weight(p)*mesh%edge(j)%flux(p,:)*dt/(mesh%edge(j)%length*2.0_dp)
+                   soltemp%val(cell1,:)=soltemp%val(cell1,:)-gauss_weight(p)*mesh%edge(j)%flux(p,:)*dt/(mesh%edge(j)%lengthN*2.0_dp)
                 else
                    call evaluate(mesh,sol,cell1,deg+1,gauss_weight,edge%X_gauss(p),edge%Y_gauss(p),u1)
                    call evaluate(mesh,sol,cell2,deg+1,gauss_weight,edge%X_gauss(p),edge%Y_gauss(p),u2)
                    call flux(u1,u2,f_equa,dir,mesh%edge(j)%flux(p,:))
-                   soltemp%val(cell1,:)=soltemp%val(cell1,:)-gauss_weight(p)*mesh%edge(j)%flux(p,:)*dt/(mesh%edge(j)%length*2.0_dp)
-                   soltemp%val(cell2,:)=soltemp%val(cell2,:)+gauss_weight(p)*mesh%edge(j)%flux(p,:)*dt/(mesh%edge(j)%length*2.0_dp)
+                   soltemp%val(cell1,:)=soltemp%val(cell1,:)-gauss_weight(p)*mesh%edge(j)%flux(p,:)*dt/(mesh%edge(j)%lengthN*2.0_dp)
+                   soltemp%val(cell2,:)=soltemp%val(cell2,:)+gauss_weight(p)*mesh%edge(j)%flux(p,:)*dt/(mesh%edge(j)%lengthN*2.0_dp)
                 endif
              endif
           enddo
@@ -119,20 +120,21 @@ contains
              if(allocated(mesh%cell(cell1)%polCoef))deallocate(mesh%cell(cell1)%polCoef)
           endif
        enddo
-       
+
        deg=L_deg(min(count,size(L_deg)))
        call decrement(mesh,sol,soltemp,deg,dt,L_str_criteria,L_var_criteria,L_eps,gauss_weight,NOT_ACCEPTED_CELL,NOT_ACCEPTED_EDGE)
 
        !if(count>10)call exit()
-       !print*,size(NOT_ACCEPTED_CELL)
+       !if(size(NOT_ACCEPTED_CELL)>0)print*,NOT_ACCEPTED_CELL(1),count
+       !print*,size(NOT_ACCEPTED_CELL),count
        !print*,"-----------------------------------"
-       call write_accept(mesh,sol,NOT_ACCEPTED_CELL,n,count)
+       !call write_accept(mesh,NOT_ACCEPTED_CELL,n,count)
 
     enddo
 
     sol2%val=soltemp%val
     deallocate(u1,u2,NOT_ACCEPTED_CELL,NOT_ACCEPTED_EDGE,soltemp%val)
-
+    
     return
   end subroutine advance
 
