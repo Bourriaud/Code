@@ -1,11 +1,11 @@
-0.	xL
-1.	xR
+-5.	xL
+5.	xR
 0.	yL
 1.	yR
-200	nx
-10	ny
+1600	nx
+5	ny
 0.95	cfl
-0.2	tf
+1.8	tf
 euler	equation
 HLL	flux
 SSPRK3	time scheme
@@ -14,8 +14,8 @@ SSPRK3	time scheme
 PAD 1 1.0e-4	detection criteria + variable + sensibility
 DMPu2 1 1.0e-4
 DMPu2 2 1.0e-4
-DMPu2 4 1.0e-4
-10	save frequency
+DMPu2 4 1.0e-3
+50	save frequency
 limit	namefile
 4	nvar
 rho	var 1

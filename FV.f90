@@ -26,7 +26,7 @@ contains
     real(dp), dimension(:), intent(inout) :: F
     real(dp), dimension(:), allocatable :: v
     integer :: k,period,isol
-
+    
     select case (trim(boundtype))
     case ('DIRICHLET')
        select case (normal)
@@ -35,11 +35,11 @@ contains
        case (2)
           call flux(bound,u,f_equa,2,F)
        case (3)
-          call flux(bound,u,f_equa,1,F)
+          call flux(u,bound,f_equa,1,F)
        case (4)
-          call flux(bound,u,f_equa,2,F)
+          call flux(u,bound,f_equa,2,F)
        end select
-
+       
     case ('NEUMANN')
        allocate(v(sol%nvar))
        select case (normal)
@@ -68,10 +68,20 @@ contains
           enddo
           call flux(v,v,f_equa,2,F)
        end select
+       
        deallocate(v)          
        
     case ('TRANSMISSIVE')
-       call flux(u,u,f_equa,normal,F)
+       select case (normal)
+       case (1)
+          call flux(u,u,f_equa,1,F)
+       case (2)
+          call flux(u,u,f_equa,2,F)
+       case (3)
+          call flux(u,u,f_equa,1,F)
+       case (4)
+          call flux(u,u,f_equa,2,F)
+       end select
        
     case ('WALL')
        allocate(v(sol%nvar))
@@ -113,7 +123,7 @@ contains
        print*,"Boundary condition ",trim(boundtype)," not implemented"
        call exit()
     end select
-
+    
   end subroutine boundary
 
   subroutine RS_advection(u1,u2,f_equa,ustar,dir)
