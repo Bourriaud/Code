@@ -1,0 +1,22 @@
+Sinus	ICBC
+0.	xL
+10.	xR
+0.	yL
+10.	yR
+100	nx
+100	ny
+0.95	cfl
+1.0	tf
+transport	equation
+godunov	flux
+SSPRK3	time scheme
+3	space order
+1	number of detection criterias
+DMPu2 1 1.0e-4	detection criteria + variable + sensibility
+1	save frequency
+test	namefile
+1	nvar
+var1	var 1
+2	nsolUser
+1	var_user : solAnal
+2	var_user : error

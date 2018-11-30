@@ -34,9 +34,9 @@ contains
     real(dp) :: p,gamma,ux,uy
 
     gamma=1.4_dp
-    ux=u(2)/u(1)
-    uy=u(3)/u(1)
-    p=(u(4)-u(1)*(0.5*(ux**2+uy**2)))*(gamma-1.0_dp)
+    call unconserv(u,"euler               ",2,ux)
+    call unconserv(u,"euler               ",2,uy)
+    call unconserv(u,"euler               ",4,p)
 
     ! x direction
     
@@ -55,44 +55,62 @@ contains
     return
   end subroutine f_euler
 
-  subroutine conserv(U,isol,uc)
+  subroutine conserv(U,str_equa,isol,uc)
     real(dp), dimension(:), intent(in) :: U
+    character(len=20), intent(in) :: str_equa
     integer, intent(in) :: isol
     real(dp), intent(out) :: uc
 
-    select case (isol)
-    case(1)
-       uc=U(1)
-    case(2)
-       uc=U(1)*U(2)
-    case(3)
-       uc=U(1)*U(3)
-    case(4)
-       uc=U(1)*(0.5_dp*(U(2)**2+U(3)**2)+U(4)/((gamma-1)*U(1)))
+    select case (trim(str_equa))
+    case("transport")
+       uc=U(isol)
+    case("euler")
+       select case (isol)
+       case(1)
+          uc=U(1)
+       case(2)
+          uc=U(1)*U(2)
+       case(3)
+          uc=U(1)*U(3)
+       case(4)
+          uc=U(1)*(0.5_dp*(U(2)**2+U(3)**2)+U(4)/((gamma-1)*U(1)))
+       case default
+          print*, "Change conserv function"
+          call exit()
+       end select
     case default
-       print*, "Change conserv function"
+       print*,"Conserv function not implemented"
        call exit()
     end select
 
     return
   end subroutine conserv
 
-  subroutine unconserv(U,isol,uu)
+  subroutine unconserv(U,str_equa,isol,uu)
     real(dp), dimension(:), intent(in) :: U
+    character(len=20), intent(in) :: str_equa
     integer, intent(in) :: isol
     real(dp), intent(out) :: uu
 
-    select case (isol)
-    case(1)
-       uu=U(1)
-    case(2)
-       uu=U(2)/U(1)
-    case(3)
-       uu=U(3)/U(1)
-    case(4)
-       uu=(gamma-1)*(U(4)-0.5_dp*(U(2)**2+U(3)**2)/U(1))
+    select case (trim(str_equa))
+    case("transport")
+       uu=U(isol)
+    case("euler")
+       select case (isol)
+       case(1)
+          uu=U(1)
+       case(2)
+          uu=U(2)/U(1)
+       case(3)
+          uu=U(3)/U(1)
+       case(4)
+          uu=(gamma-1)*(U(4)-0.5_dp*(U(2)**2+U(3)**2)/U(1))
+       case default
+          print*, "Change unconserv function"
+          call exit()
+       end select
     case default
-       print*, "Change unconserv function"
+       print*,"Unconserv function not implemented"
        call exit()
     end select
 

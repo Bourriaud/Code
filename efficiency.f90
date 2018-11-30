@@ -7,29 +7,12 @@ module efficiency
   implicit none
   
 contains
-
-  subroutine exactSol(x,y,t,s)
-    real(dp), intent(in) :: x,y,t
-    real(dp), intent(out) :: s
-    real(dp) :: a1,a2
-
-    a1=1.0_dp
-    a2=1.0_dp
-
-    s=cos((x-a1*t-5.0_dp)*pi/5.0_dp)+cos((y-a2*t-5.0_dp)*pi/5.0_dp)
-    if(s>1.5_dp)then
-       s=1.0_dp
-    else
-       s=0.0_dp
-    endif
-
-    return
-  end subroutine exactSol
   
-  subroutine exactTab(t,mesh,tab,gauss_weight)
+  subroutine exactTab(t,mesh,tab,exactSol,gauss_weight)
     real(dp), intent(in) :: t
     type (meshStruct), intent(in) :: mesh
     real(dp), dimension(:,:), intent(inout) :: tab
+    procedure (sub_exactsol), pointer, intent(in) :: exactSol
     real(dp), dimension(:), intent(in) :: gauss_weight
     integer :: k,p1,p2
     real(dp) :: s
@@ -47,25 +30,43 @@ contains
     return
   end subroutine exactTab
 
-  subroutine userSol(t,mesh,sol,gauss_weight)
+  subroutine userSol(t,mesh,sol,str_equa,exactSol,gauss_weight)
     real(dp), intent(in) :: t
     type(meshStruct), intent(in) :: mesh
     type(solStruct), intent(inout) :: sol
+    character(len=20), intent(in) :: str_equa
+    procedure (sub_exactsol), pointer, intent(in) :: exactSol
     real(dp), dimension(:), intent(in) :: gauss_weight
-    integer :: k
+    integer :: i,k
+    character(len=20) :: str
 
-    call exactTab(t,mesh,sol%user(:,1:1),gauss_weight)
-    sol%user(:,2:2)=abs(sol%user(:,1:1)-sol%val(:,1:1))
-    do k=1,mesh%nc
-       call unconserv(sol%val(k,:),4,sol%user(k,3))
+    do i=1,sol%nsolUser
+       select case (sol%var_user(i))
+       case(1)
+          sol%name_user(i)="SolAnal"
+          call exactTab(t,mesh,sol%user(:,i:i),exactSol,gauss_weight)
+       case(2)
+          sol%name_user(i)="Error"
+          call exactTab(t,mesh,sol%user(:,i:i),exactSol,gauss_weight)
+          sol%user(:,i:i)=abs(sol%user(:,i:i)-sol%val(:,1:1))
+       case(101:109)
+          write (str,"(I1)")sol%var_user(i)-100
+          sol%name_user(i)="Uncons"//trim(str)
+          do k=1,mesh%nc
+             call unconserv(sol%val(k,:),str_equa,sol%var_user(i)-100,sol%user(k,i))
+          enddo
+       case default
+          print*,"Wrong number of user_sol"
+          call exit()
+       end select
     enddo
 
     return
   end subroutine userSol
 
-  subroutine errorL1(mesh,sol,exactsol,eL1)
+  subroutine errorL1(mesh,sol,exacttab,eL1)
     type(meshStruct), intent(in) :: mesh
-    real(dp), dimension(:), intent(in) :: sol,exactsol
+    real(dp), dimension(:), intent(in) :: sol,exacttab
     real(dp), intent(out) :: eL1
     integer :: k
     real(dp) :: dx,dy
@@ -74,7 +75,7 @@ contains
     do k=1,size(sol(:))
        dx=mesh%cell(k)%dx
        dy=mesh%cell(k)%dy
-       eL1=eL1+abs(sol(k)-exactsol(k))*dx*dy
+       eL1=eL1+abs(sol(k)-exacttab(k))*dx*dy
     enddo
 
     print*, "errorL1 = ",eL1
@@ -82,9 +83,9 @@ contains
     return
   end subroutine errorL1
 
-  subroutine errorL2(mesh,sol,exactsol,eL2)
+  subroutine errorL2(mesh,sol,exacttab,eL2)
     type(meshStruct), intent(in) :: mesh
-    real(dp), dimension(:), intent(in) :: sol,exactsol
+    real(dp), dimension(:), intent(in) :: sol,exacttab
     real(dp), intent(out) :: eL2
     integer :: k
     real(dp) :: dx,dy
@@ -93,7 +94,7 @@ contains
     do k=1,size(sol(:))
        dx=mesh%cell(k)%dx
        dy=mesh%cell(k)%dy
-       eL2=eL2+dx*dy*(sol(k)-exactsol(k))**2
+       eL2=eL2+dx*dy*(sol(k)-exacttab(k))**2
     enddo
     eL2=sqrt(eL2)
 
@@ -126,5 +127,49 @@ contains
 
     return
   end subroutine check_conservativity
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! Exact solutions !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+  subroutine exactSol_sinus(x,y,t,s)
+    real(dp), intent(in) :: x,y,t
+    real(dp), intent(out) :: s
+    real(dp) :: a1,a2
+
+    a1=1.0_dp
+    a2=1.0_dp
+
+    s=cos((x-a1*t-5.0_dp)*pi/5.0_dp)+cos((y-a2*t-5.0_dp)*pi/5.0_dp)
+
+    return
+  end subroutine exactSol_sinus
+
+  subroutine exactSol_sinus_dis(x,y,t,s)
+    real(dp), intent(in) :: x,y,t
+    real(dp), intent(out) :: s
+    real(dp) :: a1,a2
+
+    a1=1.0_dp
+    a2=1.0_dp
+
+    s=cos((x-a1*t-5.0_dp)*pi/5.0_dp)+cos((y-a2*t-5.0_dp)*pi/5.0_dp)
+    if(s>1.5_dp)then
+       s=1.0_dp
+    else
+       s=0.0_dp
+    endif
+
+    return
+  end subroutine exactSol_sinus_dis
+
+  subroutine exactSol_none(x,y,t,s)
+    real(dp), intent(in) :: x,y,t
+    real(dp), intent(out) :: s
+    if(.false.)print*,x,y,t,s
+    
+    print*,"There is no exact solution for this configuration"
+    call exit()
+
+    return
+  end subroutine exactSol_none
 
 end module efficiency

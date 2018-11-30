@@ -9,11 +9,20 @@ module inout
 
 contains
 
-  subroutine init(xL,xR,yL,yR,nx,ny,nvar,cfl,tf,fs,namefile,mesh,sol,str_equa,str_flux, &
-       str_time_scheme,order,L_str_criteria,L_var_criteria,L_eps,gauss_point,gauss_weight)
+  subroutine get_config(config_file)
+    character(len=20), intent(out) :: config_file
+    
+    print*,"Configuration file : "
+    read*,config_file
+
+    return
+  end subroutine get_config
+  
+  subroutine init(config_file,test_case,xL,xR,yL,yR,nx,ny,nvar,cfl,tf,fs,namefile,mesh,sol, &
+       str_equa,str_flux,str_time_scheme,order,L_str_criteria,L_var_criteria,L_eps,gauss_point,gauss_weight)
+    character(len=20), intent(out) :: config_file,test_case,namefile,str_equa,str_flux,str_time_scheme
     real(dp), intent(out) :: xL,xR,yL,yR,cfl,tf
     integer, intent(out) :: nx,ny,nvar,fs,order
-    character(len=20), intent(out) :: namefile,str_equa,str_flux,str_time_scheme
     type(meshStruct), intent(out) :: mesh
     type(solStruct), intent(out) :: sol
     character(len=20), dimension(:), allocatable, intent(out) :: L_str_criteria
@@ -22,7 +31,9 @@ contains
     real(dp), dimension(:), allocatable, intent(out) :: gauss_point,gauss_weight
     integer :: i,ncriteria
 
-    open(11,file="configuration",form="formatted")
+    config_file="config/"//trim(config_file)
+    open(11,file=config_file,form="formatted")
+    read(11,*)test_case
     read(11,*)xL
     read(11,*)xR
     read(11,*)yL
@@ -48,9 +59,9 @@ contains
        read(11,*)sol%name(i)
     enddo
     read(11,*)sol%nsolUser
-    allocate(sol%nameUser(sol%nsolUser))
+    allocate(sol%var_user(sol%nsolUser),sol%name_user(sol%nsolUser))
     do i=1,sol%nsolUser
-       read(11,*)sol%nameUser(i)
+       read(11,*)sol%var_user(i)
     enddo
     close(11)
     
@@ -92,52 +103,9 @@ contains
 
     return
   end subroutine init
-
-  subroutine IC_func(x,y,S)
-    real(dp), intent(in) :: x,y
-    real(dp), dimension(:), intent(inout) :: S
-    real(dp), dimension(:), allocatable :: U
-    integer :: i
-    real(dp) :: x0,y0
-
-    allocate(U(size(S)))
-
-    x0=-4.0_dp
-    y0=0.5_dp
-    
-    if ((x>=x0).and.(y>=y0)) then
-       U(1)=1.0_dp+0.2_dp*sin(5.0_dp*x)
-       U(2)=0.0_dp
-       U(3)=0.0_dp
-       U(4)=1.0_dp
-    elseif ((x<x0).and.(y>=y0)) then
-       U(1)=3.857143_dp
-       U(2)=2.629369_dp
-       U(3)=0.0_dp
-       U(4)=10.33333_dp
-    elseif ((x<x0).and.(y<y0)) then
-       U(1)=3.857143_dp
-       U(2)=2.629369_dp
-       U(3)=0.0_dp
-       U(4)=10.33333_dp
-    else
-       U(1)=1.0_dp+0.2_dp*sin(5.0_dp*x)
-       U(2)=0.0_dp
-       U(3)=0.0_dp
-       U(4)=1.0_dp
-    endif
-    
-    do i=1,4
-       call conserv(U,i,S(i))
-    enddo
-    !S(1)=cos((x-5.0_dp)*pi/5.0_dp)+cos((y-5.0_dp)*pi/5.0_dp)
-
-    deallocate(U)
-    
-    return
-  end subroutine IC_func
   
-  subroutine IC(mesh,sol,gauss_weight)
+  subroutine IC(IC_func,mesh,sol,gauss_weight)
+    procedure (sub_IC), pointer, intent(in) :: IC_func
     type(meshStruct), intent(in) :: mesh
     type(solStruct), intent(inout) :: sol
     real(dp), dimension(:), intent(in) :: gauss_weight
@@ -161,54 +129,6 @@ contains
     
     return
   end subroutine IC
-
-  subroutine BC(nx,ny,nvar,mesh)
-    integer, intent(in) :: nx,ny,nvar
-    type(meshStruct), intent(inout) :: mesh
-    integer :: i,j,isol
-    real(dp), dimension(:), allocatable :: bound
-
-    allocate(bound(nvar))
-    
-    do i=1,mesh%ne
-       mesh%edge(i)%boundType='NOT A BOUNDARY'
-       mesh%edge(i)%bound(:)=0.0_dp
-       allocate(mesh%edge(i)%bound(nvar))
-    enddo
-    
-    do j=1,ny
-       mesh%edge((j-1)*(nx+1)+1)%boundType='DIRICHLET'
-       bound(1)=3.857143_dp
-       bound(2)=2.629369_dp
-       bound(3)=0.0_dp
-       bound(4)=10.33333_dp
-       do isol=1,nvar
-          call conserv(bound(:),isol,mesh%edge((j-1)*(nx+1)+1)%bound(isol))
-       enddo
-       
-       mesh%edge(j*(nx+1))%boundType='DIRICHLET'
-       bound(1)=1.0_dp+0.2_dp*sin(25.0_dp)
-       bound(2)=0.0_dp
-       bound(3)=0.0_dp
-       bound(4)=1.0_dp
-       do isol=1,nvar
-          call conserv(bound(:),isol,mesh%edge(j*(nx+1))%bound(isol))
-       enddo
-       
-    enddo
-    
-    do i=1,nx
-       mesh%edge((i-1)*(ny+1)+1+(nx+1)*ny)%boundType='NEUMANN'
-       mesh%edge((i-1)*(ny+1)+1+(nx+1)*ny)%bound(:)=0.0_dp
-       
-       mesh%edge(i*(ny+1)+(nx+1)*ny)%boundType='NEUMANN'
-       mesh%edge(i*(ny+1)+(nx+1)*ny)%bound(:)=0.0_dp
-    enddo
-
-    deallocate(bound)
-    
-    return   
-  end subroutine BC
   
   subroutine buildMesh(xL,xR,yL,yR,nx,ny,gauss_point,mesh)
     real(dp), intent(in) :: xL,xR,yL,yR
@@ -438,7 +358,7 @@ contains
     enddo
     
     do n=1,sol%nsolUser
-       write(11,'(a,a,a)')"SCALARS ",sol%nameUser(n)," float 1"
+       write(11,'(a,a,a)')"SCALARS ",sol%name_user(n)," float 1"
        write(11,'(a)')"LOOKUP_TABLE default"
        do k=1,mesh%nc
              write(11,'(e15.8)')sol%user(k,n)

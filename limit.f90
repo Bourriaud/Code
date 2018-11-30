@@ -8,10 +8,12 @@ module limit
 
 contains
 
-  subroutine decrement(mesh,sol,soltemp,deg,dt,L_str_criteria,L_var_criteria,L_eps,gauss_weight,NOT_ACCEPTED_CELL,NOT_ACCEPTED_EDGE)
+  subroutine decrement(mesh,sol,soltemp,str_equa,deg,dt,L_str_criteria,L_var_criteria,L_eps, &
+       gauss_weight,NOT_ACCEPTED_CELL,NOT_ACCEPTED_EDGE)
     type(meshStruct), intent(inout) :: mesh
     type(solStruct), intent(in) :: sol
     type(solStruct), intent(inout) :: soltemp
+    character(len=20), intent(in) :: str_equa
     integer, intent(in) :: deg
     real(dp), intent(in) :: dt
     integer, dimension(:), intent(in) :: L_var_criteria
@@ -51,7 +53,7 @@ contains
 
        do i=1,size(NOT_ACCEPTED_CELL)
           k=NOT_ACCEPTED_CELL(i)
-          call criteria(mesh,sol,sol2,k,isol,L_eps(n),gauss_weight,accept)
+          call criteria(mesh,sol,sol2,k,isol,L_eps(n),gauss_weight,str_equa,accept)
           if (.not.accept) then
              do j=1,size(mesh%cell(k)%edge)
                 edge=mesh%cell(k)%edge(j)
@@ -134,15 +136,17 @@ contains
     return
   end subroutine decrement
 
-  subroutine DMP(mesh,sol,sol2,k,isol,eps,gauss_weight,accept)
+  subroutine DMP(mesh,sol,sol2,k,isol,eps,gauss_weight,str_equa,accept)
     type(meshStruct), intent(inout) :: mesh
     type(solStruct), intent(in) :: sol,sol2
     integer, intent(in) :: k,isol
     real(dp), intent(in) :: eps
     real(dp), dimension(:), intent(in) :: gauss_weight
+    character(len=20), intent(in) :: str_equa
     logical, intent(out) :: accept
     integer :: j,neigh
     real(dp) :: mini,maxi,test
+    if(.false.)print*,gauss_weight,str_equa
 
     call norme2(sol,k,isol,mini)
     call norme2(sol,k,isol,maxi)
@@ -166,16 +170,18 @@ contains
     return
   end subroutine DMP
 
-  subroutine DMPu2(mesh,sol,sol2,k,isol,eps,gauss_weight,accept)
+  subroutine DMPu2(mesh,sol,sol2,k,isol,eps,gauss_weight,str_equa,accept)
     type(meshStruct), intent(inout) :: mesh
     type(solStruct), intent(in) :: sol,sol2
     integer, intent(in) :: k,isol
     real(dp), intent(in) :: eps
     real(dp), dimension(:), intent(in) :: gauss_weight
+    character(len=20), intent(in) :: str_equa
     logical, intent(out) :: accept
     integer :: i,j,neigh
     real(dp) :: mini,maxi,test
     logical :: extrema
+    if(.false.)print*,str_equa
 
     call norme2(sol,k,isol,mini)
     call norme2(sol,k,isol,maxi)
@@ -201,7 +207,7 @@ contains
           endif
        enddo
     endif
-    
+
     return
   end subroutine DMPu2
 
@@ -263,17 +269,19 @@ contains
     return
   end subroutine u2
 
-  subroutine PAD(mesh,sol,sol2,k,isol,eps,gauss_weight,accept)
+  subroutine PAD(mesh,sol,sol2,k,isol,eps,gauss_weight,str_equa,accept)
     type(meshStruct), intent(inout) :: mesh
     type(solStruct), intent(in) :: sol,sol2
     integer, intent(in) :: k,isol
     real(dp), intent(in) :: eps
     real(dp), dimension(:), intent(in) :: gauss_weight
+    character(len=20), intent(in) :: str_equa
     logical, intent(out) :: accept
     real(dp) :: rho,p
+    if(.false.)print*,eps,gauss_weight,isol,mesh%nc,sol%nsolUser
 
-    call unconserv(sol2%val(k,:),1,rho)
-    call unconserv(sol2%val(k,:),4,p)
+    call unconserv(sol2%val(k,:),str_equa,1,rho)
+    call unconserv(sol2%val(k,:),str_equa,4,p)
     if (rho>=0.0_dp.and.p>=0.0_dp) then
        accept=.true.
     else
@@ -286,7 +294,8 @@ contains
   subroutine criteria_flux(flux,accept)
     real(dp), dimension(:), intent(in) :: flux
     logical, intent(out) :: accept
-
+    if(.false.)print*,flux
+    
     accept=.false.
     
     return
@@ -298,11 +307,16 @@ contains
     real(dp), intent(out) :: norm
     integer :: i
 
-    norm=0.0_dp
-    do i=sol%conserv_var(isol,1),sol%conserv_var(isol,2)
-       norm=norm+sol%val(k,i)**2
-    enddo
-    norm=sqrt(norm)
+    select case (sol%conserv_var(isol,2)-sol%conserv_var(isol,1))
+    case(0)
+       norm=sol%val(k,isol)
+    case default
+       norm=0.0_dp
+       do i=sol%conserv_var(isol,1),sol%conserv_var(isol,2)
+          norm=norm+sol%val(k,i)**2
+       enddo
+       norm=sqrt(norm)
+    end select
 
     return
   end subroutine norme2

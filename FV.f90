@@ -217,8 +217,8 @@ contains
 
     allocate (F1vect(size(u1),2),F2vect(size(u2),2))
 
-    call unconserv(u1,4,p1)
-    call unconserv(u2,4,p2)
+    call unconserv(u1,"euler               ",4,p1)
+    call unconserv(u2,"euler               ",4,p2)
     a1=sqrt(gamma*abs(p1/u1(1)))
     a2=sqrt(gamma*abs(p2/u2(1)))
     SL=min(u1(1+dir)/u1(1)-a1,u2(1+dir)/u2(1)-a2)
@@ -247,9 +247,11 @@ contains
     procedure (sub_f), pointer, intent(in) :: f_equa
     real(dp), dimension(2), intent(out) :: Smax
     real(dp) :: SL,SR,p1,p2,a1,a2
+    real(dp), dimension(:,:), allocatable :: F
+    if(.false.)call f_equa(u1,F)
 
-    call unconserv(u1,4,p1)
-    call unconserv(u2,4,p2)
+    call unconserv(u1,"euler               ",4,p1)
+    call unconserv(u2,"euler               ",4,p2)
     a1=sqrt(gamma*abs(p1/u1(1)))
     a2=sqrt(gamma*abs(p2/u2(1)))
     SL=min(u1(2)/u1(1)-a1,u2(2)/u2(1)-a2)

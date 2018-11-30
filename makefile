@@ -1,6 +1,6 @@
 PROG = run
-SRCS = main.f90 constant.f90 inout.f90 efficiency.f90 types.f90 phys.f90 FV.f90 time.f90 reconstruction.f90 limit.f90
-OBJS = main.o constant.o inout.o efficiency.o types.o phys.o FV.o time.o reconstruction.o limit.o
+SRCS = main.f90 constant.f90 inout.f90 efficiency.f90 types.f90 phys.f90 FV.f90 time.f90 reconstruction.f90 limit.f90 ICBC.f90
+OBJS = main.o constant.o inout.o efficiency.o types.o phys.o FV.o time.o reconstruction.o limit.o ICBC.o
 
 F90 = gfortran
 F90FLAGS=-O0 -Wall -ffpe-trap=invalid,overflow -fcheck=all -pedantic
@@ -18,9 +18,9 @@ clean:
 .SUFFIXES: $(SUFFIXES) .f90
 
 .f90.o:
-	$(F90) $(F90FLAGS2) -c $<
+	$(F90) $(F90FLAGS) -c $<
 
-main.o: constant.o inout.o efficiency.o types.o phys.o FV.o time.o reconstruction.o
+main.o: constant.o inout.o efficiency.o types.o phys.o FV.o time.o reconstruction.o ICBC.o
 
 inout.o: constant.o types.o efficiency.o phys.o
 
@@ -38,7 +38,9 @@ reconstruction.o: constant.o types.o efficiency.o
 
 limit.o: constant.o types.o reconstruction.o
 
-test: test.o constant.o reconstruction.o types.o inout.o efficiency.o phys.o FV.o time.o limit.o
-	$(F90) -o test test.o reconstruction.o types.o inout.o efficiency.o phys.o FV.o time.o limit.o
+ICBC.o: constant.o types.o phys.o
 
-test.o : constant.o reconstruction.o types.o inout.o efficiency.o phys.o FV.o time.o limit.o
+test: test.o constant.o reconstruction.o types.o inout.o efficiency.o phys.o FV.o time.o limit.o ICBC.o
+	$(F90) -o test test.o reconstruction.o types.o inout.o efficiency.o phys.o FV.o time.o limit.o ICBC.o
+
+test.o : constant.o reconstruction.o types.o inout.o efficiency.o phys.o FV.o time.o limit.o ICBC.o
