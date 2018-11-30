@@ -93,6 +93,10 @@ contains
        IC_func => IC_func_shu
        BC => BC_shu
        exactSol => exactSol_none
+    case('123')
+       IC_func => IC_func_123
+       BC => BC_123
+       exactSol => exactSol_none
     case default
        print*,"Test case ",trim(test_case)," not implemented"
        call exit()

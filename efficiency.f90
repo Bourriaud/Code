@@ -49,6 +49,17 @@ contains
           sol%name_user(i)="Error"
           call exactTab(t,mesh,sol%user(:,i:i),exactSol,gauss_weight)
           sol%user(:,i:i)=abs(sol%user(:,i:i)-sol%val(:,1:1))
+       case(3)
+          if (trim(str_equa)=="euler") then
+             sol%name_user(i)="IntE"
+             do k=1,mesh%nc
+                call unconserv(sol%val(k,:),str_equa,4,sol%user(k,i))
+                sol%user(k,i)=sol%user(k,i)/((gamma-1.0_dp)*sol%val(k,1))
+             enddo
+          else
+             print*,"No internal energy computed for your equation"
+             call exit()
+          endif
        case(101:109)
           write (str,"(I1)")sol%var_user(i)-100
           sol%name_user(i)="Uncons"//trim(str)

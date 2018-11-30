@@ -6,7 +6,7 @@ Sod	ICBC
 200	nx
 5	ny
 0.95	cfl
-0.2	tf
+0.25	tf
 euler	equation
 HLL	flux
 SSPRK3	time scheme
