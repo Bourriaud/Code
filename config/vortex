@@ -1,0 +1,30 @@
+Vortex	ICBC
+-5.	xL
+5.	xR
+-5.	yL
+5.	yR
+64	nx
+64	ny
+0.95	cfl
+10.	tf
+euler	equation
+HLL	flux
+SSPRK3	time scheme
+3	space order
+4	number of detection criterias
+PAD 1 1.0e-4	detection criteria + variable + sensibility
+DMPu2 1 1.0e-4
+DMPu2 2 1.0e-4
+DMPu2 4 1.0e-3
+10	save frequency
+vortex	namefile
+4	nvar
+rho	var 1
+rhou	var 2
+rhov	var 3
+E	var 4
+4	nsolUser
+1	var_user : solAnal
+102	var_user : u
+103	var_user : v
+104	var_user : p

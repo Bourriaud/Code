@@ -31,25 +31,24 @@ contains
   subroutine f_euler(u,f)
     real(dp), dimension(:), intent(in) :: u     !u=(rho,rhou,rhov,E)
     real(dp), dimension(:,:), intent(inout) :: f
-    real(dp) :: p,gamma,ux,uy
+    real(dp) :: p,ux,uy
 
-    gamma=1.4_dp
     call unconserv(u,"euler               ",2,ux)
-    call unconserv(u,"euler               ",2,uy)
+    call unconserv(u,"euler               ",3,uy)
     call unconserv(u,"euler               ",4,p)
 
     ! x direction
     
     f(1,1)=u(2)
-    f(2,1)=ux*u(2)+p
-    f(3,1)=ux*u(3)
+    f(2,1)=u(2)*ux+p
+    f(3,1)=u(2)*uy
     f(4,1)=ux*(u(4)+p)
 
     ! y direction
 
     f(1,2)=u(3)
-    f(2,2)=uy*u(2)
-    f(3,2)=uy*u(3)+p
+    f(2,2)=u(3)*ux
+    f(3,2)=u(3)*uy+p
     f(4,2)=uy*(u(4)+p)
 
     return

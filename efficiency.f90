@@ -172,6 +172,22 @@ contains
     return
   end subroutine exactSol_sinus_dis
 
+  subroutine exactSol_vortex(x,y,t,s)
+    real(dp), intent(in) :: x,y,t
+    real(dp), intent(out) :: s
+    real(dp) :: x0,y0,beta,r,Temp
+
+    x0=-5.0_dp+mod(int(t+5.0_dp),10)
+    y0=-5.0_dp+mod(int(t+5.0_dp),10)
+    beta=5.0_dp
+    r=sqrt((x-x0)**2+(y-y0)**2)
+    Temp=1.0_dp-(gamma-1.0_dp)*beta**2*exp(1-r**2)/(8.0_dp*gamma*pi**2)
+    s=Temp**(1.0_dp/(gamma-1.0_dp))
+
+    return
+  end subroutine exactSol_vortex
+    
+
   subroutine exactSol_none(x,y,t,s)
     real(dp), intent(in) :: x,y,t
     real(dp), intent(out) :: s

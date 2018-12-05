@@ -430,4 +430,63 @@ contains
     return   
   end subroutine BC_123
 
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!! Vortex !!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  
+  subroutine IC_func_vortex(x,y,S)
+    real(dp), intent(in) :: x,y
+    real(dp), dimension(:), intent(inout) :: S
+    real(dp), dimension(:), allocatable :: U
+    integer :: i
+    real(dp) :: beta,r,T
+
+    allocate(U(size(S)))
+
+    beta=5.0_dp
+    r=sqrt(x**2+y**2)
+    T=1.0_dp-(gamma-1.0_dp)*beta**2*exp(1-r**2)/(8.0_dp*gamma*(pi**2))
+    U(1)=T**(1.0_dp/(gamma-1.0_dp))
+    U(2)=1.0_dp-y*beta*exp(0.5_dp*(1-r**2))/(2.0_dp*pi)
+    U(3)=1.0_dp+x*beta*exp(0.5_dp*(1-r**2))/(2.0_dp*pi)
+    U(4)=U(1)**gamma
+
+    do i=1,4
+       call conserv(U,"euler               ",i,S(i))
+    enddo
+
+    deallocate(U)
+    
+    return
+  end subroutine IC_func_vortex
+
+  subroutine BC_vortex(nx,ny,nvar,mesh)
+    integer, intent(in) :: nx,ny,nvar
+    type(meshStruct), intent(inout) :: mesh
+    integer :: i,j
+    
+    do i=1,mesh%ne
+       allocate(mesh%edge(i)%bound(nvar))
+       mesh%edge(i)%boundType='NOT A BOUNDARY'
+       mesh%edge(i)%bound(:)=0.0_dp
+    enddo
+    
+    do j=1,ny
+       mesh%edge((j-1)*(nx+1)+1)%boundType='PERIODIC'
+       mesh%edge((j-1)*(nx+1)+1)%bound(:)=0.0_dp
+       
+       mesh%edge(j*(nx+1))%boundType='PERIODIC'
+       mesh%edge(j*(nx+1))%bound(:)=0.0_dp
+       
+    enddo
+    
+    do i=1,nx
+       mesh%edge((i-1)*(ny+1)+1+(nx+1)*ny)%boundType='PERIODIC'
+       mesh%edge((i-1)*(ny+1)+1+(nx+1)*ny)%bound(:)=0.0_dp
+       
+       mesh%edge(i*(ny+1)+(nx+1)*ny)%boundType='PERIODIC'
+       mesh%edge(i*(ny+1)+(nx+1)*ny)%bound(:)=0.0_dp
+    enddo
+    
+    return   
+  end subroutine BC_vortex
+
 end module ICBC

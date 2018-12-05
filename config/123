@@ -1,0 +1,28 @@
+123	ICBC
+0.	xL
+1.	xR
+0.	yL
+1.	yR
+200	nx
+5	ny
+0.95	cfl
+0.15	tf
+euler	equation
+HLL	flux
+SSPRK3	time scheme
+3	space order
+4	number of detection criterias
+PAD 1 1.0e-4	detection criteria + variable + sensibility
+DMPu2 1 1.0e-4
+DMPu2 2 1.0e-4
+DMPu2 4 1.0e-3
+10	save frequency
+123_	namefile
+4	nvar
+rho	var 1
+rhou	var 2
+rhov	var 3
+E	var 4
+2	nsolUser
+3	var_user : internal energy
+104	var_user : p

@@ -45,12 +45,19 @@ program main
        L_str_criteria,L_var_criteria,L_eps,gauss_weight)
 
   call userSol(tf,mesh,sol,str_equa,exactSol,gauss_weight)
-  if (trim(str_equa)=='transport') then
+  select case (trim(test_case))
+  case ('Sinus')
      call errorL1(mesh,sol%val(:,1),sol%user(:,1),error)
      call errorL2(mesh,sol%val(:,1),sol%user(:,1),error)
-  else
+  case ('Sinus_dis')
+     call errorL1(mesh,sol%val(:,1),sol%user(:,1),error)
+     call errorL2(mesh,sol%val(:,1),sol%user(:,1),error)
+  case ('Vortex')
+     call errorL1(mesh,sol%val(:,1),sol%user(:,1),error)
+     call errorL2(mesh,sol%val(:,1),sol%user(:,1),error)
+  case default
      print*,"No analytical solution for this configuration"
-  endif
+  end select
   
   deallocate(mesh%node,mesh%edge,mesh%cell)
   deallocate(sol%val,sol%user,sol%name,sol%var_user,sol%name_user,sol%conserv_var)
@@ -73,30 +80,34 @@ contains
     integer :: i
 
     select case (trim(test_case))
-    case('Sinus')
+    case ('Sinus')
        IC_func => IC_func_sinus
        BC => BC_sinus
        exactSol => exactSol_sinus
-    case('Sinus_dis')
+    case ('Sinus_dis')
        IC_func => IC_func_sinus_dis
        BC => BC_sinus_dis
        exactSol => exactSol_sinus_dis
-    case('Sod')
+    case ('Sod')
        IC_func => IC_func_sod
        BC => BC_sod
        exactSol => exactSol_none
-    case('Sod_mod')
+    case ('Sod_mod')
        IC_func => IC_func_sod_mod
        BC => BC_sod_mod
        exactSol => exactSol_none
-    case('Shu')
+    case ('Shu')
        IC_func => IC_func_shu
        BC => BC_shu
        exactSol => exactSol_none
-    case('123')
+    case ('123')
        IC_func => IC_func_123
        BC => BC_123
        exactSol => exactSol_none
+    case ('Vortex')
+       IC_func => IC_func_vortex
+       BC => BC_vortex
+       exactSol => exactSol_vortex
     case default
        print*,"Test case ",trim(test_case)," not implemented"
        call exit()
@@ -175,7 +186,7 @@ contains
     do while (t<tf)
        call time_scheme(mesh,sol,str_equa,f_equa,flux,speed,order,cfl,t,n,tf, &
             L_str_criteria,L_var_criteria,L_eps,gauss_weight)
-       if (mod(n,fs)==0) then
+       if (mod(n,fs)==0.or.t>=tf) then
           call userSol(t,mesh,sol,str_equa,exactSol,gauss_weight)
           call writeSol(mesh,sol,namefile,n/fs)
           call print(mesh,sol,t,n)

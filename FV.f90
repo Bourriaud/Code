@@ -221,8 +221,8 @@ contains
     call unconserv(u2,"euler               ",4,p2)
     a1=sqrt(gamma*abs(p1/u1(1)))
     a2=sqrt(gamma*abs(p2/u2(1)))
-    SL=min(u1(1+dir)/u1(1)-a1,u2(1+dir)/u2(1)-a2)
-    SR=max(u1(1+dir)/u1(1)+a1,u2(1+dir)/u2(1)+a2)
+    SL=min(-abs(u1(1+dir)/u1(1))-a1,-abs(u2(1+dir)/u2(1))-a2)
+    SR=max(abs(u1(1+dir)/u1(1))+a1,abs(u2(1+dir)/u2(1))+a2)
 
     if (SL>0.0_dp) then
        call f_equa(u1,F1vect)
@@ -235,7 +235,7 @@ contains
        call f_equa(u2,F2vect)
        F(:)=(SR*F1vect(:,dir)-SL*F2vect(:,dir)+SL*SR*(u2(:)-u1(:)))/(SR-SL)
     endif
-    
+
     deallocate(F1vect,F2vect)
 
     return
@@ -254,13 +254,13 @@ contains
     call unconserv(u2,"euler               ",4,p2)
     a1=sqrt(gamma*abs(p1/u1(1)))
     a2=sqrt(gamma*abs(p2/u2(1)))
-    SL=min(u1(2)/u1(1)-a1,u2(2)/u2(1)-a2)
-    SR=max(u1(2)/u1(1)+a1,u2(2)/u2(1)+a2)
+    SL=min(-abs(u1(2)/u1(1))-a1,-abs(u2(2)/u2(1))-a2)
+    SR=max(abs(u1(2)/u1(1))+a1,abs(u2(2)/u2(1))+a2)
     
     Smax(1)=max(abs(SL),abs(SR))
 
-    SL=min(u1(3)/u1(1)-a1,u2(3)/u2(1)-a2)
-    SR=max(u1(3)/u1(1)+a1,u2(3)/u2(1)+a2)
+    SL=min(-abs(u1(3)/u1(1))-a1,-abs(u2(3)/u2(1))-a2)
+    SR=max(abs(u1(3)/u1(1))+a1,abs(u2(3)/u2(1))+a2)
 
     Smax(2)=max(abs(SL),abs(SR))
 
