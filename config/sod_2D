@@ -1,0 +1,27 @@
+Sod_2D	ICBC
+-1.	xL
+1.	xR
+-1.	yL
+1.	yR
+100	nx
+100	ny
+0.95	cfl
+0.25	tf
+euler	equation
+HLL	flux
+SSPRK3	time scheme
+3	space order
+4	number of detection criterias
+PAD 1 1.0e-4	detection criteria + variable + sensibility
+DMPu2 1 1.0e-4
+DMPu2 2 1.0e-4
+DMPu2 4 1.0e-3
+5	save frequency
+sod_2D	namefile
+4	nvar
+rho	var 1
+rhou	var 2
+rhov	var 3
+E	var 4
+1	nsolUser
+104	var_user : p

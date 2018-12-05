@@ -92,6 +92,10 @@ contains
        IC_func => IC_func_sod
        BC => BC_sod
        exactSol => exactSol_none
+    case ('Sod_2D')
+       IC_func => IC_func_sod_2D
+       BC => BC_sod_2D
+       exactSol => exactSol_none
     case ('Sod_mod')
        IC_func => IC_func_sod_mod
        BC => BC_sod_mod

@@ -181,6 +181,102 @@ contains
     return   
   end subroutine BC_sod
 
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!! Sod_2D !!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+  subroutine IC_func_sod_2D(x,y,S)
+    real(dp), intent(in) :: x,y
+    real(dp), dimension(:), intent(inout) :: S
+    real(dp), dimension(:), allocatable :: U
+    integer :: i
+    real(dp) :: r,r0
+
+    allocate(U(size(S)))
+
+    r0=0.25_dp
+    r=sqrt(x**2+y**2)
+    
+    if (r>r0) then
+       U(1)=1.0_dp
+       U(2)=0.0_dp
+       U(3)=0.0_dp
+       U(4)=1.0_dp
+    else
+       U(1)=0.125_dp
+       U(2)=0.0_dp
+       U(3)=0.0_dp
+       U(4)=0.1_dp
+    endif
+    
+    do i=1,4
+       call conserv(U,"euler               ",i,S(i))
+    enddo
+
+    deallocate(U)
+    
+    return
+  end subroutine IC_func_sod_2D
+
+  subroutine BC_sod_2D(nx,ny,nvar,mesh)
+    integer, intent(in) :: nx,ny,nvar
+    type(meshStruct), intent(inout) :: mesh
+    integer :: i,j,isol
+    real(dp), dimension(:), allocatable :: bound
+
+    allocate(bound(nvar))
+    
+    do i=1,mesh%ne
+       allocate(mesh%edge(i)%bound(nvar))
+       mesh%edge(i)%boundType='NOT A BOUNDARY'
+       mesh%edge(i)%bound(:)=0.0_dp
+    enddo
+    
+    do j=1,ny
+       mesh%edge((j-1)*(nx+1)+1)%boundType='DIRICHLET'
+       bound(1)=1.0_dp
+       bound(2)=0.0_dp
+       bound(3)=0.0_dp
+       bound(4)=1.0_dp
+       do isol=1,nvar
+          call conserv(bound(:),"euler               ",isol,mesh%edge((j-1)*(nx+1)+1)%bound(isol))
+       enddo
+       
+       mesh%edge(j*(nx+1))%boundType='DIRICHLET'
+       bound(1)=1.0_dp
+       bound(2)=0.0_dp
+       bound(3)=0.0_dp
+       bound(4)=1.0_dp
+       do isol=1,nvar
+          call conserv(bound(:),"euler               ",isol,mesh%edge(j*(nx+1))%bound(isol))
+       enddo
+       
+    enddo
+    
+    do i=1,nx
+       mesh%edge((i-1)*(ny+1)+1+(nx+1)*ny)%boundType='DIRICHLET'
+       bound(1)=1.0_dp
+       bound(2)=0.0_dp
+       bound(3)=0.0_dp
+       bound(4)=1.0_dp
+       do isol=1,nvar
+          call conserv(bound(:),"euler               ",isol,mesh%edge((i-1)*(ny+1)+1+(nx+1)*ny)%bound(isol))
+       enddo
+       
+       mesh%edge(i*(ny+1)+(nx+1)*ny)%boundType='DIRICHLET'
+       bound(1)=1.0_dp
+       bound(2)=0.0_dp
+       bound(3)=0.0_dp
+       bound(4)=1.0_dp
+       do isol=1,nvar
+          call conserv(bound(:),"euler               ",isol,mesh%edge(i*(ny+1)+(nx+1)*ny)%bound(isol))
+       enddo
+       
+    enddo
+
+    deallocate(bound)
+    
+    return   
+  end subroutine BC_sod_2D
+
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!! Sod_mod !!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
   subroutine IC_func_sod_mod(x,y,S)
