@@ -585,4 +585,86 @@ contains
     return   
   end subroutine BC_vortex
 
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!! RP2D_3 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+  subroutine IC_func_RP2D_3(x,y,S)
+    real(dp), intent(in) :: x,y
+    real(dp), dimension(:), intent(inout) :: S
+    real(dp), dimension(:), allocatable :: U
+    integer :: i
+    real(dp) :: x0,y0
+
+    allocate(U(size(S)))
+
+    x0=0.5_dp
+    y0=0.5_dp
+    
+    if (x<=x0.and.y<=y0) then
+       U(1)=0.138_dp
+       U(2)=1.206_dp
+       U(3)=1.206_dp
+       U(4)=0.029_dp
+    elseif (x<=x0.and.y>y0) then
+       U(1)=0.5323_dp
+       U(2)=1.206_dp
+       U(3)=0.0_dp
+       U(4)=0.3_dp
+    elseif (x>x0.and.y<=y0) then
+       U(1)=0.5323_dp
+       U(2)=0.0_dp
+       U(3)=1.206_dp
+       U(4)=0.3_dp
+    else
+       U(1)=1.5_dp
+       U(2)=0.0_dp
+       U(3)=0.0_dp
+       U(4)=1.5_dp
+    endif
+    
+    do i=1,4
+       call conserv(U,"euler               ",i,S(i))
+    enddo
+
+    deallocate(U)
+    
+    return
+  end subroutine IC_func_RP2D_3
+
+  subroutine BC_RP2D_3(nx,ny,nvar,mesh)
+    integer, intent(in) :: nx,ny,nvar
+    type(meshStruct), intent(inout) :: mesh
+    integer :: i,j
+    real(dp), dimension(:), allocatable :: bound
+
+    allocate(bound(nvar))
+    
+    do i=1,mesh%ne
+       allocate(mesh%edge(i)%bound(nvar))
+       mesh%edge(i)%boundType='NOT A BOUNDARY'
+       mesh%edge(i)%bound(:)=0.0_dp
+    enddo
+    
+    do j=1,ny
+       mesh%edge((j-1)*(nx+1)+1)%boundType='NEUMANN'
+       mesh%edge((j-1)*(nx+1)+1)%bound(:)=0.0_dp
+       
+       mesh%edge(j*(nx+1))%boundType='NEUMANN'
+       mesh%edge(j*(nx+1))%bound(:)=0.0_dp
+       
+    enddo
+    
+    do i=1,nx
+       mesh%edge((i-1)*(ny+1)+1+(nx+1)*ny)%boundType='NEUMANN'
+       mesh%edge((i-1)*(ny+1)+1+(nx+1)*ny)%bound(:)=0.0_dp
+       
+       mesh%edge(i*(ny+1)+(nx+1)*ny)%boundType='NEUMANN'
+       mesh%edge(i*(ny+1)+(nx+1)*ny)%bound(:)=0.0_dp
+    enddo
+
+    deallocate(bound)
+    
+    return   
+  end subroutine BC_RP2D_3
+
+
 end module ICBC

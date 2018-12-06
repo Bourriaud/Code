@@ -112,6 +112,10 @@ contains
        IC_func => IC_func_vortex
        BC => BC_vortex
        exactSol => exactSol_vortex
+    case ('RP2D_3')
+       IC_func => IC_func_RP2D_3
+       BC => BC_RP2D_3
+       exactSol => exactSol_none
     case default
        print*,"Test case ",trim(test_case)," not implemented"
        call exit()

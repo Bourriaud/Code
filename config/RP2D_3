@@ -1,12 +1,12 @@
-Shu	ICBC
--5.	xL
-5.	xR
+RP2D_3	ICBC
+0.	xL
+1.	xR
 0.	yL
 1.	yR
 400	nx
-5	ny
+400	ny
 0.95	cfl
-1.8	tf
+0.3	tf
 euler	equation
 HLL	flux
 SSPRK3	time scheme
@@ -17,11 +17,12 @@ DMPu2 1 1.0e-4
 DMPu2 2 1.0e-4
 DMPu2 4 1.0e-3
 10	save frequency
-shu	namefile
+RP2D_3_	namefile
 4	nvar
 rho	var 1
 rhou	var 2
 rhov	var 3
 E	var 4
-1	nsolUser
+2	nsolUser
+3	var_user : internal energy
 104	var_user : p
