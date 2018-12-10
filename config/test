@@ -1,0 +1,19 @@
+Test	ICBC
+0.	xL
+3.	xR
+0.	yL
+3.	yR
+3	nx
+3	ny
+1.	cfl
+1.5	tf
+transport	equation
+godunov	flux
+euler_exp	time scheme
+1	space order
+0	number of detection criterias
+1	save frequency
+test	namefile
+1	nvar
+var1	var 1
+0	nsolUser
