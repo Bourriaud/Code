@@ -104,26 +104,35 @@ contains
     return
   end subroutine init
   
-  subroutine IC(IC_func,mesh,sol,gauss_weight)
+  subroutine IC(IC_func,mesh,sol,order,gauss_point,gauss_weight)
     procedure (sub_IC), pointer, intent(in) :: IC_func
     type(meshStruct), intent(in) :: mesh
     type(solStruct), intent(inout) :: sol
-    real(dp), dimension(:), intent(in) :: gauss_weight
+    integer, intent(in) :: order
+    real(dp), dimension(:), intent(in) :: gauss_point,gauss_weight
     real(dp), dimension(:), allocatable :: U0,S
     integer :: k,p1,p2
+    real(dp) :: Xg,Yg
 
     allocate(U0(sol%nvar),S(sol%nvar))
     
     do k=1,mesh%nc
        U0=0.0_dp
-       do p1=1,size(mesh%cell(k)%X_gauss)
-          do p2=1,size(mesh%cell(k)%Y_gauss)
-             call IC_func(mesh%cell(k)%X_gauss(p1),mesh%cell(k)%Y_gauss(p2),S)
+       do p1=1,6
+          do p2=1,6
+             Xg=mesh%cell(k)%xc+gauss_point(p1)*mesh%cell(k)%dx/2.0_dp
+             Yg=mesh%cell(k)%yc+gauss_point(p2)*mesh%cell(k)%dy/2.0_dp
+             call IC_func(Xg,Yg,S)
              U0=U0+S*gauss_weight(p1)*gauss_weight(p2)/4.0_dp
           enddo
        enddo
        sol%val(k,:)=U0
     enddo
+
+    if (order>6) then
+       print*,"The order of initial condition's quadrature is to low"
+       call exit()
+    endif
 
     deallocate(U0,S)
     
@@ -149,6 +158,8 @@ contains
           k=j*(nx+1)+i+1
           mesh%node(k)%x=xL+i*dx
           mesh%node(k)%y=yL+j*dy
+
+          allocate(mesh%node(k)%connect(4))
 
           mesh%node(k)%connect(1)=j*(nx+1)+i
           mesh%node(k)%connect(2)=(j-1)*(nx+1)+i+1
@@ -184,8 +195,8 @@ contains
 
           mesh%cell(k)%corner(1)=(j-1)*(nx+1)+i
           mesh%cell(k)%corner(2)=(j-1)*(nx+1)+i+1
-          mesh%cell(k)%corner(3)=j*(nx+1)+i
-          mesh%cell(k)%corner(4)=j*(nx+1)+i+1
+          mesh%cell(k)%corner(3)=j*(nx+1)+i+1
+          mesh%cell(k)%corner(4)=j*(nx+1)+i
 
           mesh%cell(k)%edge(1)=k+j-1
           mesh%cell(k)%edge(2)=(nx+1)*ny+j+(i-1)*(ny+1)
@@ -251,6 +262,7 @@ contains
           mesh%edge(k)%length=dy
           mesh%edge(k)%lengthN=dx
           mesh%edge(k)%period=k
+          mesh%edge(k)%sub=0
        enddo
        mesh%edge((j-1)*(nx+1)+1)%cell1=-j*nx
        mesh%edge((j-1)*(nx+1)+1)%period=(j-1)*(nx+1)+nx+1
@@ -268,6 +280,7 @@ contains
           mesh%edge(k)%length=dx
           mesh%edge(k)%lengthN=dy
           mesh%edge(k)%period=k
+          mesh%edge(k)%sub=0
        enddo
        mesh%edge((i-1)*(ny+1)+1+(nx+1)*ny)%cell1=-(nx*(ny-1)+i)
        mesh%edge((i-1)*(ny+1)+1+(nx+1)*ny)%period=(i-1)*(ny+1)+ny+1+(nx+1)*ny
@@ -332,10 +345,10 @@ contains
 
     write(11,'(a,i8,i9)')"CELLS ",mesh%nc,5*mesh%nc
     do k=1,mesh%nc
-       i1=mesh%edge(mesh%cell(k)%edge(1))%node1-1
-       i2=mesh%edge(mesh%cell(k)%edge(3))%node1-1
-       i3=mesh%edge(mesh%cell(k)%edge(3))%node2-1
-       i4=mesh%edge(mesh%cell(k)%edge(1))%node2-1
+       i1=mesh%cell(k)%corner(1)-1
+       i2=mesh%cell(k)%corner(2)-1
+       i3=mesh%cell(k)%corner(3)-1
+       i4=mesh%cell(k)%corner(4)-1
        write(11,'(i1,i8,i8,i8,i8)')4,i1,i2,i3,i4
     enddo
 

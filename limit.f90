@@ -23,9 +23,10 @@ contains
     type(solStruct) :: sol2
     integer, dimension(:), allocatable, intent(inout) :: NOT_ACCEPTED_CELL,NOT_ACCEPTED_EDGE
     integer, dimension(:), allocatable :: NAC,NAE
-    integer :: i,j,k,n,p,isol,nc,ne,cell1,cell2,edge
+    integer :: i,j,k,n,p,isol,nc,ne,cell1,cell2,edge,sub1,sub2
     procedure (sub_criteria), pointer :: criteria
     logical :: accept
+    real(dp) :: lengthN
 
     allocate(NAC(mesh%nc),NAE(mesh%ne))
 
@@ -59,6 +60,9 @@ contains
                 edge=mesh%cell(k)%edge(j)
                 cell1=mesh%edge(edge)%cell1
                 cell2=mesh%edge(edge)%cell2
+                lengthN=mesh%edge(edge)%lengthN
+                sub1=mesh%edge(edge)%sub(1)
+                sub2=mesh%edge(edge)%sub(2)
                 if (all(NAE/=edge).and.mesh%edge(edge)%deg>0) then
                    
                    select case (trim(mesh%edge(edge)%boundtype))
@@ -84,9 +88,9 @@ contains
                          call criteria_flux(mesh%edge(edge)%flux(p,:),mesh%edge(edge)%flux_acc(p))
                          if (.not.mesh%edge(edge)%flux_acc(p)) then
                             soltemp%val(abs(cell1),:)=soltemp%val(abs(cell1),:)+ &
-                                 gauss_weight(p)*mesh%edge(edge)%flux(p,:)*dt/(mesh%edge(edge)%lengthN*2.0_dp)
+                                 gauss_weight(p)*mesh%edge(edge)%flux(p,:)*dt/(lengthN*2.0_dp**(sub1+1))
                             soltemp%val(abs(cell2),:)=soltemp%val(abs(cell2),:)- &
-                                 gauss_weight(p)*mesh%edge(edge)%flux(p,:)*dt/(mesh%edge(edge)%lengthN*2.0_dp)
+                                 gauss_weight(p)*mesh%edge(edge)%flux(p,:)*dt/(lengthN*2.0_dp**(sub2+1))
                          endif
                       enddo
                       
@@ -108,11 +112,11 @@ contains
                          if (.not.mesh%edge(edge)%flux_acc(p)) then
                             if (cell1>0) then
                                soltemp%val(cell1,:)=soltemp%val(cell1,:)+ &
-                                    gauss_weight(p)*mesh%edge(edge)%flux(p,:)*dt/(mesh%edge(edge)%lengthN*2.0_dp)
+                                    gauss_weight(p)*mesh%edge(edge)%flux(p,:)*dt/(lengthN*2.0_dp**(sub1+1))
                             endif
                             if (cell2>0) then
                                soltemp%val(cell2,:)=soltemp%val(cell2,:)- &
-                                    gauss_weight(p)*mesh%edge(edge)%flux(p,:)*dt/(mesh%edge(edge)%lengthN*2.0_dp)
+                                    gauss_weight(p)*mesh%edge(edge)%flux(p,:)*dt/(lengthN*2.0_dp**(sub2+1))
                             endif
                          endif
                       enddo

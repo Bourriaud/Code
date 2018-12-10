@@ -6,7 +6,7 @@ module types
   
   type :: nodeStruct
      real(dp) :: x,y
-     integer, dimension(4) :: connect
+     integer, dimension(:), allocatable :: connect
   end type nodeStruct
 
   type :: edgeStruct
@@ -21,6 +21,7 @@ module types
      real(dp), dimension(:,:), allocatable :: flux   !flux(gauss_point,var)
      logical, dimension(:), allocatable :: flux_acc
      integer :: deg
+     integer, dimension(2) :: sub
   end type edgeStruct
 
   type :: cellStruct

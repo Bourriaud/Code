@@ -666,5 +666,52 @@ contains
     return   
   end subroutine BC_RP2D_3
 
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!! Sinus !!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+  subroutine IC_func_test(x,y,S)
+    real(dp), intent(in) :: x,y
+    real(dp), dimension(:), intent(inout) :: S
+    if(.false.)print*,y
+
+    if (x<1.5_dp) then
+       S(1)=1.0_dp
+    else
+       S(1)=0.0_dp
+    endif
+    
+    return
+  end subroutine IC_func_test
+
+  subroutine BC_test(nx,ny,nvar,mesh)
+    integer, intent(in) :: nx,ny,nvar
+    type(meshStruct), intent(inout) :: mesh
+    integer :: i,j
+    
+    do i=1,mesh%ne
+       allocate(mesh%edge(i)%bound(nvar))
+       mesh%edge(i)%boundType='NOT A BOUNDARY'
+       mesh%edge(i)%bound=0.0_dp
+    enddo
+    
+    do j=1,ny
+       mesh%edge((j-1)*(nx+1)+1)%boundType='NEUMANN'
+       mesh%edge((j-1)*(nx+1)+1)%bound=0.0_dp
+       
+       mesh%edge(j*(nx+1))%boundType='NEUMANN'
+       mesh%edge(j*(nx+1))%bound=0.0_dp
+       
+    enddo
+    
+    do i=1,nx
+       mesh%edge((i-1)*(ny+1)+1+(nx+1)*ny)%boundType='NEUMANN'
+       mesh%edge((i-1)*(ny+1)+1+(nx+1)*ny)%bound(:)=0.0_dp
+       
+       mesh%edge(i*(ny+1)+(nx+1)*ny)%boundType='NEUMANN'
+       mesh%edge(i*(ny+1)+(nx+1)*ny)%bound(:)=0.0_dp
+    enddo
+    
+    return   
+  end subroutine BC_test
+
 
 end module ICBC

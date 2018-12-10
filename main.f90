@@ -36,7 +36,7 @@ program main
   call init_FV(test_case,str_equa,str_flux,str_time_scheme,IC_func,BC,exactSol, &
        f_equa,flux,speed,time_scheme,sol)
   call buildmesh(xL,xR,yL,yR,nx,ny,gauss_point,mesh)
-  call IC(IC_func,mesh,sol,gauss_weight)
+  call IC(IC_func,mesh,sol,order,gauss_point6,gauss_weight6)
   call BC(nx,ny,nvar,mesh)
   call userSol(0.0_dp,mesh,sol,str_equa,exactSol,gauss_weight)
   call writeSol(mesh,sol,namefile,0)

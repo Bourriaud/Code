@@ -41,6 +41,6 @@ limit.o: constant.o types.o reconstruction.o
 ICBC.o: constant.o types.o phys.o
 
 test: test.o constant.o reconstruction.o types.o inout.o efficiency.o phys.o FV.o time.o limit.o ICBC.o
-	$(F90) -o test test.o reconstruction.o types.o inout.o efficiency.o phys.o FV.o time.o limit.o ICBC.o
+	$(F90) -o test constant.o test.o reconstruction.o types.o inout.o efficiency.o phys.o FV.o time.o limit.o ICBC.o
 
 test.o : constant.o reconstruction.o types.o inout.o efficiency.o phys.o FV.o time.o limit.o ICBC.o
