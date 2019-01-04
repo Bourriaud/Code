@@ -4,6 +4,7 @@ module inout
   use types
   use efficiency
   use phys
+  use ISO_C_BINDING
   
   implicit none
 
@@ -18,12 +19,11 @@ contains
     return
   end subroutine get_config
   
-  subroutine init(config_file,test_case,xL,xR,yL,yR,nx,ny,nvar,cfl,tf,fs,namefile,mesh,sol, &
+  subroutine init(config_file,test_case,xL,xR,yL,yR,level,nvar,cfl,tf,fs,namefile,sol, &
        str_equa,str_flux,str_time_scheme,order,L_str_criteria,L_var_criteria,L_eps,gauss_point,gauss_weight)
     character(len=20), intent(out) :: config_file,test_case,namefile,str_equa,str_flux,str_time_scheme
     real(dp), intent(out) :: xL,xR,yL,yR,cfl,tf
-    integer, intent(out) :: nx,ny,nvar,fs,order
-    type(meshStruct), intent(out) :: mesh
+    integer, intent(out) :: level,nvar,fs,order
     type(solStruct), intent(out) :: sol
     character(len=20), dimension(:), allocatable, intent(out) :: L_str_criteria
     integer, dimension(:), allocatable, intent(out) :: L_var_criteria
@@ -38,8 +38,7 @@ contains
     read(11,*)xR
     read(11,*)yL
     read(11,*)yR
-    read(11,*)nx
-    read(11,*)ny
+    read(11,*)level
     read(11,*)cfl
     read(11,*)tf
     read(11,*)str_equa
@@ -65,16 +64,7 @@ contains
     enddo
     close(11)
     
-    mesh%nc=nx*ny
-    mesh%ne=ny*(nx+1)+nx*(ny+1)
-    mesh%np=(nx+1)*(ny+1)
     sol%nvar=nvar
-    
-    allocate(mesh%node(mesh%np),mesh%edge(mesh%ne),mesh%cell(mesh%nc))
-    allocate(sol%val(mesh%nc,sol%nvar),sol%user(mesh%nc,sol%nsolUser),sol%conserv_var(sol%nvar,2))
-    do i=1,mesh%ne
-       allocate(mesh%edge(i)%flux(order,nvar))
-    enddo
 
     allocate(gauss_point(order),gauss_weight(order))
     select case (order)
@@ -139,17 +129,24 @@ contains
     return
   end subroutine IC
   
-  subroutine buildMesh(xL,xR,yL,yR,nx,ny,gauss_point,mesh)
+  subroutine buildMesh(xL,xR,yL,yR,nx,ny,gauss_point,order,mesh,sol)
     real(dp), intent(in) :: xL,xR,yL,yR
-    integer, intent(in) :: nx,ny
+    integer, intent(in) :: nx,ny,order
     real(dp), dimension(:), intent(in) :: gauss_point
     type(meshStruct), intent(inout) :: mesh
+    type(solStruct), intent(inout) :: sol
     integer :: i,j,k,p,dir
     real(dp) :: dx,dy,a,b,c,center,diff,xc,yc
     type(edgeStruct) :: edge
 
     dx=(xR-xL)/nx
     dy=(yR-yL)/ny
+    mesh%np=(nx+1)*(ny+1)
+    mesh%ne=ny*(nx+1)+nx*(ny+1)
+    mesh%nc=nx*ny
+
+    allocate(mesh%node(mesh%np),mesh%cell(mesh%nc),mesh%edge(mesh%ne))
+    allocate(sol%val(mesh%nc,sol%nvar),sol%user(mesh%nc,sol%nsolUser),sol%conserv_var(sol%nvar,2))
 
     !Initialisation des points
     
@@ -158,25 +155,6 @@ contains
           k=j*(nx+1)+i+1
           mesh%node(k)%x=xL+i*dx
           mesh%node(k)%y=yL+j*dy
-
-          allocate(mesh%node(k)%connect(4))
-
-          mesh%node(k)%connect(1)=j*(nx+1)+i
-          mesh%node(k)%connect(2)=(j-1)*(nx+1)+i+1
-          mesh%node(k)%connect(3)=j*(nx+1)+i+2
-          mesh%node(k)%connect(4)=(j+1)*(nx+1)+i+1
-          if (i==0) then
-             mesh%node(k)%connect(1)=-1
-          endif
-          if (j==0) then
-             mesh%node(k)%connect(2)=-1
-          endif
-          if (i==nx) then
-             mesh%node(k)%connect(3)=-1
-          endif
-          if (j==ny) then
-             mesh%node(k)%connect(4)=-1
-          endif
        enddo
     enddo
 
@@ -195,8 +173,8 @@ contains
 
           mesh%cell(k)%corner(1)=(j-1)*(nx+1)+i
           mesh%cell(k)%corner(2)=(j-1)*(nx+1)+i+1
-          mesh%cell(k)%corner(3)=j*(nx+1)+i+1
-          mesh%cell(k)%corner(4)=j*(nx+1)+i
+          mesh%cell(k)%corner(3)=j*(nx+1)+i
+          mesh%cell(k)%corner(4)=j*(nx+1)+i+1
 
           mesh%cell(k)%edge(1)=k+j-1
           mesh%cell(k)%edge(2)=(nx+1)*ny+j+(i-1)*(ny+1)
@@ -254,8 +232,6 @@ contains
     do j=1,ny
        do i=1,nx+1
           k=(j-1)*(nx+1)+i
-          mesh%edge(k)%node1=k
-          mesh%edge(k)%node2=k+nx+1
           mesh%edge(k)%cell1=(j-1)*nx+i-1
           mesh%edge(k)%cell2=(j-1)*nx+i
           mesh%edge(k)%dir=1
@@ -272,8 +248,6 @@ contains
     do i=1,nx
        do j=1,ny+1
           k=(i-1)*(ny+1)+j+(nx+1)*ny
-          mesh%edge(k)%node1=i+(j-1)*(nx+1)
-          mesh%edge(k)%node2=i+(j-1)*(nx+1)+1
           mesh%edge(k)%cell1=i+(j-1)*nx-nx
           mesh%edge(k)%cell2=i+(j-1)*nx
           mesh%edge(k)%dir=2
@@ -293,12 +267,19 @@ contains
        dir=edge%dir
        allocate(mesh%edge(i)%X_gauss(size(gauss_point)),mesh%edge(i)%Y_gauss(size(gauss_point)))
        allocate(mesh%edge(i)%flux_acc(size(gauss_point)))
+       allocate(mesh%edge(i)%flux(order,sol%nvar))
        mesh%edge(i)%flux_acc=.false.
        select case (dir)
        case(1)
-          a=mesh%node(edge%node1)%y
-          b=mesh%node(edge%node2)%y
-          c=mesh%node(edge%node1)%x
+          if (edge%cell1>0) then
+             a=mesh%node(mesh%cell(edge%cell1)%corner(2))%y
+             b=mesh%node(mesh%cell(edge%cell1)%corner(4))%y
+             c=mesh%node(mesh%cell(edge%cell1)%corner(2))%x
+          else
+             a=mesh%node(mesh%cell(edge%cell2)%corner(1))%y
+             b=mesh%node(mesh%cell(edge%cell2)%corner(3))%y
+             c=mesh%node(mesh%cell(edge%cell2)%corner(1))%x
+          endif
           center=(a+b)/2.0_dp
           diff=(b-a)/2.0_dp
           do p=1,size(gauss_point)
@@ -306,9 +287,15 @@ contains
              mesh%edge(i)%Y_gauss(p)=center+diff*gauss_point(p)
           enddo
        case(2)
-          a=mesh%node(edge%node1)%x
-          b=mesh%node(edge%node2)%x
-          c=mesh%node(edge%node1)%y
+          if (edge%cell1>0) then
+             a=mesh%node(mesh%cell(edge%cell1)%corner(3))%x
+             b=mesh%node(mesh%cell(edge%cell1)%corner(4))%x
+             c=mesh%node(mesh%cell(edge%cell1)%corner(3))%y
+          else
+             a=mesh%node(mesh%cell(edge%cell2)%corner(1))%x
+             b=mesh%node(mesh%cell(edge%cell2)%corner(2))%x
+             c=mesh%node(mesh%cell(edge%cell2)%corner(1))%y
+          endif
           center=(a+b)/2.0_dp
           diff=(b-a)/2.0_dp
           do p=1,size(gauss_point)
@@ -320,6 +307,163 @@ contains
     
     return
   end subroutine buildMesh
+
+  subroutine buildMesh_P4EST(xL,xR,yL,yR,level,gauss_point,order,mesh,sol)
+    real(dp), intent(in) :: xL,xR,yL,yR
+    integer, intent(in) :: level,order
+    real(dp), dimension(:), intent(in) :: gauss_point
+    type(meshStruct), intent(inout) :: mesh
+    type(solStruct), intent(inout) :: sol
+    type(c_ptr) :: p4est,p4_mesh,quadrants,nodes,edges,C_corners,C_neighbors,C_sub
+    integer(c_int) :: tt
+    integer, dimension(:), pointer :: F_corners,F_neighbors,F_sub
+    integer :: k,i,iedge,cell1,cell2,lev,p
+    real(dp) :: a,b,c,center,diff
+
+    call p4_build_mesh(level,p4est,tt,p4_mesh,quadrants,nodes,edges,mesh%np,mesh%nc,mesh%ne)
+
+    allocate(mesh%node(mesh%np),mesh%cell(mesh%nc),mesh%edge(mesh%ne))
+    do k=1,mesh%nc
+       allocate(mesh%cell(k)%edge(4))
+    enddo
+    allocate(sol%val(mesh%nc,sol%nvar),sol%user(mesh%nc,sol%nsolUser),sol%conserv_var(sol%nvar,2))
+    
+    do k=1,mesh%np
+       call p4_get_node(p4est,tt,nodes,k-1,mesh%node(k)%x,mesh%node(k)%y)
+       mesh%node(k)%x=(xR-xL)*mesh%node(k)%x+xL
+       mesh%node(k)%y=(yR-yL)*mesh%node(k)%y+yL
+    enddo
+
+    do k=1,mesh%nc
+       allocate(mesh%cell(k)%X_gauss(size(gauss_point)),mesh%cell(k)%Y_gauss(size(gauss_point)))
+       call p4_get_cell(p4est,p4_mesh,tt,quadrants,nodes,edges,k-1,mesh%cell(k)%xc,mesh%cell(k)%yc, &
+            mesh%cell(k)%dx,mesh%cell(k)%dy,C_corners,C_neighbors,lev)
+       mesh%cell(k)%xc=(xR-xL)*mesh%cell(k)%xc+xL
+       mesh%cell(k)%yc=(yR-yL)*mesh%cell(k)%yc+yL
+       mesh%cell(k)%dx=(xR-xL)*mesh%cell(k)%dx
+       mesh%cell(k)%dy=(yR-yL)*mesh%cell(k)%dy
+       call c_f_pointer(C_corners,F_corners,(/4/))
+       call c_f_pointer(C_neighbors,F_neighbors,(/8/))
+       allocate(mesh%cell(k)%neigh(size(F_neighbors)))
+       mesh%cell(k)%corner=F_corners
+       mesh%cell(k)%neigh=F_neighbors
+       do p=1,size(gauss_point)
+          mesh%cell(k)%X_gauss(p)=mesh%cell(k)%xc+mesh%cell(k)%dx*gauss_point(p)/2.0_dp
+          mesh%cell(k)%Y_gauss(p)=mesh%cell(k)%yc+mesh%cell(k)%dy*gauss_point(p)/2.0_dp
+       enddo
+
+       do i=1,4
+          
+          call p4_get_edge(p4est,p4_mesh,quadrants,edges,mesh%ne,k-1,i-1,iedge,cell1,cell2,C_sub)
+          
+          if (iedge/=0) then
+
+             allocate(mesh%edge(iedge)%flux_acc(size(gauss_point)))
+             allocate(mesh%edge(iedge)%flux(order,sol%nvar))
+             allocate(mesh%edge(iedge)%X_gauss(size(gauss_point)),mesh%edge(iedge)%Y_gauss(size(gauss_point)))
+             mesh%edge(iedge)%flux_acc=.false.
+             call c_f_pointer(C_sub,F_sub,(/2/))
+             mesh%edge(iedge)%sub=F_sub
+             
+             if (cell1>0) then
+                mesh%cell(cell1)%edge(i)=iedge
+             endif           
+             if (cell2>0) then
+                mesh%cell(cell2)%edge(i)=iedge
+             endif
+             
+             mesh%edge(iedge)%cell1=cell1
+             mesh%edge(iedge)%cell2=cell2
+             
+             select case (i)
+             case (1,2)
+                mesh%edge(iedge)%dir=1
+                mesh%edge(iedge)%length=(yR-yL)/(2**lev)
+                mesh%edge(iedge)%lengthN=(xR-xL)/(2**lev)
+             case (3,4)
+                mesh%edge(iedge)%dir=2
+                mesh%edge(iedge)%length=(xR-xL)/(2**lev)
+                mesh%edge(iedge)%lengthN=(yR-yL)/(2**lev)
+             end select
+
+             select case (mesh%edge(iedge)%dir)
+             case(1)
+                if (cell1>0) then
+                   a=mesh%node(mesh%cell(cell1)%corner(2))%y
+                   b=mesh%node(mesh%cell(cell1)%corner(3))%y
+                   c=mesh%node(mesh%cell(cell1)%corner(2))%x
+                else
+                   a=mesh%node(mesh%cell(cell2)%corner(1))%y
+                   b=mesh%node(mesh%cell(cell2)%corner(4))%y
+                   c=mesh%node(mesh%cell(cell2)%corner(1))%x
+                endif
+                center=(a+b)/2.0_dp
+                diff=(b-a)/2.0_dp
+                do p=1,size(gauss_point)
+                   mesh%edge(iedge)%X_gauss(p)=c
+                   mesh%edge(iedge)%Y_gauss(p)=center+diff*gauss_point(p)
+                enddo
+             case(2)
+                if (cell1>0) then
+                   a=mesh%node(mesh%cell(cell1)%corner(4))%x
+                   b=mesh%node(mesh%cell(cell1)%corner(3))%x
+                   c=mesh%node(mesh%cell(cell1)%corner(4))%y
+                else
+                   a=mesh%node(mesh%cell(cell2)%corner(1))%x
+                   b=mesh%node(mesh%cell(cell2)%corner(2))%x
+                   c=mesh%node(mesh%cell(cell2)%corner(1))%y
+                endif
+                center=(a+b)/2.0_dp
+                diff=(b-a)/2.0_dp
+                do p=1,size(gauss_point)
+                   mesh%edge(iedge)%X_gauss(p)=center+diff*gauss_point(p)
+                   mesh%edge(iedge)%Y_gauss(p)=c
+                enddo
+             end select
+          endif
+          
+       enddo
+       
+    enddo
+
+    do k=1,mesh%nc
+       if (k>mesh%cell(k)%neigh(1).and.mesh%cell(k)%neigh(1)>0) then
+          mesh%cell(k)%edge(1)=mesh%cell(mesh%cell(k)%neigh(1))%edge(2)
+       endif
+       if (k>mesh%cell(k)%neigh(2).and.mesh%cell(k)%neigh(2)>0) then
+          mesh%cell(k)%edge(2)=mesh%cell(mesh%cell(k)%neigh(2))%edge(1)
+       endif
+       if (k>mesh%cell(k)%neigh(3).and.mesh%cell(k)%neigh(3)>0) then
+          mesh%cell(k)%edge(3)=mesh%cell(mesh%cell(k)%neigh(3))%edge(4)
+       endif
+       if (k>mesh%cell(k)%neigh(4).and.mesh%cell(k)%neigh(4)>0) then
+          mesh%cell(k)%edge(4)=mesh%cell(mesh%cell(k)%neigh(4))%edge(3)
+       endif
+
+       if (mesh%cell(k)%neigh(1)<0) then
+          mesh%edge(mesh%cell(k)%edge(1))%period=mesh%cell(-mesh%cell(k)%neigh(1))%edge(2)
+       else
+          mesh%edge(mesh%cell(k)%edge(1))%period=mesh%cell(k)%edge(1)
+       endif
+       if (mesh%cell(k)%neigh(2)<0) then
+          mesh%edge(mesh%cell(k)%edge(2))%period=mesh%cell(-mesh%cell(k)%neigh(2))%edge(1)
+       else
+          mesh%edge(mesh%cell(k)%edge(2))%period=mesh%cell(k)%edge(2)
+       endif
+       if (mesh%cell(k)%neigh(3)<0) then
+          mesh%edge(mesh%cell(k)%edge(3))%period=mesh%cell(-mesh%cell(k)%neigh(3))%edge(4)
+       else
+          mesh%edge(mesh%cell(k)%edge(3))%period=mesh%cell(k)%edge(3)
+       endif
+       if (mesh%cell(k)%neigh(4)<0) then
+          mesh%edge(mesh%cell(k)%edge(4))%period=mesh%cell(-mesh%cell(k)%neigh(4))%edge(3)
+       else
+          mesh%edge(mesh%cell(k)%edge(4))%period=mesh%cell(k)%edge(4)
+       endif
+    enddo
+    
+    return
+  end subroutine buildMesh_P4EST
   
   subroutine writeSol(mesh,sol,namefile,nfile)
     type(meshStruct), intent(in) :: mesh
@@ -349,7 +493,7 @@ contains
        i2=mesh%cell(k)%corner(2)-1
        i3=mesh%cell(k)%corner(3)-1
        i4=mesh%cell(k)%corner(4)-1
-       write(11,'(i1,i8,i8,i8,i8)')4,i1,i2,i3,i4
+       write(11,'(i1,i8,i8,i8,i8)')4,i1,i2,i4,i3
     enddo
 
     write(11,'(a,i8)')"CELL_TYPES ",mesh%nc
@@ -419,10 +563,10 @@ contains
 
     write(11,'(a,i8,i9)')"CELLS ",mesh%nc,5*mesh%nc
     do k=1,mesh%nc
-       i1=mesh%edge(mesh%cell(k)%edge(1))%node1-1
-       i2=mesh%edge(mesh%cell(k)%edge(3))%node1-1
-       i3=mesh%edge(mesh%cell(k)%edge(3))%node2-1
-       i4=mesh%edge(mesh%cell(k)%edge(1))%node2-1
+       i1=mesh%cell(k)%corner(1)
+       i2=mesh%cell(k)%corner(2)
+       i3=mesh%cell(k)%corner(3)
+       i4=mesh%cell(k)%corner(4)
        write(11,'(i1,i8,i8,i8,i8)')4,i1,i2,i3,i4
     enddo
 

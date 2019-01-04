@@ -6,11 +6,9 @@ module types
   
   type :: nodeStruct
      real(dp) :: x,y
-     integer, dimension(:), allocatable :: connect
   end type nodeStruct
 
   type :: edgeStruct
-     integer :: node1,node2
      integer :: cell1,cell2
      integer :: dir
      integer :: period
@@ -59,10 +57,10 @@ module types
        real(dp), dimension(:), intent(inout) :: S
      end subroutine sub_IC
 
-     subroutine sub_BC (nx,ny,nvar,mesh)
+     subroutine sub_BC (nvar,mesh)
        use constant
        import meshStruct
-       integer, intent(in) :: nx,ny,nvar
+       integer, intent(in) :: nvar
        type(meshStruct), intent(inout) :: mesh
      end subroutine sub_BC
      
@@ -125,6 +123,44 @@ module types
        real(dp), intent(in) :: x,y,t
        real(dp), intent(out) :: s
      end subroutine sub_exactsol
+     
+  end interface
+
+  interface
+     
+     subroutine p4_build_mesh(level,p4est,tt,mesh,quadrants,nodes,edges,np,nc,ne) bind(C)
+       use, intrinsic :: ISO_C_BINDING
+       integer(c_int), value, intent(in) :: level
+       type(c_ptr), intent(out) :: p4est,mesh,quadrants,nodes,edges
+       integer(c_int), intent(out) :: tt
+       integer(c_int), intent(out) :: np,nc,ne
+     end subroutine p4_build_mesh
+
+     subroutine p4_get_node(p4est,tt,nodes,k,X,Y) bind(C)
+       use, intrinsic :: ISO_C_BINDING
+       type(c_ptr), value, intent(in) :: p4est,nodes
+       integer(c_int), value, intent(in) :: tt
+       integer(c_int), value, intent(in) :: k
+       real(c_double), intent(out) :: X,Y
+     end subroutine p4_get_node
+
+     subroutine p4_get_cell(p4est,mesh,tt,quadrants,nodes,edges,k,xc,yc,dx,dy,corners,neighbors,level) bind(C)
+       use, intrinsic :: ISO_C_BINDING
+       type(c_ptr), value, intent(in) :: p4est,mesh,quadrants,nodes,edges
+       integer(c_int), value, intent(in) :: tt
+       integer(c_int), value, intent(in) :: k
+       real(c_double), intent(out) :: xc,yc,dx,dy
+       type(c_ptr), intent(out) :: corners,neighbors
+       integer(c_int), intent(out) :: level
+     end subroutine p4_get_cell
+
+     subroutine p4_get_edge(p4est,mesh,quadrants,edges,ne,k,i,iedge,cell1,cell2,sub) bind(C)
+       use, intrinsic :: ISO_C_BINDING
+       type(c_ptr), value, intent(in) :: p4est,mesh,quadrants,edges
+       integer(c_int), value, intent(in) :: ne,k,i
+       integer(c_int), intent(out) :: iedge,cell1,cell2
+       type(c_ptr), intent(out) :: sub
+     end subroutine p4_get_edge
      
   end interface
 

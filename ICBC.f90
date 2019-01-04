@@ -19,32 +19,20 @@ contains
     return
   end subroutine IC_func_sinus
 
-  subroutine BC_sinus(nx,ny,nvar,mesh)
-    integer, intent(in) :: nx,ny,nvar
+  subroutine BC_sinus(nvar,mesh)
+    integer, intent(in) :: nvar
     type(meshStruct), intent(inout) :: mesh
-    integer :: i,j
+    integer :: i
     
     do i=1,mesh%ne
        allocate(mesh%edge(i)%bound(nvar))
-       mesh%edge(i)%boundType='NOT A BOUNDARY'
-       mesh%edge(i)%bound=0.0_dp
-    enddo
-    
-    do j=1,ny
-       mesh%edge((j-1)*(nx+1)+1)%boundType='PERIODIC'
-       mesh%edge((j-1)*(nx+1)+1)%bound=0.0_dp
-       
-       mesh%edge(j*(nx+1))%boundType='PERIODIC'
-       mesh%edge(j*(nx+1))%bound=0.0_dp
-       
-    enddo
-    
-    do i=1,nx
-       mesh%edge((i-1)*(ny+1)+1+(nx+1)*ny)%boundType='PERIODIC'
-       mesh%edge((i-1)*(ny+1)+1+(nx+1)*ny)%bound(:)=0.0_dp
-       
-       mesh%edge(i*(ny+1)+(nx+1)*ny)%boundType='PERIODIC'
-       mesh%edge(i*(ny+1)+(nx+1)*ny)%bound(:)=0.0_dp
+       if (mesh%edge(i)%cell1<0.or.mesh%edge(i)%cell2<0) then
+          mesh%edge(i)%boundType='PERIODIC'
+          mesh%edge(i)%bound=0.0_dp
+       else
+          mesh%edge(i)%boundType='NOT A BOUNDARY'
+          mesh%edge(i)%bound=0.0_dp
+       endif
     enddo
     
     return   
@@ -67,32 +55,20 @@ contains
     return
   end subroutine IC_func_sinus_dis
 
-  subroutine BC_sinus_dis(nx,ny,nvar,mesh)
-    integer, intent(in) :: nx,ny,nvar
+  subroutine BC_sinus_dis(nvar,mesh)
+    integer, intent(in) :: nvar
     type(meshStruct), intent(inout) :: mesh
-    integer :: i,j
+    integer :: i
     
     do i=1,mesh%ne
        allocate(mesh%edge(i)%bound(nvar))
-       mesh%edge(i)%boundType='NOT A BOUNDARY'
-       mesh%edge(i)%bound=0.0_dp
-    enddo
-    
-    do j=1,ny
-       mesh%edge((j-1)*(nx+1)+1)%boundType='PERIODIC'
-       mesh%edge((j-1)*(nx+1)+1)%bound=0.0_dp
-       
-       mesh%edge(j*(nx+1))%boundType='PERIODIC'
-       mesh%edge(j*(nx+1))%bound=0.0_dp
-       
-    enddo
-    
-    do i=1,nx
-       mesh%edge((i-1)*(ny+1)+1+(nx+1)*ny)%boundType='PERIODIC'
-       mesh%edge((i-1)*(ny+1)+1+(nx+1)*ny)%bound(:)=0.0_dp
-       
-       mesh%edge(i*(ny+1)+(nx+1)*ny)%boundType='PERIODIC'
-       mesh%edge(i*(ny+1)+(nx+1)*ny)%bound(:)=0.0_dp
+       if (mesh%edge(i)%cell1<0.or.mesh%edge(i)%cell2<0) then
+          mesh%edge(i)%boundType='PERIODIC'
+          mesh%edge(i)%bound=0.0_dp
+       else
+          mesh%edge(i)%boundType='NOT A BOUNDARY'
+          mesh%edge(i)%bound=0.0_dp
+       endif
     enddo
     
     return   
@@ -133,47 +109,44 @@ contains
     return
   end subroutine IC_func_sod
 
-  subroutine BC_sod(nx,ny,nvar,mesh)
-    integer, intent(in) :: nx,ny,nvar
+  subroutine BC_sod(nvar,mesh)
+    integer, intent(in) :: nvar
     type(meshStruct), intent(inout) :: mesh
-    integer :: i,j,isol
+    integer :: i,isol
     real(dp), dimension(:), allocatable :: bound
 
     allocate(bound(nvar))
     
     do i=1,mesh%ne
        allocate(mesh%edge(i)%bound(nvar))
-       mesh%edge(i)%boundType='NOT A BOUNDARY'
-       mesh%edge(i)%bound(:)=0.0_dp
-    enddo
-    
-    do j=1,ny
-       mesh%edge((j-1)*(nx+1)+1)%boundType='DIRICHLET'
-       bound(1)=1.0_dp
-       bound(2)=0.0_dp
-       bound(3)=0.0_dp
-       bound(4)=1.0_dp
-       do isol=1,nvar
-          call conserv(bound(:),"euler               ",isol,mesh%edge((j-1)*(nx+1)+1)%bound(isol))
-       enddo
-       
-       mesh%edge(j*(nx+1))%boundType='DIRICHLET'
-       bound(1)=0.125_dp
-       bound(2)=0.0_dp
-       bound(3)=0.0_dp
-       bound(4)=0.1_dp
-       do isol=1,nvar
-          call conserv(bound(:),"euler               ",isol,mesh%edge(j*(nx+1))%bound(isol))
-       enddo
-       
-    enddo
-    
-    do i=1,nx
-       mesh%edge((i-1)*(ny+1)+1+(nx+1)*ny)%boundType='PERIODIC'
-       mesh%edge((i-1)*(ny+1)+1+(nx+1)*ny)%bound(:)=0.0_dp
-       
-       mesh%edge(i*(ny+1)+(nx+1)*ny)%boundType='PERIODIC'
-       mesh%edge(i*(ny+1)+(nx+1)*ny)%bound(:)=0.0_dp
+       if (mesh%edge(i)%cell1<0.and.mesh%edge(i)%dir==1) then
+          mesh%edge(i)%boundType='DIRICHLET'
+          bound(1)=1.0_dp
+          bound(2)=0.0_dp
+          bound(3)=0.0_dp
+          bound(4)=1.0_dp
+          do isol=1,nvar
+             call conserv(bound(:),"euler               ",isol,mesh%edge(i)%bound(isol))
+          enddo
+       elseif (mesh%edge(i)%cell2<0.and.mesh%edge(i)%dir==1) then
+          mesh%edge(i)%boundType='DIRICHLET'
+          bound(1)=0.125_dp
+          bound(2)=0.0_dp
+          bound(3)=0.0_dp
+          bound(4)=0.1_dp
+          do isol=1,nvar
+             call conserv(bound(:),"euler               ",isol,mesh%edge(i)%bound(isol))
+          enddo
+       elseif (mesh%edge(i)%cell1<0.and.mesh%edge(i)%dir==2) then
+          mesh%edge(i)%boundType='PERIODIC'
+          mesh%edge(i)%bound(:)=0.0_dp
+       elseif (mesh%edge(i)%cell2<0.and.mesh%edge(i)%dir==2) then
+          mesh%edge(i)%boundType='PERIODIC'
+          mesh%edge(i)%bound(:)=0.0_dp
+       else
+          mesh%edge(i)%boundType='NOT A BOUNDARY'
+          mesh%edge(i)%bound=0.0_dp
+       endif
     enddo
 
     deallocate(bound)
@@ -216,60 +189,29 @@ contains
     return
   end subroutine IC_func_sod_2D
 
-  subroutine BC_sod_2D(nx,ny,nvar,mesh)
-    integer, intent(in) :: nx,ny,nvar
+  subroutine BC_sod_2D(nvar,mesh)
+    integer, intent(in) :: nvar
     type(meshStruct), intent(inout) :: mesh
-    integer :: i,j,isol
+    integer :: i,isol
     real(dp), dimension(:), allocatable :: bound
 
     allocate(bound(nvar))
     
     do i=1,mesh%ne
        allocate(mesh%edge(i)%bound(nvar))
-       mesh%edge(i)%boundType='NOT A BOUNDARY'
-       mesh%edge(i)%bound(:)=0.0_dp
-    enddo
-    
-    do j=1,ny
-       mesh%edge((j-1)*(nx+1)+1)%boundType='DIRICHLET'
-       bound(1)=1.0_dp
-       bound(2)=0.0_dp
-       bound(3)=0.0_dp
-       bound(4)=1.0_dp
-       do isol=1,nvar
-          call conserv(bound(:),"euler               ",isol,mesh%edge((j-1)*(nx+1)+1)%bound(isol))
-       enddo
-       
-       mesh%edge(j*(nx+1))%boundType='DIRICHLET'
-       bound(1)=1.0_dp
-       bound(2)=0.0_dp
-       bound(3)=0.0_dp
-       bound(4)=1.0_dp
-       do isol=1,nvar
-          call conserv(bound(:),"euler               ",isol,mesh%edge(j*(nx+1))%bound(isol))
-       enddo
-       
-    enddo
-    
-    do i=1,nx
-       mesh%edge((i-1)*(ny+1)+1+(nx+1)*ny)%boundType='DIRICHLET'
-       bound(1)=1.0_dp
-       bound(2)=0.0_dp
-       bound(3)=0.0_dp
-       bound(4)=1.0_dp
-       do isol=1,nvar
-          call conserv(bound(:),"euler               ",isol,mesh%edge((i-1)*(ny+1)+1+(nx+1)*ny)%bound(isol))
-       enddo
-       
-       mesh%edge(i*(ny+1)+(nx+1)*ny)%boundType='DIRICHLET'
-       bound(1)=1.0_dp
-       bound(2)=0.0_dp
-       bound(3)=0.0_dp
-       bound(4)=1.0_dp
-       do isol=1,nvar
-          call conserv(bound(:),"euler               ",isol,mesh%edge(i*(ny+1)+(nx+1)*ny)%bound(isol))
-       enddo
-       
+       if (mesh%edge(i)%cell1<0.or.mesh%edge(i)%cell2<0) then
+          mesh%edge(i)%boundType='DIRICHLET'
+          bound(1)=1.0_dp
+          bound(2)=0.0_dp
+          bound(3)=0.0_dp
+          bound(4)=1.0_dp
+          do isol=1,nvar
+             call conserv(bound(:),"euler               ",isol,mesh%edge(i)%bound(isol))
+          enddo
+       else
+          mesh%edge(i)%boundType='NOT A BOUNDARY'
+          mesh%edge(i)%bound=0.0_dp
+       endif
     enddo
 
     deallocate(bound)
@@ -312,49 +254,46 @@ contains
     return
   end subroutine IC_func_sod_mod
 
-  subroutine BC_sod_mod(nx,ny,nvar,mesh)
-    integer, intent(in) :: nx,ny,nvar
+  subroutine BC_sod_mod(nvar,mesh)
+    integer, intent(in) :: nvar
     type(meshStruct), intent(inout) :: mesh
-    integer :: i,j,isol
+    integer :: i,isol
     real(dp), dimension(:), allocatable :: bound
 
     allocate(bound(nvar))
     
     do i=1,mesh%ne
        allocate(mesh%edge(i)%bound(nvar))
-       mesh%edge(i)%boundType='NOT A BOUNDARY'
-       mesh%edge(i)%bound(:)=0.0_dp
+       if (mesh%edge(i)%cell1<0.and.mesh%edge(i)%dir==1) then
+          mesh%edge(i)%boundType='DIRICHLET'
+          bound(1)=1.0_dp
+          bound(2)=0.75_dp
+          bound(3)=0.0_dp
+          bound(4)=1.0_dp
+          do isol=1,nvar
+             call conserv(bound(:),"euler               ",isol,mesh%edge(i)%bound(isol))
+          enddo
+       elseif (mesh%edge(i)%cell2<0.and.mesh%edge(i)%dir==1) then
+          mesh%edge(i)%boundType='DIRICHLET'
+          bound(1)=0.125_dp
+          bound(2)=0.0_dp
+          bound(3)=0.0_dp
+          bound(4)=0.1_dp
+          do isol=1,nvar
+             call conserv(bound(:),"euler               ",isol,mesh%edge(i)%bound(isol))
+          enddo
+       elseif (mesh%edge(i)%cell1<0.and.mesh%edge(i)%dir==2) then
+          mesh%edge(i)%boundType='PERIODIC'
+          mesh%edge(i)%bound(:)=0.0_dp
+       elseif (mesh%edge(i)%cell2<0.and.mesh%edge(i)%dir==2) then
+          mesh%edge(i)%boundType='PERIODIC'
+          mesh%edge(i)%bound(:)=0.0_dp
+       else
+          mesh%edge(i)%boundType='NOT A BOUNDARY'
+          mesh%edge(i)%bound=0.0_dp
+       endif
     enddo
     
-    do j=1,ny
-       mesh%edge((j-1)*(nx+1)+1)%boundType='DIRICHLET'
-       bound(1)=1.0_dp
-       bound(2)=0.75_dp
-       bound(3)=0.0_dp
-       bound(4)=1.0_dp
-       do isol=1,nvar
-          call conserv(bound(:),"euler               ",isol,mesh%edge((j-1)*(nx+1)+1)%bound(isol))
-       enddo
-       
-       mesh%edge(j*(nx+1))%boundType='DIRICHLET'
-       bound(1)=0.125_dp
-       bound(2)=0.0_dp
-       bound(3)=0.0_dp
-       bound(4)=0.1_dp
-       do isol=1,nvar
-          call conserv(bound(:),"euler               ",isol,mesh%edge(j*(nx+1))%bound(isol))
-       enddo
-       
-    enddo
-    
-    do i=1,nx
-       mesh%edge((i-1)*(ny+1)+1+(nx+1)*ny)%boundType='PERIODIC'
-       mesh%edge((i-1)*(ny+1)+1+(nx+1)*ny)%bound(:)=0.0_dp
-       
-       mesh%edge(i*(ny+1)+(nx+1)*ny)%boundType='PERIODIC'
-       mesh%edge(i*(ny+1)+(nx+1)*ny)%bound(:)=0.0_dp
-    enddo
-
     deallocate(bound)
     
     return   
@@ -395,47 +334,44 @@ contains
     return
   end subroutine IC_func_shu
 
-  subroutine BC_shu(nx,ny,nvar,mesh)
-    integer, intent(in) :: nx,ny,nvar
+  subroutine BC_shu(nvar,mesh)
+    integer, intent(in) :: nvar
     type(meshStruct), intent(inout) :: mesh
-    integer :: i,j,isol
+    integer :: i,isol
     real(dp), dimension(:), allocatable :: bound
 
     allocate(bound(nvar))
     
     do i=1,mesh%ne
        allocate(mesh%edge(i)%bound(nvar))
-       mesh%edge(i)%boundType='NOT A BOUNDARY'
-       mesh%edge(i)%bound(:)=0.0_dp
-    enddo
-    
-    do j=1,ny
-       mesh%edge((j-1)*(nx+1)+1)%boundType='DIRICHLET'
-       bound(1)=3.857143_dp
-       bound(2)=2.629369_dp
-       bound(3)=0.0_dp
-       bound(4)=10.33333_dp
-       do isol=1,nvar
-          call conserv(bound(:),"euler               ",isol,mesh%edge((j-1)*(nx+1)+1)%bound(isol))
-       enddo
-       
-       mesh%edge(j*(nx+1))%boundType='DIRICHLET'
-       bound(1)=1.0_dp+0.2_dp*sin(25.0_dp)
-       bound(2)=0.0_dp
-       bound(3)=0.0_dp
-       bound(4)=1.0_dp
-       do isol=1,nvar
-          call conserv(bound(:),"euler               ",isol,mesh%edge(j*(nx+1))%bound(isol))
-       enddo
-       
-    enddo
-    
-    do i=1,nx
-       mesh%edge((i-1)*(ny+1)+1+(nx+1)*ny)%boundType='PERIODIC'
-       mesh%edge((i-1)*(ny+1)+1+(nx+1)*ny)%bound(:)=0.0_dp
-       
-       mesh%edge(i*(ny+1)+(nx+1)*ny)%boundType='PERIODIC'
-       mesh%edge(i*(ny+1)+(nx+1)*ny)%bound(:)=0.0_dp
+       if (mesh%edge(i)%cell1<0.and.mesh%edge(i)%dir==1) then
+          mesh%edge(i)%boundType='DIRICHLET'
+          bound(1)=3.857143_dp
+          bound(2)=2.629369_dp
+          bound(3)=0.0_dp
+          bound(4)=10.33333_dp
+          do isol=1,nvar
+             call conserv(bound(:),"euler               ",isol,mesh%edge(i)%bound(isol))
+          enddo
+       elseif (mesh%edge(i)%cell2<0.and.mesh%edge(i)%dir==1) then
+          mesh%edge(i)%boundType='DIRICHLET'
+          bound(1)=1.0_dp+0.2_dp*sin(25.0_dp)
+          bound(2)=0.0_dp
+          bound(3)=0.0_dp
+          bound(4)=1.0_dp
+          do isol=1,nvar
+             call conserv(bound(:),"euler               ",isol,mesh%edge(i)%bound(isol))
+          enddo
+       elseif (mesh%edge(i)%cell1<0.and.mesh%edge(i)%dir==2) then
+          mesh%edge(i)%boundType='PERIODIC'
+          mesh%edge(i)%bound(:)=0.0_dp
+       elseif (mesh%edge(i)%cell2<0.and.mesh%edge(i)%dir==2) then
+          mesh%edge(i)%boundType='PERIODIC'
+          mesh%edge(i)%bound(:)=0.0_dp
+       else
+          mesh%edge(i)%boundType='NOT A BOUNDARY'
+          mesh%edge(i)%bound=0.0_dp
+       endif
     enddo
 
     deallocate(bound)
@@ -478,47 +414,44 @@ contains
     return
   end subroutine IC_func_123
 
-  subroutine BC_123(nx,ny,nvar,mesh)
-    integer, intent(in) :: nx,ny,nvar
+  subroutine BC_123(nvar,mesh)
+    integer, intent(in) :: nvar
     type(meshStruct), intent(inout) :: mesh
-    integer :: i,j,isol
+    integer :: i,isol
     real(dp), dimension(:), allocatable :: bound
 
     allocate(bound(nvar))
     
     do i=1,mesh%ne
        allocate(mesh%edge(i)%bound(nvar))
-       mesh%edge(i)%boundType='NOT A BOUNDARY'
-       mesh%edge(i)%bound(:)=0.0_dp
-    enddo
-    
-    do j=1,ny
-       mesh%edge((j-1)*(nx+1)+1)%boundType='DIRICHLET'
-       bound(1)=1.0_dp
-       bound(2)=-2.0_dp
-       bound(3)=0.0_dp
-       bound(4)=0.4_dp
-       do isol=1,nvar
-          call conserv(bound(:),"euler               ",isol,mesh%edge((j-1)*(nx+1)+1)%bound(isol))
-       enddo
-       
-       mesh%edge(j*(nx+1))%boundType='DIRICHLET'
-       bound(1)=1_dp
-       bound(2)=2.0_dp
-       bound(3)=0.0_dp
-       bound(4)=0.4_dp
-       do isol=1,nvar
-          call conserv(bound(:),"euler               ",isol,mesh%edge(j*(nx+1))%bound(isol))
-       enddo
-       
-    enddo
-    
-    do i=1,nx
-       mesh%edge((i-1)*(ny+1)+1+(nx+1)*ny)%boundType='PERIODIC'
-       mesh%edge((i-1)*(ny+1)+1+(nx+1)*ny)%bound(:)=0.0_dp
-       
-       mesh%edge(i*(ny+1)+(nx+1)*ny)%boundType='PERIODIC'
-       mesh%edge(i*(ny+1)+(nx+1)*ny)%bound(:)=0.0_dp
+       if (mesh%edge(i)%cell1<0.and.mesh%edge(i)%dir==1) then
+          mesh%edge(i)%boundType='DIRICHLET'
+          bound(1)=1.0_dp
+          bound(2)=-2.0_dp
+          bound(3)=0.0_dp
+          bound(4)=0.4_dp
+          do isol=1,nvar
+             call conserv(bound(:),"euler               ",isol,mesh%edge(i)%bound(isol))
+          enddo
+       elseif (mesh%edge(i)%cell2<0.and.mesh%edge(i)%dir==1) then
+          mesh%edge(i)%boundType='DIRICHLET'
+          bound(1)=1_dp
+          bound(2)=2.0_dp
+          bound(3)=0.0_dp
+          bound(4)=0.4_dp
+          do isol=1,nvar
+             call conserv(bound(:),"euler               ",isol,mesh%edge(i)%bound(isol))
+          enddo
+       elseif (mesh%edge(i)%cell1<0.and.mesh%edge(i)%dir==2) then
+          mesh%edge(i)%boundType='PERIODIC'
+          mesh%edge(i)%bound(:)=0.0_dp
+       elseif (mesh%edge(i)%cell2<0.and.mesh%edge(i)%dir==2) then
+          mesh%edge(i)%boundType='PERIODIC'
+          mesh%edge(i)%bound(:)=0.0_dp
+       else
+          mesh%edge(i)%boundType='NOT A BOUNDARY'
+          mesh%edge(i)%bound=0.0_dp
+       endif
     enddo
 
     deallocate(bound)
@@ -554,32 +487,20 @@ contains
     return
   end subroutine IC_func_vortex
 
-  subroutine BC_vortex(nx,ny,nvar,mesh)
-    integer, intent(in) :: nx,ny,nvar
+  subroutine BC_vortex(nvar,mesh)
+    integer, intent(in) :: nvar
     type(meshStruct), intent(inout) :: mesh
-    integer :: i,j
+    integer :: i
     
     do i=1,mesh%ne
        allocate(mesh%edge(i)%bound(nvar))
-       mesh%edge(i)%boundType='NOT A BOUNDARY'
-       mesh%edge(i)%bound(:)=0.0_dp
-    enddo
-    
-    do j=1,ny
-       mesh%edge((j-1)*(nx+1)+1)%boundType='PERIODIC'
-       mesh%edge((j-1)*(nx+1)+1)%bound(:)=0.0_dp
-       
-       mesh%edge(j*(nx+1))%boundType='PERIODIC'
-       mesh%edge(j*(nx+1))%bound(:)=0.0_dp
-       
-    enddo
-    
-    do i=1,nx
-       mesh%edge((i-1)*(ny+1)+1+(nx+1)*ny)%boundType='PERIODIC'
-       mesh%edge((i-1)*(ny+1)+1+(nx+1)*ny)%bound(:)=0.0_dp
-       
-       mesh%edge(i*(ny+1)+(nx+1)*ny)%boundType='PERIODIC'
-       mesh%edge(i*(ny+1)+(nx+1)*ny)%bound(:)=0.0_dp
+       if (mesh%edge(i)%cell1<0.or.mesh%edge(i)%cell2<0) then
+          mesh%edge(i)%boundType='PERIODIC'
+          mesh%edge(i)%bound=0.0_dp
+       else
+          mesh%edge(i)%boundType='NOT A BOUNDARY'
+          mesh%edge(i)%bound=0.0_dp
+       endif
     enddo
     
     return   
@@ -630,35 +551,23 @@ contains
     return
   end subroutine IC_func_RP2D_3
 
-  subroutine BC_RP2D_3(nx,ny,nvar,mesh)
-    integer, intent(in) :: nx,ny,nvar
+  subroutine BC_RP2D_3(nvar,mesh)
+    integer, intent(in) :: nvar
     type(meshStruct), intent(inout) :: mesh
-    integer :: i,j
+    integer :: i
     real(dp), dimension(:), allocatable :: bound
 
     allocate(bound(nvar))
     
     do i=1,mesh%ne
        allocate(mesh%edge(i)%bound(nvar))
-       mesh%edge(i)%boundType='NOT A BOUNDARY'
-       mesh%edge(i)%bound(:)=0.0_dp
-    enddo
-    
-    do j=1,ny
-       mesh%edge((j-1)*(nx+1)+1)%boundType='NEUMANN'
-       mesh%edge((j-1)*(nx+1)+1)%bound(:)=0.0_dp
-       
-       mesh%edge(j*(nx+1))%boundType='NEUMANN'
-       mesh%edge(j*(nx+1))%bound(:)=0.0_dp
-       
-    enddo
-    
-    do i=1,nx
-       mesh%edge((i-1)*(ny+1)+1+(nx+1)*ny)%boundType='NEUMANN'
-       mesh%edge((i-1)*(ny+1)+1+(nx+1)*ny)%bound(:)=0.0_dp
-       
-       mesh%edge(i*(ny+1)+(nx+1)*ny)%boundType='NEUMANN'
-       mesh%edge(i*(ny+1)+(nx+1)*ny)%bound(:)=0.0_dp
+       if (mesh%edge(i)%cell1<0.or.mesh%edge(i)%cell2<0) then
+          mesh%edge(i)%boundType='NEUMANN'
+          mesh%edge(i)%bound=0.0_dp
+       else
+          mesh%edge(i)%boundType='NOT A BOUNDARY'
+          mesh%edge(i)%bound=0.0_dp
+       endif
     enddo
 
     deallocate(bound)
@@ -682,32 +591,20 @@ contains
     return
   end subroutine IC_func_test
 
-  subroutine BC_test(nx,ny,nvar,mesh)
-    integer, intent(in) :: nx,ny,nvar
+  subroutine BC_test(nvar,mesh)
+    integer, intent(in) :: nvar
     type(meshStruct), intent(inout) :: mesh
-    integer :: i,j
+    integer :: i
     
     do i=1,mesh%ne
        allocate(mesh%edge(i)%bound(nvar))
-       mesh%edge(i)%boundType='NOT A BOUNDARY'
-       mesh%edge(i)%bound=0.0_dp
-    enddo
-    
-    do j=1,ny
-       mesh%edge((j-1)*(nx+1)+1)%boundType='NEUMANN'
-       mesh%edge((j-1)*(nx+1)+1)%bound=0.0_dp
-       
-       mesh%edge(j*(nx+1))%boundType='NEUMANN'
-       mesh%edge(j*(nx+1))%bound=0.0_dp
-       
-    enddo
-    
-    do i=1,nx
-       mesh%edge((i-1)*(ny+1)+1+(nx+1)*ny)%boundType='NEUMANN'
-       mesh%edge((i-1)*(ny+1)+1+(nx+1)*ny)%bound(:)=0.0_dp
-       
-       mesh%edge(i*(ny+1)+(nx+1)*ny)%boundType='NEUMANN'
-       mesh%edge(i*(ny+1)+(nx+1)*ny)%bound(:)=0.0_dp
+       if (mesh%edge(i)%cell1<0.or.mesh%edge(i)%cell2<0) then
+          mesh%edge(i)%boundType='NEUMANN'
+          mesh%edge(i)%bound=0.0_dp
+       else
+          mesh%edge(i)%boundType='NOT A BOUNDARY'
+          mesh%edge(i)%bound=0.0_dp
+       endif
     enddo
     
     return   
