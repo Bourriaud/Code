@@ -3,8 +3,7 @@ Sinus_dis	ICBC
 10.	xR
 0.	yL
 10.	yR
-100	nx
-100	ny
+7	level
 0.95	cfl
 1.0	tf
 transport	equation

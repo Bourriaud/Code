@@ -3,8 +3,7 @@
 1.	xR
 0.	yL
 1.	yR
-200	nx
-5	ny
+7 	level
 0.95	cfl
 0.15	tf
 euler	equation

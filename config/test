@@ -3,8 +3,7 @@ Test	ICBC
 3.	xR
 0.	yL
 3.	yR
-3	nx
-3	ny
+2	level
 1.	cfl
 1.5	tf
 transport	equation

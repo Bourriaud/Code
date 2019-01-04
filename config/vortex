@@ -3,8 +3,7 @@ Vortex	ICBC
 5.	xR
 -5.	yL
 5.	yR
-64	nx
-64	ny
+6	level
 0.95	cfl
 10.	tf
 euler	equation
