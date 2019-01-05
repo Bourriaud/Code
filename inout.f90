@@ -314,152 +314,143 @@ contains
     real(dp), dimension(:), intent(in) :: gauss_point
     type(meshStruct), intent(inout) :: mesh
     type(solStruct), intent(inout) :: sol
-    type(c_ptr) :: p4est,p4_mesh,quadrants,nodes,edges,C_corners,C_neighbors,C_sub
+    type(c_ptr) :: p4est,p4_mesh,quadrants,nodes,edges,C_corners,C_neighbors,C_sub,C_cell1,C_cell2,C_iedge,C_period
     integer(c_int) :: tt
-    integer, dimension(:), pointer :: F_corners,F_neighbors,F_sub
-    integer :: k,i,iedge,cell1,cell2,lev,p
+    integer, dimension(:), pointer :: F_corners,F_neighbors,F_sub,F_cell1,F_cell2,F_iedge,F_period
+    integer :: k,i,lev,p,Nneigh,N_edge,ie,nedge,i1,iloc
     real(dp) :: a,b,c,center,diff
+    type(c_ptr) :: refine_fn,init_fn
+    character(len=20), pointer :: f_refine,f_init
 
-    call p4_build_mesh(level,p4est,tt,p4_mesh,quadrants,nodes,edges,mesh%np,mesh%nc,mesh%ne)
+    call p4_new(level,p4est)
+    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    allocate(f_refine,f_init)
+    f_refine='refine_test'//c_null_char
+    f_init='null'//c_null_char
+    refine_fn=c_loc(f_refine)
+    init_fn=c_loc(f_init)
+    call p4_refine(p4est,0,refine_fn,init_fn)
+    call p4_build_mesh(p4est,tt,p4_mesh,quadrants,nodes,edges,mesh%np,mesh%nc,mesh%ne)
+    deallocate(f_refine,f_init)
+    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
     allocate(mesh%node(mesh%np),mesh%cell(mesh%nc),mesh%edge(mesh%ne))
-    do k=1,mesh%nc
-       allocate(mesh%cell(k)%edge(4))
-    enddo
     allocate(sol%val(mesh%nc,sol%nvar),sol%user(mesh%nc,sol%nsolUser),sol%conserv_var(sol%nvar,2))
-    
+
     do k=1,mesh%np
        call p4_get_node(p4est,tt,nodes,k-1,mesh%node(k)%x,mesh%node(k)%y)
        mesh%node(k)%x=(xR-xL)*mesh%node(k)%x+xL
        mesh%node(k)%y=(yR-yL)*mesh%node(k)%y+yL
     enddo
 
+    ie=0
     do k=1,mesh%nc
        allocate(mesh%cell(k)%X_gauss(size(gauss_point)),mesh%cell(k)%Y_gauss(size(gauss_point)))
        call p4_get_cell(p4est,p4_mesh,tt,quadrants,nodes,edges,k-1,mesh%cell(k)%xc,mesh%cell(k)%yc, &
-            mesh%cell(k)%dx,mesh%cell(k)%dy,C_corners,C_neighbors,lev)
+            mesh%cell(k)%dx,mesh%cell(k)%dy,C_corners,Nneigh,C_neighbors,N_edge,lev)
        mesh%cell(k)%xc=(xR-xL)*mesh%cell(k)%xc+xL
        mesh%cell(k)%yc=(yR-yL)*mesh%cell(k)%yc+yL
        mesh%cell(k)%dx=(xR-xL)*mesh%cell(k)%dx
        mesh%cell(k)%dy=(yR-yL)*mesh%cell(k)%dy
+       
        call c_f_pointer(C_corners,F_corners,(/4/))
-       call c_f_pointer(C_neighbors,F_neighbors,(/8/))
-       allocate(mesh%cell(k)%neigh(size(F_neighbors)))
+       call c_f_pointer(C_neighbors,F_neighbors,(/12/))
+       allocate(mesh%cell(k)%neigh(Nneigh))
        mesh%cell(k)%corner=F_corners
-       mesh%cell(k)%neigh=F_neighbors
+       mesh%cell(k)%neigh(1:Nneigh)=F_neighbors(1:Nneigh)
        do p=1,size(gauss_point)
           mesh%cell(k)%X_gauss(p)=mesh%cell(k)%xc+mesh%cell(k)%dx*gauss_point(p)/2.0_dp
           mesh%cell(k)%Y_gauss(p)=mesh%cell(k)%yc+mesh%cell(k)%dy*gauss_point(p)/2.0_dp
        enddo
 
+       allocate(mesh%cell(k)%edge(N_edge))
+       iloc=1
        do i=1,4
-          
-          call p4_get_edge(p4est,p4_mesh,quadrants,edges,mesh%ne,k-1,i-1,iedge,cell1,cell2,C_sub)
-          
-          if (iedge/=0) then
 
-             allocate(mesh%edge(iedge)%flux_acc(size(gauss_point)))
-             allocate(mesh%edge(iedge)%flux(order,sol%nvar))
-             allocate(mesh%edge(iedge)%X_gauss(size(gauss_point)),mesh%edge(iedge)%Y_gauss(size(gauss_point)))
-             mesh%edge(iedge)%flux_acc=.false.
-             call c_f_pointer(C_sub,F_sub,(/2/))
-             mesh%edge(iedge)%sub=F_sub
-             
-             if (cell1>0) then
-                mesh%cell(cell1)%edge(i)=iedge
-             endif           
-             if (cell2>0) then
-                mesh%cell(cell2)%edge(i)=iedge
-             endif
-             
-             mesh%edge(iedge)%cell1=cell1
-             mesh%edge(iedge)%cell2=cell2
-             
-             select case (i)
-             case (1,2)
-                mesh%edge(iedge)%dir=1
-                mesh%edge(iedge)%length=(yR-yL)/(2**lev)
-                mesh%edge(iedge)%lengthN=(xR-xL)/(2**lev)
-             case (3,4)
-                mesh%edge(iedge)%dir=2
-                mesh%edge(iedge)%length=(xR-xL)/(2**lev)
-                mesh%edge(iedge)%lengthN=(yR-yL)/(2**lev)
-             end select
-
-             select case (mesh%edge(iedge)%dir)
-             case(1)
-                if (cell1>0) then
-                   a=mesh%node(mesh%cell(cell1)%corner(2))%y
-                   b=mesh%node(mesh%cell(cell1)%corner(3))%y
-                   c=mesh%node(mesh%cell(cell1)%corner(2))%x
-                else
-                   a=mesh%node(mesh%cell(cell2)%corner(1))%y
-                   b=mesh%node(mesh%cell(cell2)%corner(4))%y
-                   c=mesh%node(mesh%cell(cell2)%corner(1))%x
-                endif
-                center=(a+b)/2.0_dp
-                diff=(b-a)/2.0_dp
-                do p=1,size(gauss_point)
-                   mesh%edge(iedge)%X_gauss(p)=c
-                   mesh%edge(iedge)%Y_gauss(p)=center+diff*gauss_point(p)
-                enddo
-             case(2)
-                if (cell1>0) then
-                   a=mesh%node(mesh%cell(cell1)%corner(4))%x
-                   b=mesh%node(mesh%cell(cell1)%corner(3))%x
-                   c=mesh%node(mesh%cell(cell1)%corner(4))%y
-                else
-                   a=mesh%node(mesh%cell(cell2)%corner(1))%x
-                   b=mesh%node(mesh%cell(cell2)%corner(2))%x
-                   c=mesh%node(mesh%cell(cell2)%corner(1))%y
-                endif
-                center=(a+b)/2.0_dp
-                diff=(b-a)/2.0_dp
-                do p=1,size(gauss_point)
-                   mesh%edge(iedge)%X_gauss(p)=center+diff*gauss_point(p)
-                   mesh%edge(iedge)%Y_gauss(p)=c
-                enddo
-             end select
+          call p4_get_edge(p4est,p4_mesh,quadrants,edges,k-1,i-1,C_iedge,nedge,C_cell1,C_cell2,C_sub,C_period)
+          if (abs(nedge)==2) then
+             call c_f_pointer(C_iedge,F_iedge,(/2/))
+             call c_f_pointer(C_period,F_period,(/2/))
+          else
+             call c_f_pointer(C_iedge,F_iedge,(/1/))
+             call c_f_pointer(C_period,F_period,(/1/))
           endif
-          
+
+          do i1=1,abs(nedge)
+             mesh%cell(k)%edge(iloc)=abs(F_iedge(i1))
+             iloc=iloc+1
+             if (F_iedge(i1)>0) then
+                allocate(mesh%edge(F_iedge(i1))%flux_acc(size(gauss_point)))
+                allocate(mesh%edge(F_iedge(i1))%flux(order,sol%nvar))
+                allocate(mesh%edge(F_iedge(i1))%X_gauss(size(gauss_point)),mesh%edge(F_iedge(i1))%Y_gauss(size(gauss_point)))
+                
+                call c_f_pointer(C_sub,F_sub,(/2/))
+
+                select case (nedge)
+                case (1)
+                   call c_f_pointer(C_cell1,F_cell1,(/1/))
+                   call c_f_pointer(C_cell2,F_cell2,(/1/))
+                   ie=ie+1
+                case default
+                   call c_f_pointer(C_cell1,F_cell1,(/2/))
+                   call c_f_pointer(C_cell2,F_cell2,(/2/))
+                   ie=ie+2
+                end select
+
+                mesh%edge(F_iedge(i1))%flux_acc=.false.
+                mesh%edge(F_iedge(i1))%sub=F_sub
+                mesh%edge(F_iedge(i1))%cell1=F_cell1(i1)
+                mesh%edge(F_iedge(i1))%cell2=F_cell2(i1)
+                mesh%edge(F_iedge(i1))%period=F_period(i1)
+                   
+                select case (i)
+                case (1,2)
+                   mesh%edge(F_iedge(i1))%dir=1
+                   mesh%edge(F_iedge(i1))%length=(yR-yL)/(nedge*2**lev)
+                   mesh%edge(F_iedge(i1))%lengthN=(xR-xL)/(2**lev)
+                case (3,4)
+                   mesh%edge(F_iedge(i1))%dir=2
+                   mesh%edge(F_iedge(i1))%length=(xR-xL)/(nedge*2**lev)
+                   mesh%edge(F_iedge(i1))%lengthN=(yR-yL)/(2**lev)
+                end select
+
+                select case (mesh%edge(F_iedge(i1))%dir)
+                case(1)
+                   if (F_cell1(i1)>0) then
+                      a=mesh%node(mesh%cell(F_cell1(i1))%corner(2))%y
+                      b=mesh%node(mesh%cell(F_cell1(i1))%corner(3))%y
+                      c=mesh%node(mesh%cell(F_cell1(i1))%corner(2))%x
+                   else
+                      a=mesh%node(mesh%cell(F_cell2(i1))%corner(1))%y
+                      b=mesh%node(mesh%cell(F_cell2(i1))%corner(4))%y
+                      c=mesh%node(mesh%cell(F_cell2(i1))%corner(1))%x
+                   endif
+                   center=(a+b)/2.0_dp
+                   diff=(b-a)/2.0_dp
+                   do p=1,size(gauss_point)
+                      mesh%edge(F_iedge(i1))%X_gauss(p)=c
+                      mesh%edge(F_iedge(i1))%Y_gauss(p)=center+diff*gauss_point(p)
+                   enddo
+                case(2)
+                   if (F_cell1(i1)>0) then
+                      a=mesh%node(mesh%cell(F_cell1(i1))%corner(4))%x
+                      b=mesh%node(mesh%cell(F_cell1(i1))%corner(3))%x
+                      c=mesh%node(mesh%cell(F_cell1(i1))%corner(4))%y
+                   else
+                      a=mesh%node(mesh%cell(F_cell2(i1))%corner(1))%x
+                      b=mesh%node(mesh%cell(F_cell2(i1))%corner(2))%x
+                      c=mesh%node(mesh%cell(F_cell2(i1))%corner(1))%y
+                   endif
+                   center=(a+b)/2.0_dp
+                   diff=(b-a)/2.0_dp
+                   do p=1,size(gauss_point)
+                      mesh%edge(F_iedge(i1))%X_gauss(p)=center+diff*gauss_point(p)
+                      mesh%edge(F_iedge(i1))%Y_gauss(p)=c
+                   enddo
+                end select
+             endif
+          enddo
        enddo
-       
-    enddo
-
-    do k=1,mesh%nc
-       if (k>mesh%cell(k)%neigh(1).and.mesh%cell(k)%neigh(1)>0) then
-          mesh%cell(k)%edge(1)=mesh%cell(mesh%cell(k)%neigh(1))%edge(2)
-       endif
-       if (k>mesh%cell(k)%neigh(2).and.mesh%cell(k)%neigh(2)>0) then
-          mesh%cell(k)%edge(2)=mesh%cell(mesh%cell(k)%neigh(2))%edge(1)
-       endif
-       if (k>mesh%cell(k)%neigh(3).and.mesh%cell(k)%neigh(3)>0) then
-          mesh%cell(k)%edge(3)=mesh%cell(mesh%cell(k)%neigh(3))%edge(4)
-       endif
-       if (k>mesh%cell(k)%neigh(4).and.mesh%cell(k)%neigh(4)>0) then
-          mesh%cell(k)%edge(4)=mesh%cell(mesh%cell(k)%neigh(4))%edge(3)
-       endif
-
-       if (mesh%cell(k)%neigh(1)<0) then
-          mesh%edge(mesh%cell(k)%edge(1))%period=mesh%cell(-mesh%cell(k)%neigh(1))%edge(2)
-       else
-          mesh%edge(mesh%cell(k)%edge(1))%period=mesh%cell(k)%edge(1)
-       endif
-       if (mesh%cell(k)%neigh(2)<0) then
-          mesh%edge(mesh%cell(k)%edge(2))%period=mesh%cell(-mesh%cell(k)%neigh(2))%edge(1)
-       else
-          mesh%edge(mesh%cell(k)%edge(2))%period=mesh%cell(k)%edge(2)
-       endif
-       if (mesh%cell(k)%neigh(3)<0) then
-          mesh%edge(mesh%cell(k)%edge(3))%period=mesh%cell(-mesh%cell(k)%neigh(3))%edge(4)
-       else
-          mesh%edge(mesh%cell(k)%edge(3))%period=mesh%cell(k)%edge(3)
-       endif
-       if (mesh%cell(k)%neigh(4)<0) then
-          mesh%edge(mesh%cell(k)%edge(4))%period=mesh%cell(-mesh%cell(k)%neigh(4))%edge(3)
-       else
-          mesh%edge(mesh%cell(k)%edge(4))%period=mesh%cell(k)%edge(4)
-       endif
     enddo
     
     return

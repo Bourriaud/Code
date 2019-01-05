@@ -56,7 +56,7 @@ contains
     integer, dimension(:), allocatable :: NOT_ACCEPTED_CELL,NOT_ACCEPTED_EDGE
     type(solStruct) :: soltemp
     integer, dimension(2) :: L_deg
-    real(dp) :: lengthN
+    real(dp) :: lengthN1,lengthN2
     if(.false.)print*,n
 
     allocate(u1(sol%nvar),u2(sol%nvar))
@@ -85,7 +85,8 @@ contains
           cell1=edge%cell1
           cell2=edge%cell2
           dir=edge%dir
-          lengthN=edge%lengthN
+          lengthN1=mesh%cell(abs(cell1))%dx
+          lengthN2=mesh%cell(abs(cell2))%dx
           sub1=edge%sub(1)
           sub2=edge%sub(2)
           deg=min(mesh%cell(abs(cell1))%deg,mesh%cell(abs(cell2))%deg)
@@ -98,18 +99,18 @@ contains
                    call evaluate(mesh,sol,cell2,deg+1,gauss_weight,edge%X_gauss(p),edge%Y_gauss(p),u2)
                    call boundary(flux,f_equa,gauss_weight,cell2,cell1, &
                         u2,mesh,sol,j,p,edge%boundType,edge%bound,dir,deg+1,mesh%edge(j)%flux(p,:))
-                   soltemp%val(cell2,:)=soltemp%val(cell2,:)+gauss_weight(p)*mesh%edge(j)%flux(p,:)*dt/(lengthN*2.0_dp**(sub2+1))
+                   soltemp%val(cell2,:)=soltemp%val(cell2,:)+gauss_weight(p)*mesh%edge(j)%flux(p,:)*dt/(lengthN2*2.0_dp**(sub2+1))
                 elseif (cell2<0) then
                    call evaluate(mesh,sol,cell1,deg+1,gauss_weight,edge%X_gauss(p),edge%Y_gauss(p),u1)
                    call boundary(flux,f_equa,gauss_weight,cell1,cell2, &
                         u1,mesh,sol,j,p,edge%boundType,edge%bound,dir+2,deg+1,mesh%edge(j)%flux(p,:))
-                   soltemp%val(cell1,:)=soltemp%val(cell1,:)-gauss_weight(p)*mesh%edge(j)%flux(p,:)*dt/(lengthN*2.0_dp**(sub1+1))
+                   soltemp%val(cell1,:)=soltemp%val(cell1,:)-gauss_weight(p)*mesh%edge(j)%flux(p,:)*dt/(lengthN1*2.0_dp**(sub1+1))
                 else
                    call evaluate(mesh,sol,cell1,deg+1,gauss_weight,edge%X_gauss(p),edge%Y_gauss(p),u1)
                    call evaluate(mesh,sol,cell2,deg+1,gauss_weight,edge%X_gauss(p),edge%Y_gauss(p),u2)
                    call flux(u1,u2,f_equa,dir,mesh%edge(j)%flux(p,:))
-                   soltemp%val(cell1,:)=soltemp%val(cell1,:)-gauss_weight(p)*mesh%edge(j)%flux(p,:)*dt/(lengthN*2.0_dp**(sub1+1))
-                   soltemp%val(cell2,:)=soltemp%val(cell2,:)+gauss_weight(p)*mesh%edge(j)%flux(p,:)*dt/(lengthN*2.0_dp**(sub2+1))
+                   soltemp%val(cell1,:)=soltemp%val(cell1,:)-gauss_weight(p)*mesh%edge(j)%flux(p,:)*dt/(lengthN1*2.0_dp**(sub1+1))
+                   soltemp%val(cell2,:)=soltemp%val(cell2,:)+gauss_weight(p)*mesh%edge(j)%flux(p,:)*dt/(lengthN2*2.0_dp**(sub2+1))
                 endif
              endif
           enddo

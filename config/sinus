@@ -8,8 +8,8 @@ Sinus	ICBC
 1.0	tf
 transport	equation
 godunov	flux
-SSPRK3	time scheme
-3	space order
+euler_exp	time scheme
+1	space order
 1	number of detection criterias
 DMPu2 1 1.0e-4	detection criteria + variable + sensibility
 1	save frequency

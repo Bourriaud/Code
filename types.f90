@@ -127,11 +127,17 @@ module types
   end interface
 
   interface
-     
-     subroutine p4_build_mesh(level,p4est,tt,mesh,quadrants,nodes,edges,np,nc,ne) bind(C)
+
+     subroutine p4_new(level,p4est) bind(C)
        use, intrinsic :: ISO_C_BINDING
        integer(c_int), value, intent(in) :: level
-       type(c_ptr), intent(out) :: p4est,mesh,quadrants,nodes,edges
+       type(c_ptr), intent(out) :: p4est
+     end subroutine p4_new
+     
+     subroutine p4_build_mesh(p4est,tt,mesh,quadrants,nodes,edges,np,nc,ne) bind(C)
+       use, intrinsic :: ISO_C_BINDING
+       type(c_ptr), value, intent(in) :: p4est
+       type(c_ptr), intent(out) :: mesh,quadrants,nodes,edges
        integer(c_int), intent(out) :: tt
        integer(c_int), intent(out) :: np,nc,ne
      end subroutine p4_build_mesh
@@ -144,23 +150,29 @@ module types
        real(c_double), intent(out) :: X,Y
      end subroutine p4_get_node
 
-     subroutine p4_get_cell(p4est,mesh,tt,quadrants,nodes,edges,k,xc,yc,dx,dy,corners,neighbors,level) bind(C)
+     subroutine p4_get_cell(p4est,mesh,tt,quadrants,nodes,edges,k,xc,yc,dx,dy,corners,Nneigh,neighbors,N_edge,level) bind(C)
        use, intrinsic :: ISO_C_BINDING
        type(c_ptr), value, intent(in) :: p4est,mesh,quadrants,nodes,edges
        integer(c_int), value, intent(in) :: tt
        integer(c_int), value, intent(in) :: k
        real(c_double), intent(out) :: xc,yc,dx,dy
        type(c_ptr), intent(out) :: corners,neighbors
-       integer(c_int), intent(out) :: level
+       integer(c_int), intent(out) :: Nneigh,N_edge,level
      end subroutine p4_get_cell
 
-     subroutine p4_get_edge(p4est,mesh,quadrants,edges,ne,k,i,iedge,cell1,cell2,sub) bind(C)
+     subroutine p4_get_edge(p4est,mesh,quadrants,edges,k,i,iedge_out,nedge,cell1,cell2,sub,period) bind(C)
        use, intrinsic :: ISO_C_BINDING
        type(c_ptr), value, intent(in) :: p4est,mesh,quadrants,edges
-       integer(c_int), value, intent(in) :: ne,k,i
-       integer(c_int), intent(out) :: iedge,cell1,cell2
-       type(c_ptr), intent(out) :: sub
+       integer(c_int), value, intent(in) :: k,i
+       integer(c_int), intent(out) :: nedge
+       type(c_ptr), intent(out) :: iedge_out,cell1,cell2,sub,period
      end subroutine p4_get_edge
+
+     subroutine p4_refine(p4est,refine_recursive,refine_fn,init_fn) bind(C)
+       use, intrinsic :: ISO_C_BINDING
+       type(c_ptr), value, intent(in) :: p4est,refine_fn,init_fn
+       integer(c_int), value, intent(in) :: refine_recursive
+     end subroutine p4_refine
      
   end interface
 

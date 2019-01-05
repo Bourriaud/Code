@@ -34,7 +34,7 @@ program test
   call init(config_file,test_case,xL,xR,yL,yR,level,nvar,cfl,tf,fs,namefile,sol, &
        str_equa,str_flux,str_time_scheme,order,L_str_criteria,L_var_criteria,L_eps, &
        gauss_point,gauss_weight)
-  call buildMesh_P4EST(xL,xR,yL,yR,level,gauss_point,order,mesh,sol)
+  call buildMesh_P4EST(xL,xR,yL,yR,2,gauss_point,order,mesh,sol)
   call init_FV(test_case,str_equa,str_flux,str_time_scheme,IC_func,BC,exactSol, &
        f_equa,flux,speed,time_scheme,sol)
   call IC(IC_func,mesh,sol,order,gauss_point6,gauss_weight6)
