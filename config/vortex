@@ -12,8 +12,8 @@ SSPRK3	time scheme
 3	space order
 4	number of detection criterias
 PAD 1 1.0e-4	detection criteria + variable + sensibility
-DMPu2 1 1.0e-4
-DMPu2 2 1.0e-4
+DMPu2 1 1.0e-3
+DMPu2 2 1.0e-3
 DMPu2 4 1.0e-3
 10	save frequency
 vortex	namefile

@@ -168,13 +168,17 @@ contains
           mesh%cell(k)%xc=xL+i*dx-dx/2.0_dp
           mesh%cell(k)%yc=yL+j*dy-dy/2.0_dp
 
-          allocate(mesh%cell(k)%edge(4),mesh%cell(k)%neigh(8))
+          allocate(mesh%cell(k)%node(4),mesh%cell(k)%neigh(8),mesh%cell(k)%edge(4))
           allocate(mesh%cell(k)%X_gauss(size(gauss_point)),mesh%cell(k)%Y_gauss(size(gauss_point)))
 
           mesh%cell(k)%corner(1)=(j-1)*(nx+1)+i
           mesh%cell(k)%corner(2)=(j-1)*(nx+1)+i+1
           mesh%cell(k)%corner(3)=j*(nx+1)+i
           mesh%cell(k)%corner(4)=j*(nx+1)+i+1
+          mesh%cell(k)%node(1)=mesh%cell(k)%corner(1)
+          mesh%cell(k)%node(2)=mesh%cell(k)%corner(2)
+          mesh%cell(k)%node(3)=mesh%cell(k)%corner(4)
+          mesh%cell(k)%node(4)=mesh%cell(k)%corner(3)
 
           mesh%cell(k)%edge(1)=k+j-1
           mesh%cell(k)%edge(2)=(nx+1)*ny+j+(i-1)*(ny+1)
@@ -314,10 +318,11 @@ contains
     real(dp), dimension(:), intent(in) :: gauss_point
     type(meshStruct), intent(inout) :: mesh
     type(solStruct), intent(inout) :: sol
-    type(c_ptr) :: p4est,p4_mesh,quadrants,nodes,edges,C_corners,C_neighbors,C_sub,C_cell1,C_cell2,C_iedge,C_period
+    type(c_ptr) :: p4est,p4_mesh,quadrants,nodes,edges
+    type(c_ptr) :: C_corners,C_neighbors,C_sub,C_cell1,C_cell2,C_iedge,C_period,C_nodes
     integer(c_int) :: tt
-    integer, dimension(:), pointer :: F_corners,F_neighbors,F_sub,F_cell1,F_cell2,F_iedge,F_period
-    integer :: k,i,lev,p,Nneigh,N_edge,ie,nedge,i1,iloc
+    integer, dimension(:), pointer :: F_corners,F_neighbors,F_sub,F_cell1,F_cell2,F_iedge,F_period,F_nodes
+    integer :: k,i,lev,p,Nneigh,N_edge,Nnodes,ie,nedge,i1,iloc
     real(dp) :: a,b,c,center,diff
     type(c_ptr) :: refine_fn,init_fn
     character(len=20), pointer :: f_refine,f_init
@@ -345,18 +350,24 @@ contains
 
     ie=0
     do k=1,mesh%nc
-       allocate(mesh%cell(k)%X_gauss(size(gauss_point)),mesh%cell(k)%Y_gauss(size(gauss_point)))
        call p4_get_cell(p4est,p4_mesh,tt,quadrants,nodes,edges,k-1,mesh%cell(k)%xc,mesh%cell(k)%yc, &
-            mesh%cell(k)%dx,mesh%cell(k)%dy,C_corners,Nneigh,C_neighbors,N_edge,lev)
+            mesh%cell(k)%dx,mesh%cell(k)%dy,C_corners,Nneigh,C_neighbors,Nnodes,C_nodes,N_edge,lev)
+
+       allocate(mesh%cell(k)%node(Nnodes))
+       allocate(mesh%cell(k)%neigh(Nneigh))
+       allocate(mesh%cell(k)%X_gauss(size(gauss_point)),mesh%cell(k)%Y_gauss(size(gauss_point)))
+       
        mesh%cell(k)%xc=(xR-xL)*mesh%cell(k)%xc+xL
        mesh%cell(k)%yc=(yR-yL)*mesh%cell(k)%yc+yL
        mesh%cell(k)%dx=(xR-xL)*mesh%cell(k)%dx
        mesh%cell(k)%dy=(yR-yL)*mesh%cell(k)%dy
        
        call c_f_pointer(C_corners,F_corners,(/4/))
+       call c_f_pointer(C_nodes,F_nodes,(/Nnodes/))
        call c_f_pointer(C_neighbors,F_neighbors,(/12/))
-       allocate(mesh%cell(k)%neigh(Nneigh))
+       
        mesh%cell(k)%corner=F_corners
+       mesh%cell(k)%node=F_nodes
        mesh%cell(k)%neigh(1:Nneigh)=F_neighbors(1:Nneigh)
        do p=1,size(gauss_point)
           mesh%cell(k)%X_gauss(p)=mesh%cell(k)%xc+mesh%cell(k)%dx*gauss_point(p)/2.0_dp
@@ -462,7 +473,7 @@ contains
     character(len=20), intent(in) :: namefile
     integer, intent(in) :: nfile
     integer :: k,n
-    integer :: i1,i2,i3,i4
+    integer :: i,nnodes
     character(len=34) :: completenamefile
 
     write(completenamefile,'(A,A,I3.3,A)')'./results/',trim(namefile),nfile,'.vtk'
@@ -478,13 +489,18 @@ contains
        write(11,'(e15.8,a,e15.8,a,e15.8)')mesh%node(k)%x," ",mesh%node(k)%y," ",0.0_dp
     enddo
 
-    write(11,'(a,i8,i9)')"CELLS ",mesh%nc,5*mesh%nc
+    n=0
     do k=1,mesh%nc
-       i1=mesh%cell(k)%corner(1)-1
-       i2=mesh%cell(k)%corner(2)-1
-       i3=mesh%cell(k)%corner(3)-1
-       i4=mesh%cell(k)%corner(4)-1
-       write(11,'(i1,i8,i8,i8,i8)')4,i1,i2,i4,i3
+       n=n+size(mesh%cell(k)%node)+1
+    enddo
+    write(11,'(a,i8,i9)')"CELLS ",mesh%nc,n
+    do k=1,mesh%nc
+       nnodes=size(mesh%cell(k)%node)
+       write(11,'(i1)',advance='no')nnodes
+       do i=1,nnodes-1
+          write(11,'(i8)',advance='no')mesh%cell(k)%node(i)-1
+       enddo
+       write(11,'(i8)')mesh%cell(k)%node(nnodes)-1
     enddo
 
     write(11,'(a,i8)')"CELL_TYPES ",mesh%nc

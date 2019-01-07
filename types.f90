@@ -27,6 +27,7 @@ module types
      real(dp) :: xc,yc
      real(dp), dimension(:,:), allocatable :: polCoef
      integer, dimension(4) :: corner
+     integer, dimension(:), allocatable :: node
      integer, dimension(:), allocatable :: neigh
      integer, dimension(:), allocatable :: edge
      real(dp), dimension(:), allocatable :: X_gauss,Y_gauss
@@ -150,14 +151,15 @@ module types
        real(c_double), intent(out) :: X,Y
      end subroutine p4_get_node
 
-     subroutine p4_get_cell(p4est,mesh,tt,quadrants,nodes,edges,k,xc,yc,dx,dy,corners,Nneigh,neighbors,N_edge,level) bind(C)
+     subroutine p4_get_cell(p4est,mesh,tt,quadrants,nodes,edges,k,xc,yc,dx,dy, &
+          corners,Nneigh,neighbors,Nnodes,cell_nodes,N_edge,level) bind(C)
        use, intrinsic :: ISO_C_BINDING
        type(c_ptr), value, intent(in) :: p4est,mesh,quadrants,nodes,edges
        integer(c_int), value, intent(in) :: tt
        integer(c_int), value, intent(in) :: k
        real(c_double), intent(out) :: xc,yc,dx,dy
-       type(c_ptr), intent(out) :: corners,neighbors
-       integer(c_int), intent(out) :: Nneigh,N_edge,level
+       type(c_ptr), intent(out) :: corners,neighbors,cell_nodes
+       integer(c_int), intent(out) :: Nneigh,Nnodes,N_edge,level
      end subroutine p4_get_cell
 
      subroutine p4_get_edge(p4est,mesh,quadrants,edges,k,i,iedge_out,nedge,cell1,cell2,sub,period) bind(C)

@@ -17,7 +17,7 @@ typedef struct var
 }
 var_t;
 
-static void initial_condition(p4est_t * p4est, p4est_topidx_t which_tree, p4est_quadrant_t * q)
+static void initial_condition(p4est_t* p4est, p4est_topidx_t which_tree, p4est_quadrant_t* q)
 {
   var_t *data = (var_t *) q->p.user_data;
   data->u = 1.;
@@ -26,8 +26,8 @@ static void initial_condition(p4est_t * p4est, p4est_topidx_t which_tree, p4est_
 void p4_new (int level, p4est_t** p4est_out)
 {
   sc_MPI_Comm mpicomm;
-  p4est_connectivity_t *conn;
-  p4est_t *p4est;
+  p4est_connectivity_t* conn;
+  p4est_t* p4est;
 
   mpicomm = sc_MPI_COMM_WORLD;
   conn = p4est_connectivity_new_periodic();
@@ -38,17 +38,17 @@ void p4_new (int level, p4est_t** p4est_out)
 void p4_build_mesh(p4est_t* p4est, p4est_topidx_t* tt_out, p4est_mesh_t** mesh_out, sc_array_t** quadrants_out, p4est_nodes_t** nodes_out, int** edges_out, int* np, int* nc, int* ne)
 {
   p4est_topidx_t  tt;
-  sc_array_t *trees;
-  p4est_tree_t *tree;
-  p4est_nodes_t *nodes;
-  sc_array_t *quadrants;
+  sc_array_t* trees;
+  p4est_tree_t* tree;
+  p4est_nodes_t* nodes;
+  sc_array_t* quadrants;
   p4est_mesh_t* mesh;
   p4est_ghost_t* ghost;
   int i;
   int k;
   int neigh;
-  p4est_quadrant_t *quad;
-  p4est_quadrant_t *quad_neigh;
+  p4est_quadrant_t* quad;
+  p4est_quadrant_t* quad_neigh;
   int* edges;
   int* half_neigh;
 
@@ -242,7 +242,7 @@ void p4_get_node(p4est_t* p4est, p4est_topidx_t tt, p4est_nodes_t* nodes, int i,
   *Y_out=vxyz[1];
 }
 
-void p4_get_cell(p4est_t* p4est, p4est_mesh_t* mesh, p4est_locidx_t tt, sc_array_t* quadrants, p4est_nodes_t* nodes, int* edges, int i, double* Xc_out, double* Yc_out, double* dX_out, double* dY_out, int** corners_out, int* Nneigh, int** neighbors_out, int* N_edge, int* lev)
+void p4_get_cell(p4est_t* p4est, p4est_mesh_t* mesh, p4est_locidx_t tt, sc_array_t* quadrants, p4est_nodes_t* nodes, int* edges, int i, double* Xc_out, double* Yc_out, double* dX_out, double* dY_out, int** corners_out, int* Nneigh, int** neighbors_out, int* Nnodes, int** nodes_out, int* N_edge, int* lev)
 {
   p4est_quadrant_t *quad;
   size_t num_quads;
@@ -255,6 +255,8 @@ void p4_get_cell(p4est_t* p4est, p4est_mesh_t* mesh, p4est_locidx_t tt, sc_array
   int index;
   p4est_quadrant_t* quad_neigh;
   int* half_neigh;
+  int* cell_nodes;
+  int inode;
 
   num_quads = quadrants->elem_count;
 
@@ -272,14 +274,101 @@ void p4_get_cell(p4est_t* p4est, p4est_mesh_t* mesh, p4est_locidx_t tt, sc_array
   *dY_out=dX[1];
 
   corners = (int*) malloc(sizeof(int)*4);
+  cell_nodes = (int*) malloc(sizeof(int)*8);
+  neighbors = (int*) malloc(sizeof(int)*12);
+  *Nneigh = 0;
+  inode = 0;
+
   corners[0]=(int) nodes->local_nodes[4*i]+1;
   corners[1]=(int) nodes->local_nodes[4*i+1]+1;
   corners[2]=(int) nodes->local_nodes[4*i+2]+1;
   corners[3]=(int) nodes->local_nodes[4*i+3]+1;
-  *corners_out=corners;
+  if (mesh->quad_to_face[4*i+2]<0)
+  {
+    half_neigh=sc_array_index(mesh->quad_to_half,mesh->quad_to_quad[4*i+2]);
+    quad_neigh=sc_array_index(quadrants,half_neigh[0]);
+    if (quad_neigh->y<quad->y)
+    {
+      cell_nodes[inode]=nodes->local_nodes[4*half_neigh[0]+2]+1;
+      cell_nodes[inode+1]=nodes->local_nodes[4*half_neigh[1]+2]+1;
+      inode=inode+2;
+    }
+    else
+    {
+      cell_nodes[inode]=nodes->local_nodes[4*i]+1;
+      inode=inode+1;
+    }
+  }
+  else
+  {
+    cell_nodes[inode]=nodes->local_nodes[4*i]+1;
+    inode=inode+1;
+  }
+  if (mesh->quad_to_face[4*i+1]<0)
+  {
+    half_neigh=sc_array_index(mesh->quad_to_half,mesh->quad_to_quad[4*i+1]);
+    quad_neigh=sc_array_index(quadrants,half_neigh[0]);
+    if (quad_neigh->x>quad->x)
+    {
+      cell_nodes[inode]=nodes->local_nodes[4*half_neigh[0]]+1;
+      cell_nodes[inode+1]=nodes->local_nodes[4*half_neigh[1]]+1;
+      inode=inode+2;
+    }
+    else
+    {
+      cell_nodes[inode]=nodes->local_nodes[4*i+1]+1;
+      inode=inode+1;
+    }
+  }
+  else
+  {
+    cell_nodes[inode]=nodes->local_nodes[4*i+1]+1;
+    inode=inode+1;
+  }
+  if (mesh->quad_to_face[4*i+3]<0)
+  {
+    half_neigh=sc_array_index(mesh->quad_to_half,mesh->quad_to_quad[4*i+3]);
+    quad_neigh=sc_array_index(quadrants,half_neigh[0]);
+    if (quad_neigh->y>quad->y)
+    {
+      cell_nodes[inode]=nodes->local_nodes[4*half_neigh[1]+1]+1;
+      cell_nodes[inode+1]=nodes->local_nodes[4*half_neigh[0]+1]+1;
+      inode=inode+2;
+    }
+    else
+    {
+      cell_nodes[inode]=nodes->local_nodes[4*i+3]+1;
+      inode=inode+1;
+    }
+  }
+  else
+  {
+    cell_nodes[inode]=nodes->local_nodes[4*i+3]+1;
+    inode=inode+1;
+  }
+  if (mesh->quad_to_face[4*i]<0)
+  {
+    half_neigh=sc_array_index(mesh->quad_to_half,mesh->quad_to_quad[4*i]);
+    quad_neigh=sc_array_index(quadrants,half_neigh[0]);
+    if (quad_neigh->x<quad->x)
+    {
+      cell_nodes[inode]=nodes->local_nodes[4*half_neigh[1]+3]+1;
+      cell_nodes[inode+1]=nodes->local_nodes[4*half_neigh[0]+3]+1;
+      inode=inode+2;
+    }
+    else
+    {
+      cell_nodes[inode]=nodes->local_nodes[4*i+2]+1;
+      inode=inode+1;
+    }
+  }
+  else
+  {
+    cell_nodes[inode]=nodes->local_nodes[4*i+2]+1;
+    inode=inode+1;
+  }
+  *Nnodes=inode;
 
-  neighbors = (int*) malloc(sizeof(int)*12);
-  *Nneigh = 0;
   for (k=0;k<4;k++)
   {
     if (mesh->quad_to_face[4*i+k]<0)
@@ -363,6 +452,8 @@ void p4_get_cell(p4est_t* p4est, p4est_mesh_t* mesh, p4est_locidx_t tt, sc_array
     }
   }
   *neighbors_out=neighbors;
+  *corners_out=corners;
+  *nodes_out=cell_nodes;
 }
 
 void p4_get_edge(p4est_t *p4est, p4est_mesh_t* mesh, sc_array_t* quadrants, int* edges, int k, int i, int** iedge_out, int* nedge, int** cell1_out, int** cell2_out, int** sub_out, int** period_out)
@@ -596,13 +687,12 @@ static int refine_test (p4est_t* p4est, p4est_topidx_t which_tree, p4est_quadran
 
   tt = p4est->first_local_tree;
   p4est_qcoord_to_vertex (p4est->connectivity, tt, q->x, q->y, X);
-  if (X[0]==0.5&&X[1]==0.5){return 1;}
+  if (X[0]>0.7&&X[1]>0.7){return 1;}
   else {return 0;}
 }
 
 void p4_refine (p4est_t* p4est, int refine_recursive, char* refine_fn, char* init_fn)
 {
-  //p4est_refine(p4est,refine_recursive,refine_fn,init_fn);
   printf("Refine function : |%s| \ninit_fn : |%s| \n",refine_fn,init_fn);
   p4est_refine(p4est,refine_recursive,refine_test,NULL);
 }
