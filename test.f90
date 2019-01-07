@@ -10,6 +10,7 @@ program test
   use reconstruction
   use ICBC
   use limit
+  use AMR
   
   implicit none
 
@@ -29,16 +30,24 @@ program test
   procedure (sub_speed), pointer :: speed
   procedure (sub_time), pointer :: time_scheme
   real(dp), dimension(:), allocatable :: gauss_point,gauss_weight
+  type(c_ptr) :: p4est,quadrants
   
   call get_config(config_file)
   call init(config_file,test_case,xL,xR,yL,yR,level,nvar,cfl,tf,fs,namefile,sol, &
        str_equa,str_flux,str_time_scheme,order,L_str_criteria,L_var_criteria,L_eps, &
        gauss_point,gauss_weight)
-  call buildMesh_P4EST(xL,xR,yL,yR,2,gauss_point,order,mesh,sol)
+  call buildP4EST(2,p4est)
+  call buildMesh_P4EST(p4est,xL,xR,yL,yR,gauss_point,order,mesh,sol,quadrants)
   call init_FV(test_case,str_equa,str_flux,str_time_scheme,IC_func,BC,exactSol, &
        f_equa,flux,speed,time_scheme,sol)
   call IC(IC_func,mesh,sol,order,gauss_point6,gauss_weight6)
   call BC(nvar,mesh)
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  call adapt(p4est,quadrants,mesh,sol)
+  call buildMesh_P4EST(p4est,xL,xR,yL,yR,gauss_point,order,mesh,sol,quadrants)
+  call IC(IC_func,mesh,sol,order,gauss_point6,gauss_weight6)
+  call BC(nvar,mesh)
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   call userSol(0.0_dp,mesh,sol,str_equa,exactSol,gauss_weight)
   call writeSol(mesh,sol,namefile,0)
   call calculation(mesh,sol,order,cfl,tf,fs,namefile,str_equa, &

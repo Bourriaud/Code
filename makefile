@@ -1,6 +1,6 @@
 PROG = run
-SRCS = main.f90 constant.f90 inout.f90 efficiency.f90 types.f90 phys.f90 FV.f90 time.f90 reconstruction.f90 limit.f90 ICBC.f90 p4est_wrapper.c
-OBJS = main.o constant.o inout.o efficiency.o types.o phys.o FV.o time.o reconstruction.o limit.o ICBC.o p4est_wrapper.o
+SRCS = main.f90 constant.f90 inout.f90 efficiency.f90 types.f90 phys.f90 FV.f90 time.f90 reconstruction.f90 limit.f90 ICBC.f90 AMR.f90 p4est_wrapper.c
+OBJS = main.o constant.o inout.o efficiency.o types.o phys.o FV.o time.o reconstruction.o limit.o ICBC.o AMR.o p4est_wrapper.o
 
 INC = -I/home/imb/abourriaud/Documents/Code/P4EST/local/include
 LIBP = -L/home/imb/abourriaud/Documents/Code/P4EST/local/lib
@@ -34,7 +34,7 @@ clean:
 .f90.o:
 	$(F90) $(F90FLAGS) -c $<
 
-main.o: constant.o inout.o efficiency.o types.o phys.o FV.o time.o reconstruction.o ICBC.o
+main.o: constant.o inout.o efficiency.o types.o phys.o FV.o time.o reconstruction.o ICBC.o AMR.o
 
 inout.o: constant.o types.o efficiency.o phys.o
 
@@ -54,7 +54,9 @@ limit.o: constant.o types.o reconstruction.o
 
 ICBC.o: constant.o types.o phys.o
 
-test: test.o constant.o reconstruction.o types.o inout.o efficiency.o phys.o FV.o time.o limit.o ICBC.o p4est_wrapper.o
-	$(F90) -o test constant.o test.o reconstruction.o types.o inout.o efficiency.o phys.o FV.o time.o limit.o ICBC.o p4est_wrapper.o $(INC) $(LIBP) $(LIBS)
+AMR.o: constant.o types.o
 
-test.o : constant.o reconstruction.o types.o inout.o efficiency.o phys.o FV.o time.o limit.o ICBC.o
+test: test.o constant.o reconstruction.o types.o inout.o efficiency.o phys.o FV.o time.o limit.o ICBC.o p4est_wrapper.o
+	$(F90) -o test constant.o test.o reconstruction.o types.o inout.o efficiency.o phys.o FV.o time.o limit.o ICBC.o AMR.o p4est_wrapper.o $(INC) $(LIBP) $(LIBS)
+
+test.o : constant.o reconstruction.o types.o inout.o efficiency.o phys.o FV.o time.o limit.o ICBC.o AMR.o

@@ -59,6 +59,7 @@ contains
     enddo
     read(11,*)sol%nsolUser
     allocate(sol%var_user(sol%nsolUser),sol%name_user(sol%nsolUser))
+    allocate(sol%conserv_var(nvar,2))
     do i=1,sol%nsolUser
        read(11,*)sol%var_user(i)
     enddo
@@ -146,7 +147,7 @@ contains
     mesh%nc=nx*ny
 
     allocate(mesh%node(mesh%np),mesh%cell(mesh%nc),mesh%edge(mesh%ne))
-    allocate(sol%val(mesh%nc,sol%nvar),sol%user(mesh%nc,sol%nsolUser),sol%conserv_var(sol%nvar,2))
+    allocate(sol%val(mesh%nc,sol%nvar),sol%user(mesh%nc,sol%nsolUser))
 
     !Initialisation des points
     
@@ -312,35 +313,36 @@ contains
     return
   end subroutine buildMesh
 
-  subroutine buildMesh_P4EST(xL,xR,yL,yR,level,gauss_point,order,mesh,sol)
+  subroutine buildP4EST(level,p4est)
+    integer, intent(in) :: level
+    type(c_ptr), intent(out) :: p4est
+
+    call p4_new(level,p4est)
+
+    return
+  end subroutine buildP4EST
+  
+  subroutine buildMesh_P4EST(p4est,xL,xR,yL,yR,gauss_point,order,mesh,sol,quadrants)
+    type(c_ptr), intent(in) :: p4est
     real(dp), intent(in) :: xL,xR,yL,yR
-    integer, intent(in) :: level,order
+    integer, intent(in) :: order
     real(dp), dimension(:), intent(in) :: gauss_point
     type(meshStruct), intent(inout) :: mesh
     type(solStruct), intent(inout) :: sol
-    type(c_ptr) :: p4est,p4_mesh,quadrants,nodes,edges
-    type(c_ptr) :: C_corners,C_neighbors,C_sub,C_cell1,C_cell2,C_iedge,C_period,C_nodes
+    type(c_ptr), intent(out) :: quadrants
     integer(c_int) :: tt
+    type(c_ptr) :: p4_mesh,nodes,edges
+    type(c_ptr) :: C_corners,C_neighbors,C_sub,C_cell1,C_cell2,C_iedge,C_period,C_nodes
     integer, dimension(:), pointer :: F_corners,F_neighbors,F_sub,F_cell1,F_cell2,F_iedge,F_period,F_nodes
     integer :: k,i,lev,p,Nneigh,N_edge,Nnodes,ie,nedge,i1,iloc
     real(dp) :: a,b,c,center,diff
-    type(c_ptr) :: refine_fn,init_fn
-    character(len=20), pointer :: f_refine,f_init
 
-    call p4_new(level,p4est)
-    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    allocate(f_refine,f_init)
-    f_refine='refine_test'//c_null_char
-    f_init='null'//c_null_char
-    refine_fn=c_loc(f_refine)
-    init_fn=c_loc(f_init)
-    call p4_refine(p4est,0,refine_fn,init_fn)
     call p4_build_mesh(p4est,tt,p4_mesh,quadrants,nodes,edges,mesh%np,mesh%nc,mesh%ne)
-    deallocate(f_refine,f_init)
-    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
+    
+    if (allocated(mesh%node)) deallocate(mesh%node,mesh%cell,mesh%edge)
     allocate(mesh%node(mesh%np),mesh%cell(mesh%nc),mesh%edge(mesh%ne))
-    allocate(sol%val(mesh%nc,sol%nvar),sol%user(mesh%nc,sol%nsolUser),sol%conserv_var(sol%nvar,2))
+    if (allocated(sol%val)) deallocate(sol%val,sol%user)
+    allocate(sol%val(mesh%nc,sol%nvar),sol%user(mesh%nc,sol%nsolUser))
 
     do k=1,mesh%np
        call p4_get_node(p4est,tt,nodes,k-1,mesh%node(k)%x,mesh%node(k)%y)
