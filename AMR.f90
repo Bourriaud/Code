@@ -52,6 +52,7 @@ contains
           sol%val(k,isol)=F_sol((isol-1)*mesh%nc+k)
        enddo
     enddo
+    call p4_free(C_sol)
 
     return
   end subroutine new_sol

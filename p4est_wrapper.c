@@ -232,9 +232,6 @@ void p4_get_node(p4est_t* p4est, p4est_topidx_t tt, p4est_nodes_t* nodes, int i,
   double vxyz[3];
   p4est_indep_t *indep;
 
-  double* X = (double*) malloc(sizeof(double)*nodes->indep_nodes.elem_count);
-  double* Y = (double*) malloc(sizeof(double)*nodes->indep_nodes.elem_count);
-
   indep = (p4est_indep_t *) sc_array_index (&nodes->indep_nodes, (size_t) i);
   p4est_qcoord_to_vertex (p4est->connectivity, tt, indep->x, indep->y, vxyz);
 
@@ -731,6 +728,7 @@ static void replace_fn (p4est_t* p4est, p4est_topidx_t which_tree, int num_outgo
         child_data = (var_t *) outgoing[i]->p.user_data;
         parent_data->u[isol] += child_data->u[isol]/P4EST_CHILDREN;
       }
+      free(child_data->u);
     }
   }
   else
@@ -745,6 +743,7 @@ static void replace_fn (p4est_t* p4est, p4est_topidx_t which_tree, int num_outgo
       child_data->nsol=parent_data->nsol;
       for (isol=0;isol<parent_data->nsol;isol++){child_data->u[isol] = parent_data->u[isol];}
     }
+    free(parent_data->u);
   }
 }
 
@@ -803,6 +802,12 @@ void p4_new_sol (sc_array_t* quadrants, double** sol_out)
     {
       sol[isol*nc+k]=data->u[isol];
     }
+    free(data->u);
   }
   *sol_out=sol;
+}
+
+void p4_free(void* ptr)
+{
+  free(ptr);
 }

@@ -489,8 +489,17 @@ contains
                 end select
              endif
           enddo
+          call p4_free(C_iedge)
+          call p4_free(C_cell1)
+          call p4_free(C_cell2)
+          call p4_free(C_sub)
+          call p4_free(C_period)
        enddo
+       call p4_free(C_corners)
+       call p4_free(C_neighbors)
+       call p4_free(C_nodes)
     enddo
+    call p4_free(edges)
     
     return
   end subroutine buildMesh_P4EST

@@ -182,6 +182,11 @@ module types
        type(c_ptr), value, intent(in) :: quadrants
        type(c_ptr), intent(out) :: sol
      end subroutine p4_new_sol
+
+     subroutine p4_free(ptr) bind(C)
+       use, intrinsic :: ISO_C_BINDING
+       type(c_ptr), value, intent(in) :: ptr
+     end subroutine p4_free
      
   end interface
 
