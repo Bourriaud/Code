@@ -12,23 +12,33 @@ contains
 
   subroutine get_config(config_file)
     character(len=20), intent(out) :: config_file
-    
+    logical :: file_exists
+
     print*,"Configuration file : "
     read*,config_file
+    INQUIRE(file="config/"//trim(config_file), EXIST=file_exists)
+    if (.not.file_exists) then
+       print*,"Configuration file ",trim(config_file)," doesn't exist"
+       call exit()
+    endif
 
     return
   end subroutine get_config
   
   subroutine init(config_file,test_case,xL,xR,yL,yR,level,nvar,cfl,tf,fs,namefile,sol, &
-       str_equa,str_flux,str_time_scheme,order,L_str_criteria,L_var_criteria,L_eps,gauss_point,gauss_weight)
+       str_equa,str_flux,str_time_scheme,order,L_str_criteria,L_var_criteria,L_eps, &
+       gauss_point,gauss_weight,bool_AMR,f_adapt,maxlevel,coarsen_recursive,refine_recursive, &
+       coarsen_fn,refine_fn)
     character(len=20), intent(out) :: config_file,test_case,namefile,str_equa,str_flux,str_time_scheme
     real(dp), intent(out) :: xL,xR,yL,yR,cfl,tf
-    integer, intent(out) :: level,nvar,fs,order
+    integer, intent(out) :: level,nvar,fs,order,f_adapt,maxlevel,coarsen_recursive,refine_recursive
     type(solStruct), intent(out) :: sol
     character(len=20), dimension(:), allocatable, intent(out) :: L_str_criteria
     integer, dimension(:), allocatable, intent(out) :: L_var_criteria
     real(dp), dimension(:), allocatable, intent(out) :: L_eps
     real(dp), dimension(:), allocatable, intent(out) :: gauss_point,gauss_weight
+    logical, intent(out) :: bool_AMR
+    character(len=20), intent(out) :: coarsen_fn,refine_fn
     integer :: i,ncriteria
 
     config_file="config/"//trim(config_file)
@@ -63,6 +73,22 @@ contains
     do i=1,sol%nsolUser
        read(11,*)sol%var_user(i)
     enddo
+    read(11,*)bool_AMR
+    if (bool_AMR) then
+       read(11,*)f_adapt
+       read(11,*)maxlevel
+       read(11,*)coarsen_recursive
+       read(11,*)refine_recursive
+       read(11,*)coarsen_fn
+       read(11,*)refine_fn
+    else
+       f_adapt=1
+       maxlevel=0
+       coarsen_recursive=0
+       refine_recursive=0
+       coarsen_fn="NO"
+       refine_fn="NO"
+    endif
     close(11)
     
     sol%nvar=nvar

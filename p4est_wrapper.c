@@ -13,6 +13,7 @@ static sc_MPI_Comm mpicomm;
 typedef struct var
 {
   double* u;
+  int nsol;
 }
 var_t;
 
@@ -679,6 +680,24 @@ void p4_get_edge(p4est_t *p4est, p4est_mesh_t* mesh, sc_array_t* quadrants, int*
   *period_out=period;
 }
 
+static int coarsen_test (p4est_t* p4est, p4est_topidx_t which_tree, p4est_quadrant_t** q)
+{
+  double X[3];
+  p4est_topidx_t tt;
+  var_t* data1;
+  var_t* data2;
+  var_t* data3;
+  var_t* data4;
+
+  tt = p4est->first_local_tree;
+  data1 = (var_t *) q[0]->p.user_data;
+  data2 = (var_t *) q[1]->p.user_data;
+  data3 = (var_t *) q[2]->p.user_data;
+  data4 = (var_t *) q[3]->p.user_data;
+  if ((data1->u[0]+data2->u[0]+data3->u[0]+data4->u[0])/4.>0.95) {return 1;}
+  else {return 0;}
+}
+
 static int refine_test (p4est_t* p4est, p4est_topidx_t which_tree, p4est_quadrant_t* q)
 {
   double X[3];
@@ -687,29 +706,103 @@ static int refine_test (p4est_t* p4est, p4est_topidx_t which_tree, p4est_quadran
 
   tt = p4est->first_local_tree;
   data = (var_t *) q->p.user_data;
-  if (data->u[0]>0.5) {return 1;}
-  //p4est_qcoord_to_vertex (p4est->connectivity, tt, q->x, q->y, X);
-  //if (X[0]<0.2&&X[1]<0.2){return 1;}
+  if (data->u[0]<0.85) {return 1;}
   else {return 0;}
 }
 
-void p4_refine (p4est_t* p4est, sc_array_t* quadrants, double* sol, int nsol, int refine_recursive, char* refine_fn, char* init_fn)
+static void replace_fn (p4est_t* p4est, p4est_topidx_t which_tree, int num_outgoing, p4est_quadrant_t* outgoing[], int num_incoming, p4est_quadrant_t* incoming[])
+{
+  var_t *parent_data,*child_data;
+  int i,j,isol;
+  double h;
+
+  if (num_outgoing > 1)
+  {
+    /* this is coarsening */
+    parent_data = (var_t *) incoming[0]->p.user_data;
+    child_data = (var_t *) outgoing[0]->p.user_data;
+    parent_data->u = (double*) malloc(sizeof(double)*child_data->nsol);
+    parent_data->nsol=child_data->nsol;
+    for (isol=0;isol<child_data->nsol;isol++){parent_data->u[isol] = 0.;}
+    for (i=0;i<P4EST_CHILDREN;i++)
+    {
+      for (isol=0;isol<child_data->nsol;isol++)
+      {
+        child_data = (var_t *) outgoing[i]->p.user_data;
+        parent_data->u[isol] += child_data->u[isol]/P4EST_CHILDREN;
+      }
+    }
+  }
+  else
+  {
+    /* this is refinement */
+    parent_data = (var_t *) outgoing[0]->p.user_data;
+    h=(double) P4EST_QUADRANT_LEN (outgoing[0]->level)/(double) P4EST_ROOT_LEN;
+    for (i=0;i<P4EST_CHILDREN;i++)
+    {
+      child_data = (var_t *) incoming[i]->p.user_data;
+      child_data->u = (double*) malloc(sizeof(double)*parent_data->nsol);
+      child_data->nsol=parent_data->nsol;
+      for (isol=0;isol<parent_data->nsol;isol++){child_data->u[isol] = parent_data->u[isol];}
+    }
+  }
+}
+
+void p4_adapt (p4est_t* p4est, sc_array_t* quadrants, double* sol, int nsol, int maxlevel, int coarsen_recursive, char* coarsen_fn, int refine_recursive, char* refine_fn, char* init_fn)
 {
   int k;
   int isol;
   p4est_quadrant_t* q;
   var_t* data;
+  int callback_orphans=0;
 
-  printf("Refine function : |%s| \ninit_fn : |%s| \n",refine_fn,init_fn);
   for (k=0;k<quadrants->elem_count;k++)
   {
     q=sc_array_index(quadrants,k);
-    data = (var_t *) q->p.user_data;
+    data = q->p.user_data;
     data->u = (double*) malloc(sizeof(double)*nsol);
+    data->nsol=nsol;
     for (isol=0;isol<nsol;isol++)
     {
       data->u[isol]=sol[isol*quadrants->elem_count+k];
     }
   }
-  p4est_refine(p4est,refine_recursive,refine_test,NULL);
+
+  if (strcmp(coarsen_fn,"coarsen_test")==0)
+  {
+    p4est_coarsen_ext(p4est,coarsen_recursive,callback_orphans,coarsen_test,NULL,replace_fn);
+  }
+  else {printf("Coarsen function %s not implemented\n",coarsen_fn);}
+  if (strcmp(refine_fn,"refine_test")==0)
+  {
+    p4est_refine_ext(p4est,refine_recursive,maxlevel,refine_test,NULL,replace_fn);
+  }
+  else {printf("Refine function %s not implemented\n",refine_fn);}
+  p4est_balance_ext (p4est,P4EST_CONNECT_FACE,NULL,replace_fn);
+}
+
+void p4_new_sol (sc_array_t* quadrants, double** sol_out)
+{
+  int nc;
+  double* sol;
+  int k;
+  int isol;
+  p4est_quadrant_t* q;
+  var_t* data;
+
+  nc=quadrants->elem_count;
+  q=sc_array_index(quadrants,0);
+  data=q->p.user_data;
+  sol = (double*) malloc(sizeof(double)*data->nsol*nc);
+
+  for (k=0;k<nc;k++)
+  {
+    q=sc_array_index(quadrants,k);
+    data=q->p.user_data;
+    for (isol=0;isol<data->nsol;isol++)
+    {
+      sol[isol*nc+k]=data->u[isol];
+    }
+  }
+  *sol_out=sol;
 }

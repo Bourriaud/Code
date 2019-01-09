@@ -27,3 +27,10 @@ E	var 4
 102	var_user : u
 103	var_user : v
 104	var_user : p
+TRUE	AMR
+1	adaptation frequency
+7	level max
+0	coarsen recursive
+0	refine recursive
+coarsen_test	coarsen function
+refine_test	refine function

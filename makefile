@@ -22,7 +22,7 @@ $(PROG): $(OBJS)
 	$(F90) -o $@ $(OBJS) $(INC) $(LIBP) $(LIBS)
 
 clean:
-	rm -f $(PROG) $(OBJS) *.mod
+	rm -f $(PROG) $(OBJS) *.mod test.o test
 
 .SUFFIXES: $(SUFFIXES) .c
 

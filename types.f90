@@ -170,11 +170,18 @@ module types
        type(c_ptr), intent(out) :: iedge_out,cell1,cell2,sub,period
      end subroutine p4_get_edge
 
-     subroutine p4_refine(p4est,quadrants,sol,nsol,refine_recursive,refine_fn,init_fn) bind(C)
+     subroutine p4_adapt(p4est,quadrants,sol,nsol,maxlevel,coarsen_recursive,coarsen_fn, &
+          refine_recursive,refine_fn,init_fn) bind(C)
        use, intrinsic :: ISO_C_BINDING
-       type(c_ptr), value, intent(in) :: p4est,quadrants,sol,refine_fn,init_fn
-       integer(c_int), value, intent(in) :: nsol,refine_recursive
-     end subroutine p4_refine
+       type(c_ptr), value, intent(in) :: p4est,quadrants,sol,coarsen_fn,refine_fn,init_fn
+       integer(c_int), value, intent(in) :: nsol,maxlevel,coarsen_recursive,refine_recursive
+     end subroutine p4_adapt
+
+     subroutine p4_new_sol(quadrants,sol) bind(C)
+       use, intrinsic :: ISO_C_BINDING
+       type(c_ptr), value, intent(in) :: quadrants
+       type(c_ptr), intent(out) :: sol
+     end subroutine p4_new_sol
      
   end interface
 

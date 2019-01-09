@@ -16,10 +16,11 @@ program main
   type(meshStruct) :: mesh
   type(solStruct) :: sol
   real(dp) :: xL,xR,yL,yR,cfl,tf,error
-  integer :: level,nvar,fs,order,i
+  integer :: level,nvar,fs,order,i,f_adapt,maxlevel,coarsen_recursive,refine_recursive
   integer, dimension(:), allocatable :: L_var_criteria
   real(dp), dimension(:), allocatable :: L_eps
   character(len=20) :: config_file,test_case,namefile,str_equa,str_flux,str_time_scheme
+  character(len=20) :: coarsen_fn,refine_fn
   character(len=20), dimension(:), allocatable :: L_str_criteria
   procedure (sub_IC), pointer :: IC_func
   procedure (sub_BC), pointer :: BC
@@ -30,11 +31,13 @@ program main
   procedure (sub_time), pointer :: time_scheme
   real(dp), dimension(:), allocatable :: gauss_point,gauss_weight
   type(c_ptr) :: p4est,quadrants
+  logical :: bool_AMR
 
   call get_config(config_file)
   call init(config_file,test_case,xL,xR,yL,yR,level,nvar,cfl,tf,fs,namefile,sol, &
        str_equa,str_flux,str_time_scheme,order,L_str_criteria,L_var_criteria,L_eps, &
-       gauss_point,gauss_weight)
+       gauss_point,gauss_weight,bool_AMR,f_adapt,maxlevel,coarsen_recursive,refine_recursive, &
+       coarsen_fn,refine_fn)
   call buildP4EST(level,p4est)
   call buildMesh_P4EST(p4est,xL,xR,yL,yR,gauss_point,order,mesh,sol,quadrants)
   !call buildmesh(xL,xR,yL,yR,64,64,gauss_point,order,mesh,sol)
@@ -43,18 +46,23 @@ program main
   call IC(IC_func,mesh,sol,order,gauss_point6,gauss_weight6)
   call BC(nvar,mesh)
 
-  do i=1,1
-     call adapt(p4est,quadrants,mesh,sol)
-     call buildMesh_P4EST(p4est,xL,xR,yL,yR,gauss_point,order,mesh,sol,quadrants)
-     call IC(IC_func,mesh,sol,order,gauss_point6,gauss_weight6)
-     call BC(nvar,mesh)
-  enddo
+  if (bool_AMR) then
+     do i=1,1
+        call adapt(p4est,quadrants,mesh,sol,maxlevel,coarsen_recursive,refine_recursive, &
+             coarsen_fn,refine_fn)
+        call buildMesh_P4EST(p4est,xL,xR,yL,yR,gauss_point,order,mesh,sol,quadrants)
+        call IC(IC_func,mesh,sol,order,gauss_point6,gauss_weight6)
+        call BC(nvar,mesh)
+     enddo
+  endif
   
   call userSol(0.0_dp,mesh,sol,str_equa,exactSol,gauss_weight)
   call writeSol(mesh,sol,namefile,0)
   call calculation(mesh,sol,order,cfl,tf,fs,namefile,str_equa, &
        f_equa,flux,speed,time_scheme,exactSol, &
-       L_str_criteria,L_var_criteria,L_eps,gauss_weight)
+       L_str_criteria,L_var_criteria,L_eps,gauss_weight, &
+       bool_AMR,f_adapt,maxlevel,coarsen_recursive,refine_recursive, &
+       coarsen_fn,refine_fn)
 
   call userSol(tf,mesh,sol,str_equa,exactSol,gauss_weight)
   select case (trim(test_case))
@@ -181,12 +189,14 @@ contains
 
   subroutine calculation(mesh,sol,order,cfl,tf,fs,namefile,str_equa, &
        f_equa,flux,speed,time_scheme,exactSol, &
-       L_str_criteria,L_var_criteria,L_eps,gauss_weight)
+       L_str_criteria,L_var_criteria,L_eps,gauss_weight, &
+       bool_AMR,f_adapt,maxlevel,coarsen_recursive,refine_recursive, &
+       coarsen_fn,refine_fn)
     type(meshStruct), intent(inout) :: mesh
     type(solStruct), intent(inout) :: sol
     integer, intent(in) :: order
     real(dp), intent(in) :: cfl,tf
-    integer, intent(in) :: fs
+    integer, intent(in) :: fs,f_adapt,maxlevel,coarsen_recursive,refine_recursive
     character(len=20),intent(in) :: namefile,str_equa
     procedure (sub_f), pointer, intent(in) :: f_equa
     procedure (sub_flux), pointer, intent(in) :: flux
@@ -197,6 +207,8 @@ contains
     integer, dimension(:), intent(in) :: L_var_criteria
     real(dp), dimension(:), intent(in) :: L_eps
     real(dp), dimension(:), intent(in) :: gauss_weight
+    logical, intent(in) :: bool_AMR
+    character(len=20), intent(in) :: coarsen_fn,refine_fn
     integer :: n
     real(dp) :: t
     
@@ -206,6 +218,13 @@ contains
     do while (t<tf)
        call time_scheme(mesh,sol,str_equa,f_equa,flux,speed,order,cfl,t,n,tf, &
             L_str_criteria,L_var_criteria,L_eps,gauss_weight)
+       if (bool_AMR.and.mod(n,f_adapt)==0) then
+          call adapt(p4est,quadrants,mesh,sol,maxlevel,coarsen_recursive,refine_recursive, &
+               coarsen_fn,refine_fn)
+          call buildMesh_P4EST(p4est,xL,xR,yL,yR,gauss_point,order,mesh,sol,quadrants)
+          call new_sol(mesh,quadrants,sol)
+          call BC(nvar,mesh)
+       endif
        if (mod(n,fs)==0.or.t>=tf) then
           call userSol(t,mesh,sol,str_equa,exactSol,gauss_weight)
           call writeSol(mesh,sol,namefile,n/fs)
