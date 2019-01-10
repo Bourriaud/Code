@@ -27,27 +27,31 @@ contains
   
   subroutine init(config_file,test_case,xL,xR,yL,yR,level,nvar,cfl,tf,fs,namefile,sol, &
        str_equa,str_flux,str_time_scheme,order,L_str_criteria,L_var_criteria,L_eps, &
-       gauss_point,gauss_weight,bool_AMR,f_adapt,maxlevel,coarsen_recursive,refine_recursive, &
-       coarsen_fn,refine_fn)
+       gauss_point,gauss_weight,bool_AMR,fn_adapt,f_adapt)
     character(len=20), intent(out) :: config_file,test_case,namefile,str_equa,str_flux,str_time_scheme
     real(dp), intent(out) :: xL,xR,yL,yR,cfl,tf
-    integer, intent(out) :: level,nvar,fs,order,f_adapt,maxlevel,coarsen_recursive,refine_recursive
+    integer, intent(out) :: level,nvar,fs,order,f_adapt
     type(solStruct), intent(out) :: sol
     character(len=20), dimension(:), allocatable, intent(out) :: L_str_criteria
     integer, dimension(:), allocatable, intent(out) :: L_var_criteria
     real(dp), dimension(:), allocatable, intent(out) :: L_eps
     real(dp), dimension(:), allocatable, intent(out) :: gauss_point,gauss_weight
+    character(len=20), intent(out) :: fn_adapt
     logical, intent(out) :: bool_AMR
-    character(len=20), intent(out) :: coarsen_fn,refine_fn
+    character(len=20) :: blank
     integer :: i,ncriteria
 
     config_file="config/"//trim(config_file)
     open(11,file=config_file,form="formatted")
+    
+    read(11,*)blank
     read(11,*)test_case
+    read(11,*)blank
     read(11,*)xL
     read(11,*)xR
     read(11,*)yL
     read(11,*)yR
+    read(11,*)blank
     read(11,*)level
     read(11,*)cfl
     read(11,*)tf
@@ -55,11 +59,13 @@ contains
     read(11,*)str_flux
     read(11,*)str_time_scheme
     read(11,*)order
+    read(11,*)blank
     read(11,*)ncriteria
     allocate(L_str_criteria(ncriteria),L_var_criteria(ncriteria),L_eps(ncriteria))
     do i=1,ncriteria
        read(11,*)L_str_criteria(i),L_var_criteria(i),L_eps(i)
     enddo
+    read(11,*)blank
     read(11,*)fs
     read(11,*)namefile
     read(11,*)nvar
@@ -73,22 +79,11 @@ contains
     do i=1,sol%nsolUser
        read(11,*)sol%var_user(i)
     enddo
+    read(11,*)blank
     read(11,*)bool_AMR
-    if (bool_AMR) then
-       read(11,*)f_adapt
-       read(11,*)maxlevel
-       read(11,*)coarsen_recursive
-       read(11,*)refine_recursive
-       read(11,*)coarsen_fn
-       read(11,*)refine_fn
-    else
-       f_adapt=1
-       maxlevel=0
-       coarsen_recursive=0
-       refine_recursive=0
-       coarsen_fn="NO"
-       refine_fn="NO"
-    endif
+    read(11,*)fn_adapt
+    read(11,*)f_adapt
+    
     close(11)
     
     sol%nvar=nvar
@@ -383,12 +378,14 @@ contains
 
        allocate(mesh%cell(k)%node(Nnodes))
        allocate(mesh%cell(k)%neigh(Nneigh))
-       allocate(mesh%cell(k)%X_gauss(size(gauss_point)),mesh%cell(k)%Y_gauss(size(gauss_point)))
+       allocate(mesh%cell(k)%X_gauss(max(size(gauss_point),2)))
+       allocate(mesh%cell(k)%Y_gauss(max(size(gauss_point),2)))
        
        mesh%cell(k)%xc=(xR-xL)*mesh%cell(k)%xc+xL
        mesh%cell(k)%yc=(yR-yL)*mesh%cell(k)%yc+yL
        mesh%cell(k)%dx=(xR-xL)*mesh%cell(k)%dx
        mesh%cell(k)%dy=(yR-yL)*mesh%cell(k)%dy
+       mesh%cell(k)%level=lev
        
        call c_f_pointer(C_corners,F_corners,(/4/))
        call c_f_pointer(C_nodes,F_nodes,(/Nnodes/))

@@ -288,8 +288,8 @@ contains
     real(dp) :: s
     
     int=0.0_dp
-    do p1=1,size(mesh%cell(k)%X_gauss)
-       do p2=1,size(mesh%cell(k)%Y_gauss)
+    do p1=1,size(gauss_weight)!size(mesh%cell(k)%X_gauss)
+       do p2=1,size(gauss_weight)!size(mesh%cell(k)%Y_gauss)
           call polynomialProduct(mesh%cell(k)%X_gauss(p1),mesh%cell(k)%Y_gauss(p2),c,alpha,s)
           int=int+s*gauss_weight(p1)*gauss_weight(p2)/4.0_dp
        enddo

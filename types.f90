@@ -33,6 +33,7 @@ module types
      real(dp), dimension(:), allocatable :: X_gauss,Y_gauss
      logical :: accept
      integer :: deg
+     integer :: level
   end type cellStruct
   
   type :: meshStruct
@@ -124,6 +125,16 @@ module types
        real(dp), intent(in) :: x,y,t
        real(dp), intent(out) :: s
      end subroutine sub_exactsol
+
+     subroutine sub_adapt(mesh,sol,maxlevel,coarsen_recursive,refine_recursive,sol_coarsen,sol_refine)
+       use constant
+       import meshStruct
+       import solStruct
+       type(meshStruct), intent(inout) :: mesh
+       type(solStruct), intent(in) :: sol
+       integer, intent(out) :: maxlevel,coarsen_recursive,refine_recursive
+       integer, dimension(:), intent(inout) :: sol_coarsen,sol_refine
+     end subroutine sub_adapt
      
   end interface
 
@@ -170,10 +181,11 @@ module types
        type(c_ptr), intent(out) :: iedge_out,cell1,cell2,sub,period
      end subroutine p4_get_edge
 
-     subroutine p4_adapt(p4est,quadrants,sol,nsol,maxlevel,coarsen_recursive,coarsen_fn, &
-          refine_recursive,refine_fn,init_fn) bind(C)
+     subroutine p4_adapt(p4est,quadrants,sol,nsol,sol_coarsen,sol_refine,maxlevel, &
+          coarsen_recursive,refine_recursive) bind(C)
        use, intrinsic :: ISO_C_BINDING
-       type(c_ptr), value, intent(in) :: p4est,quadrants,sol,coarsen_fn,refine_fn,init_fn
+       type(c_ptr), value, intent(in) :: p4est,quadrants,sol
+       type(c_ptr), value, intent(in) :: sol_coarsen,sol_refine
        integer(c_int), value, intent(in) :: nsol,maxlevel,coarsen_recursive,refine_recursive
      end subroutine p4_adapt
 

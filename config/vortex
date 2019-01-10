@@ -1,8 +1,11 @@
+-------------------- Test case -------------------------------------------
 Vortex	ICBC
+-------------------- Geometrical parameters ------------------------------
 -5.	xL
 5.	xR
 -5.	yL
 5.	yR
+-------------------- Numerical parameters --------------------------------
 6	level
 0.95	cfl
 10.	tf
@@ -10,11 +13,13 @@ euler	equation
 HLL	flux
 SSPRK3	time scheme
 3	space order
+-------------------- Limitation parameters -------------------------------
 4	number of detection criterias
 PAD 1 1.0e-4	detection criteria + variable + sensibility
 DMPu2 1 1.0e-3
 DMPu2 2 1.0e-3
 DMPu2 4 1.0e-3
+-------------------- Output parameters -----------------------------------
 10	save frequency
 vortex	namefile
 4	nvar
@@ -27,10 +32,7 @@ E	var 4
 102	var_user : u
 103	var_user : v
 104	var_user : p
+-------------------- AMR parameters --------------------------------------
 TRUE	AMR
+vortex	adaptation function
 1	adaptation frequency
-7	level max
-0	coarsen recursive
-0	refine recursive
-coarsen_test	coarsen function
-refine_test	refine function

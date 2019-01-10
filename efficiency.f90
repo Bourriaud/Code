@@ -8,19 +8,20 @@ module efficiency
   
 contains
   
-  subroutine exactTab(t,mesh,tab,exactSol,gauss_weight)
+  subroutine exactTab(t,mesh,tab,exactSol,gauss_weight,order)
     real(dp), intent(in) :: t
     type (meshStruct), intent(in) :: mesh
     real(dp), dimension(:,:), intent(inout) :: tab
     procedure (sub_exactsol), pointer, intent(in) :: exactSol
     real(dp), dimension(:), intent(in) :: gauss_weight
+    integer, intent(in) :: order
     integer :: k,p1,p2
     real(dp) :: s
 
     do k=1,mesh%nc
        tab(k,1)=0.0_dp
-       do p1=1,size(mesh%cell(k)%X_gauss)
-          do p2=1,size(mesh%cell(k)%Y_gauss)
+       do p1=1,order
+          do p2=1,order
              call exactSol(mesh%cell(k)%X_gauss(p1),mesh%cell(k)%Y_gauss(p2),t,s)
              tab(k,1)=tab(k,1)+s*gauss_weight(p1)*gauss_weight(p2)/4.0_dp
           enddo
@@ -30,13 +31,14 @@ contains
     return
   end subroutine exactTab
 
-  subroutine userSol(t,mesh,sol,str_equa,exactSol,gauss_weight)
+  subroutine userSol(t,mesh,sol,str_equa,exactSol,gauss_weight,order)
     real(dp), intent(in) :: t
     type(meshStruct), intent(in) :: mesh
     type(solStruct), intent(inout) :: sol
     character(len=20), intent(in) :: str_equa
     procedure (sub_exactsol), pointer, intent(in) :: exactSol
     real(dp), dimension(:), intent(in) :: gauss_weight
+    integer, intent(in) :: order
     integer :: i,k
     character(len=20) :: str
 
@@ -44,10 +46,10 @@ contains
        select case (sol%var_user(i))
        case(1)
           sol%name_user(i)="SolAnal"
-          call exactTab(t,mesh,sol%user(:,i:i),exactSol,gauss_weight)
+          call exactTab(t,mesh,sol%user(:,i:i),exactSol,gauss_weight,order)
        case(2)
           sol%name_user(i)="Error"
-          call exactTab(t,mesh,sol%user(:,i:i),exactSol,gauss_weight)
+          call exactTab(t,mesh,sol%user(:,i:i),exactSol,gauss_weight,order)
           sol%user(:,i:i)=abs(sol%user(:,i:i)-sol%val(:,1:1))
        case(3)
           if (trim(str_equa)=="euler") then
@@ -175,12 +177,14 @@ contains
   subroutine exactSol_vortex(x,y,t,s)
     real(dp), intent(in) :: x,y,t
     real(dp), intent(out) :: s
-    real(dp) :: x0,y0,beta,r,Temp
+    real(dp) :: x0,y0,xmin,ymin,beta,r,Temp
 
-    x0=-5.0_dp+mod(int(t+5.0_dp),10)
-    y0=-5.0_dp+mod(int(t+5.0_dp),10)
+    x0=-5.0_dp+mod(int(t+5.0_dp),10)+t-int(t)
+    y0=-5.0_dp+mod(int(t+5.0_dp),10)+t-int(t)
     beta=5.0_dp
-    r=sqrt((x-x0)**2+(y-y0)**2)
+    xmin=min(abs(x-x0),abs(x-x0-10.0_dp),abs(x-x0+10.0_dp))
+    ymin=min(abs(y-y0),abs(y-y0-10.0_dp),abs(y-y0+10.0_dp))
+    r=sqrt(xmin**2+ymin**2)
     Temp=1.0_dp-(gamma-1.0_dp)*beta**2*exp(1-r**2)/(8.0_dp*gamma*pi**2)
     s=Temp**(1.0_dp/(gamma-1.0_dp))
 

@@ -1,8 +1,11 @@
+-------------------- Test case -------------------------------------------
 Test	ICBC
+-------------------- Geometrical parameters ------------------------------
 0.	xL
 3.	xR
 0.	yL
 3.	yR
+-------------------- Numerical parameters --------------------------------
 2	level
 1.	cfl
 1.5	tf
@@ -10,10 +13,15 @@ transport	equation
 godunov	flux
 euler_exp	time scheme
 1	space order
+-------------------- Limitation parameters -------------------------------
 0	number of detection criterias
+-------------------- Output parameters -----------------------------------
 1	save frequency
 test	namefile
 1	nvar
 var1	var 1
 0	nsolUser
+-------------------- AMR parameters --------------------------------------
 FALSE	AMR
+sinus	adaptation function
+1	adaptation frequency

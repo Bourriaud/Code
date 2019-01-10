@@ -1,8 +1,11 @@
+-------------------- Test case -------------------------------------------
 Shu	ICBC
+-------------------- Geometrical parameters ------------------------------
 -5.	xL
 5.	xR
 0.	yL
 1.	yR
+-------------------- Numerical parameters --------------------------------
 7 	level
 0.95	cfl
 1.8	tf
@@ -10,11 +13,13 @@ euler	equation
 HLL	flux
 SSPRK3	time scheme
 3	space order
+-------------------- Limitation parameters -------------------------------
 4	number of detection criterias
 PAD 1 1.0e-4	detection criteria + variable + sensibility
 DMPu2 1 1.0e-4
 DMPu2 2 1.0e-4
 DMPu2 4 1.0e-3
+-------------------- Output parameters -----------------------------------
 10	save frequency
 shu	namefile
 4	nvar
@@ -24,4 +29,7 @@ rhov	var 3
 E	var 4
 1	nsolUser
 104	var_user : p
+-------------------- AMR parameters --------------------------------------
 FALSE	AMR
+shu	adaptation function
+1	adaptation frequency

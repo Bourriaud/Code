@@ -1,8 +1,11 @@
+-------------------- Test case -------------------------------------------
 RP2D_3	ICBC
+-------------------- Geometrical parameters ------------------------------
 0.	xL
 1.	xR
 0.	yL
 1.	yR
+-------------------- Numerical parameters --------------------------------
 8	level
 0.95	cfl
 0.3	tf
@@ -10,11 +13,13 @@ euler	equation
 HLL	flux
 SSPRK3	time scheme
 3	space order
+-------------------- Limitation parameters -------------------------------
 4	number of detection criterias
 PAD 1 1.0e-4	detection criteria + variable + sensibility
 DMPu2 1 1.0e-4
 DMPu2 2 1.0e-4
 DMPu2 4 1.0e-3
+-------------------- Output parameters -----------------------------------
 10	save frequency
 RP2D_3_	namefile
 4	nvar
@@ -25,4 +30,7 @@ E	var 4
 2	nsolUser
 3	var_user : internal energy
 104	var_user : p
+-------------------- AMR parameters --------------------------------------
 FALSE	AMR
+RP2D_3	adaptation function
+1	adaptation frequency

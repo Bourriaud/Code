@@ -13,6 +13,8 @@ static sc_MPI_Comm mpicomm;
 typedef struct var
 {
   double* u;
+  int coarsen;
+  int refine;
   int nsol;
 }
 var_t;
@@ -232,7 +234,7 @@ void p4_get_node(p4est_t* p4est, p4est_topidx_t tt, p4est_nodes_t* nodes, int i,
   double vxyz[3];
   p4est_indep_t *indep;
 
-  indep = (p4est_indep_t *) sc_array_index (&nodes->indep_nodes, (size_t) i);
+  indep = sc_array_index (&nodes->indep_nodes, (size_t) i);
   p4est_qcoord_to_vertex (p4est->connectivity, tt, indep->x, indep->y, vxyz);
 
   *X_out=vxyz[0];
@@ -677,7 +679,7 @@ void p4_get_edge(p4est_t *p4est, p4est_mesh_t* mesh, sc_array_t* quadrants, int*
   *period_out=period;
 }
 
-static int coarsen_test (p4est_t* p4est, p4est_topidx_t which_tree, p4est_quadrant_t** q)
+static int coarsen_value (p4est_t* p4est, p4est_topidx_t which_tree, p4est_quadrant_t** q)
 {
   double X[3];
   p4est_topidx_t tt;
@@ -685,17 +687,19 @@ static int coarsen_test (p4est_t* p4est, p4est_topidx_t which_tree, p4est_quadra
   var_t* data2;
   var_t* data3;
   var_t* data4;
+  int m;
 
   tt = p4est->first_local_tree;
   data1 = (var_t *) q[0]->p.user_data;
   data2 = (var_t *) q[1]->p.user_data;
   data3 = (var_t *) q[2]->p.user_data;
   data4 = (var_t *) q[3]->p.user_data;
-  if ((data1->u[0]+data2->u[0]+data3->u[0]+data4->u[0])/4.>0.95) {return 1;}
+  m=data1->coarsen+data2->coarsen+data3->coarsen+data4->coarsen;
+  if (m>1) {return 1;}
   else {return 0;}
 }
 
-static int refine_test (p4est_t* p4est, p4est_topidx_t which_tree, p4est_quadrant_t* q)
+static int refine_value (p4est_t* p4est, p4est_topidx_t which_tree, p4est_quadrant_t* q)
 {
   double X[3];
   p4est_topidx_t tt;
@@ -703,7 +707,7 @@ static int refine_test (p4est_t* p4est, p4est_topidx_t which_tree, p4est_quadran
 
   tt = p4est->first_local_tree;
   data = (var_t *) q->p.user_data;
-  if (data->u[0]<0.85) {return 1;}
+  if (data->refine==1) {return 1;}
   else {return 0;}
 }
 
@@ -747,7 +751,7 @@ static void replace_fn (p4est_t* p4est, p4est_topidx_t which_tree, int num_outgo
   }
 }
 
-void p4_adapt (p4est_t* p4est, sc_array_t* quadrants, double* sol, int nsol, int maxlevel, int coarsen_recursive, char* coarsen_fn, int refine_recursive, char* refine_fn, char* init_fn)
+void p4_adapt (p4est_t* p4est, sc_array_t* quadrants, double* sol, int nsol, int* sol_coarsen, int* sol_refine, int maxlevel, int coarsen_recursive, int refine_recursive)
 {
   int k;
   int isol;
@@ -761,23 +765,18 @@ void p4_adapt (p4est_t* p4est, sc_array_t* quadrants, double* sol, int nsol, int
     data = q->p.user_data;
     data->u = (double*) malloc(sizeof(double)*nsol);
     data->nsol=nsol;
+    data->coarsen=sol_coarsen[k];
+    data->refine=sol_refine[k];
     for (isol=0;isol<nsol;isol++)
     {
       data->u[isol]=sol[isol*quadrants->elem_count+k];
     }
   }
 
-  if (strcmp(coarsen_fn,"coarsen_test")==0)
-  {
-    p4est_coarsen_ext(p4est,coarsen_recursive,callback_orphans,coarsen_test,NULL,replace_fn);
-  }
-  else {printf("Coarsen function %s not implemented\n",coarsen_fn);}
-  if (strcmp(refine_fn,"refine_test")==0)
-  {
-    p4est_refine_ext(p4est,refine_recursive,maxlevel,refine_test,NULL,replace_fn);
-  }
-  else {printf("Refine function %s not implemented\n",refine_fn);}
-  p4est_balance_ext (p4est,P4EST_CONNECT_FACE,NULL,replace_fn);
+  p4est_coarsen_ext(p4est,coarsen_recursive,callback_orphans,coarsen_value,NULL,replace_fn);
+  p4est_refine_ext(p4est,refine_recursive,maxlevel,refine_value,NULL,replace_fn);
+  p4est_balance_ext (p4est,P4EST_CONNECT_FULL,NULL,replace_fn);
+
 }
 
 void p4_new_sol (sc_array_t* quadrants, double** sol_out)
