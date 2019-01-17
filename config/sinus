@@ -25,6 +25,6 @@ var1	var 1
 1	var_user : solAnal
 2	var_user : error
 -------------------- AMR parameters --------------------------------------
-FALSE	AMR
+TRUE	AMR
 sinus	adaptation function
-100	adaptation frequency
+1	adaptation frequency

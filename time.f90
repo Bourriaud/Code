@@ -115,7 +115,7 @@ contains
              endif
           enddo
        enddo
-
+       
        do k=1,size(NOT_ACCEPTED_EDGE)
           cell1=mesh%edge(NOT_ACCEPTED_EDGE(k))%cell1
           cell2=mesh%edge(NOT_ACCEPTED_EDGE(k))%cell2

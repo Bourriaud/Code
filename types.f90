@@ -12,7 +12,7 @@ module types
      integer :: cell1,cell2
      integer :: dir
      integer :: period
-     real(dp) :: length,lengthN
+     real(dp) :: length
      character(len=20) :: boundType
      real(dp), dimension(:), allocatable :: bound
      real(dp), dimension(:), allocatable :: X_gauss,Y_gauss
@@ -34,6 +34,7 @@ module types
      logical :: accept
      integer :: deg
      integer :: level
+     integer, dimension(4) :: sisters
   end type cellStruct
   
   type :: meshStruct
@@ -163,13 +164,13 @@ module types
      end subroutine p4_get_node
 
      subroutine p4_get_cell(p4est,mesh,tt,quadrants,nodes,edges,k,xc,yc,dx,dy, &
-          corners,Nneigh,neighbors,Nnodes,cell_nodes,N_edge,level) bind(C)
+          corners,Nneigh,neighbors,Nnodes,cell_nodes,N_edge,level,sisters) bind(C)
        use, intrinsic :: ISO_C_BINDING
        type(c_ptr), value, intent(in) :: p4est,mesh,quadrants,nodes,edges
        integer(c_int), value, intent(in) :: tt
        integer(c_int), value, intent(in) :: k
        real(c_double), intent(out) :: xc,yc,dx,dy
-       type(c_ptr), intent(out) :: corners,neighbors,cell_nodes
+       type(c_ptr), intent(out) :: corners,neighbors,cell_nodes,sisters
        integer(c_int), intent(out) :: Nneigh,Nnodes,N_edge,level
      end subroutine p4_get_cell
 

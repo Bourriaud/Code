@@ -16,6 +16,7 @@ typedef struct var
   int coarsen;
   int refine;
   int nsol;
+  int k;
 }
 var_t;
 
@@ -53,6 +54,7 @@ void p4_build_mesh(p4est_t* p4est, p4est_topidx_t* tt_out, p4est_mesh_t** mesh_o
   p4est_quadrant_t* quad_neigh;
   int* edges;
   int* half_neigh;
+  var_t* data;
 
   ghost = p4est_ghost_new (p4est,P4EST_CONNECT_FULL);
   mesh = p4est_mesh_new_ext(p4est,ghost,1,1,P4EST_CONNECT_FULL);
@@ -75,6 +77,8 @@ void p4_build_mesh(p4est_t* p4est, p4est_topidx_t* tt_out, p4est_mesh_t** mesh_o
   for (i=0;i<mesh->local_num_quadrants;i++)
   {
     quad=sc_array_index(quadrants,i);
+    data=quad->p.user_data;
+    data->k=i;
     for (k=0;k<4;k++)
     {
       if (mesh->quad_to_face[4*i+k]>-1)
@@ -241,7 +245,7 @@ void p4_get_node(p4est_t* p4est, p4est_topidx_t tt, p4est_nodes_t* nodes, int i,
   *Y_out=vxyz[1];
 }
 
-void p4_get_cell(p4est_t* p4est, p4est_mesh_t* mesh, p4est_locidx_t tt, sc_array_t* quadrants, p4est_nodes_t* nodes, int* edges, int i, double* Xc_out, double* Yc_out, double* dX_out, double* dY_out, int** corners_out, int* Nneigh, int** neighbors_out, int* Nnodes, int** nodes_out, int* N_edge, int* lev)
+void p4_get_cell(p4est_t* p4est, p4est_mesh_t* mesh, p4est_locidx_t tt, sc_array_t* quadrants, p4est_nodes_t* nodes, int* edges, int i, double* Xc_out, double* Yc_out, double* dX_out, double* dY_out, int** corners_out, int* Nneigh, int** neighbors_out, int* Nnodes, int** nodes_out, int* N_edge, int* lev, int** sisters_out)
 {
   p4est_quadrant_t *quad;
   size_t num_quads;
@@ -256,6 +260,9 @@ void p4_get_cell(p4est_t* p4est, p4est_mesh_t* mesh, p4est_locidx_t tt, sc_array
   int* half_neigh;
   int* cell_nodes;
   int inode;
+  int* sisters;
+  p4est_quadrant_t q0,q1,q2,q3;
+  var_t *var;
 
   num_quads = quadrants->elem_count;
 
@@ -275,6 +282,7 @@ void p4_get_cell(p4est_t* p4est, p4est_mesh_t* mesh, p4est_locidx_t tt, sc_array
   corners = (int*) malloc(sizeof(int)*4);
   cell_nodes = (int*) malloc(sizeof(int)*8);
   neighbors = (int*) malloc(sizeof(int)*12);
+  sisters = (int*) malloc(sizeof(int)*4);
   *Nneigh = 0;
   inode = 0;
 
@@ -282,6 +290,17 @@ void p4_get_cell(p4est_t* p4est, p4est_mesh_t* mesh, p4est_locidx_t tt, sc_array
   corners[1]=(int) nodes->local_nodes[4*i+1]+1;
   corners[2]=(int) nodes->local_nodes[4*i+2]+1;
   corners[3]=(int) nodes->local_nodes[4*i+3]+1;
+
+  p4est_quadrant_children(quad,&q0,&q1,&q2,&q3);
+  var=q0.p.user_data;
+  sisters[0]=q0.p.piggy3.local_num;
+  var=q1.p.user_data;
+  sisters[1]=q1.p.piggy3.local_num;
+  var=q2.p.user_data;
+  sisters[2]=q2.p.piggy3.local_num;
+  var=q3.p.user_data;
+  sisters[3]=q3.p.piggy3.local_num;
+
   if (mesh->quad_to_face[4*i+2]<0)
   {
     half_neigh=sc_array_index(mesh->quad_to_half,mesh->quad_to_quad[4*i+2]);
@@ -453,6 +472,7 @@ void p4_get_cell(p4est_t* p4est, p4est_mesh_t* mesh, p4est_locidx_t tt, sc_array
   *neighbors_out=neighbors;
   *corners_out=corners;
   *nodes_out=cell_nodes;
+  *sisters_out=sisters;
 }
 
 void p4_get_edge(p4est_t *p4est, p4est_mesh_t* mesh, sc_array_t* quadrants, int* edges, int k, int i, int** iedge_out, int* nedge, int** cell1_out, int** cell2_out, int** sub_out, int** period_out)
@@ -713,7 +733,7 @@ static int refine_value (p4est_t* p4est, p4est_topidx_t which_tree, p4est_quadra
 
 static void replace_fn (p4est_t* p4est, p4est_topidx_t which_tree, int num_outgoing, p4est_quadrant_t* outgoing[], int num_incoming, p4est_quadrant_t* incoming[])
 {
-  var_t *parent_data,*child_data;
+  var_t *parent_data,*child_data,*child_data2;
   int i,j,isol;
   double h;
 
@@ -727,9 +747,9 @@ static void replace_fn (p4est_t* p4est, p4est_topidx_t which_tree, int num_outgo
     for (isol=0;isol<child_data->nsol;isol++){parent_data->u[isol] = 0.;}
     for (i=0;i<P4EST_CHILDREN;i++)
     {
+      child_data = (var_t *) outgoing[i]->p.user_data;
       for (isol=0;isol<child_data->nsol;isol++)
       {
-        child_data = (var_t *) outgoing[i]->p.user_data;
         parent_data->u[isol] += child_data->u[isol]/P4EST_CHILDREN;
       }
       free(child_data->u);

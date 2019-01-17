@@ -43,26 +43,26 @@ program main
   !call buildmesh(xL,xR,yL,yR,64,64,gauss_point,order,mesh,sol)
   call init_FV(test_case,str_equa,str_flux,str_time_scheme,str_fn_adapt,IC_func, &
        BC,exactSol,f_equa,flux,speed,time_scheme,sol,fn_adapt)
-  call IC(IC_func,mesh,sol,order,gauss_point6,gauss_weight6)
+  call IC(IC_func,mesh,sol,order)
   call BC(nvar,mesh)
 
   if (bool_AMR) then
      do i=1,1
         call adapt(fn_adapt,p4est,quadrants,mesh,sol)
         call buildMesh_P4EST(p4est,xL,xR,yL,yR,gauss_point,order,mesh,sol,quadrants)
-        call IC(IC_func,mesh,sol,order,gauss_point6,gauss_weight6)
+        call IC(IC_func,mesh,sol,order)
         call BC(nvar,mesh)
      enddo
   endif
   
-  call userSol(0.0_dp,mesh,sol,str_equa,exactSol,gauss_weight,order)
+  call userSol(0.0_dp,mesh,sol,str_equa,exactSol)
   call writeSol(mesh,sol,namefile,0)
   call calculation(mesh,sol,order,cfl,tf,fs,namefile,str_equa, &
        f_equa,flux,speed,time_scheme,exactSol, &
        L_str_criteria,L_var_criteria,L_eps,gauss_weight, &
        bool_AMR,fn_adapt,f_adapt)
 
-  call userSol(tf,mesh,sol,str_equa,exactSol,gauss_weight,order)
+  call userSol(tf,mesh,sol,str_equa,exactSol)
   select case (trim(test_case))
   case ('Sinus')
      call errorL1(mesh,sol%val(:,1),sol%user(:,1),error)
@@ -234,7 +234,7 @@ contains
           call BC(nvar,mesh)
        endif
        if (mod(n,fs)==0.or.t>=tf) then
-          call userSol(t,mesh,sol,str_equa,exactSol,gauss_weight,order)
+          call userSol(t,mesh,sol,str_equa,exactSol)
           call writeSol(mesh,sol,namefile,n/fs)
           call print(mesh,sol,t,n)
        endif

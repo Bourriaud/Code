@@ -116,12 +116,11 @@ contains
     return
   end subroutine init
   
-  subroutine IC(IC_func,mesh,sol,order,gauss_point,gauss_weight)
+  subroutine IC(IC_func,mesh,sol,order)
     procedure (sub_IC), pointer, intent(in) :: IC_func
     type(meshStruct), intent(in) :: mesh
     type(solStruct), intent(inout) :: sol
     integer, intent(in) :: order
-    real(dp), dimension(:), intent(in) :: gauss_point,gauss_weight
     real(dp), dimension(:), allocatable :: U0,S
     integer :: k,p1,p2
     real(dp) :: Xg,Yg
@@ -132,10 +131,10 @@ contains
        U0=0.0_dp
        do p1=1,6
           do p2=1,6
-             Xg=mesh%cell(k)%xc+gauss_point(p1)*mesh%cell(k)%dx/2.0_dp
-             Yg=mesh%cell(k)%yc+gauss_point(p2)*mesh%cell(k)%dy/2.0_dp
+             Xg=mesh%cell(k)%xc+gauss_point6(p1)*mesh%cell(k)%dx/2.0_dp
+             Yg=mesh%cell(k)%yc+gauss_point6(p2)*mesh%cell(k)%dx/2.0_dp
              call IC_func(Xg,Yg,S)
-             U0=U0+S*gauss_weight(p1)*gauss_weight(p2)/4.0_dp
+             U0=U0+S*gauss_weight6(p1)*gauss_weight6(p2)/4.0_dp
           enddo
        enddo
        sol%val(k,:)=U0
@@ -262,7 +261,6 @@ contains
           mesh%edge(k)%cell2=(j-1)*nx+i
           mesh%edge(k)%dir=1
           mesh%edge(k)%length=dy
-          mesh%edge(k)%lengthN=dx
           mesh%edge(k)%period=k
           mesh%edge(k)%sub=0
        enddo
@@ -278,7 +276,6 @@ contains
           mesh%edge(k)%cell2=i+(j-1)*nx
           mesh%edge(k)%dir=2
           mesh%edge(k)%length=dx
-          mesh%edge(k)%lengthN=dy
           mesh%edge(k)%period=k
           mesh%edge(k)%sub=0
        enddo
@@ -353,8 +350,9 @@ contains
     type(c_ptr), intent(out) :: quadrants
     integer(c_int) :: tt
     type(c_ptr) :: p4_mesh,nodes,edges
-    type(c_ptr) :: C_corners,C_neighbors,C_sub,C_cell1,C_cell2,C_iedge,C_period,C_nodes
-    integer, dimension(:), pointer :: F_corners,F_neighbors,F_sub,F_cell1,F_cell2,F_iedge,F_period,F_nodes
+    type(c_ptr) :: C_corners,C_neighbors,C_sub,C_cell1,C_cell2,C_iedge,C_period,C_nodes,C_sisters
+    integer, dimension(:), pointer :: F_corners,F_neighbors,F_sub,F_cell1,F_cell2
+    integer, dimension(:), pointer :: F_iedge,F_period,F_nodes,F_sisters
     integer :: k,i,lev,p,Nneigh,N_edge,Nnodes,ie,nedge,i1,iloc
     real(dp) :: a,b,c,center,diff
 
@@ -374,7 +372,7 @@ contains
     ie=0
     do k=1,mesh%nc
        call p4_get_cell(p4est,p4_mesh,tt,quadrants,nodes,edges,k-1,mesh%cell(k)%xc,mesh%cell(k)%yc, &
-            mesh%cell(k)%dx,mesh%cell(k)%dy,C_corners,Nneigh,C_neighbors,Nnodes,C_nodes,N_edge,lev)
+            mesh%cell(k)%dx,mesh%cell(k)%dy,C_corners,Nneigh,C_neighbors,Nnodes,C_nodes,N_edge,lev,C_sisters)
 
        allocate(mesh%cell(k)%node(Nnodes))
        allocate(mesh%cell(k)%neigh(Nneigh))
@@ -390,10 +388,13 @@ contains
        call c_f_pointer(C_corners,F_corners,(/4/))
        call c_f_pointer(C_nodes,F_nodes,(/Nnodes/))
        call c_f_pointer(C_neighbors,F_neighbors,(/12/))
+       call c_f_pointer(C_sisters,F_sisters,(/4/))
        
        mesh%cell(k)%corner=F_corners
        mesh%cell(k)%node=F_nodes
        mesh%cell(k)%neigh(1:Nneigh)=F_neighbors(1:Nneigh)
+       mesh%cell(k)%sisters=F_sisters
+       !print*,k,F_sisters
        do p=1,size(gauss_point)
           mesh%cell(k)%X_gauss(p)=mesh%cell(k)%xc+mesh%cell(k)%dx*gauss_point(p)/2.0_dp
           mesh%cell(k)%Y_gauss(p)=mesh%cell(k)%yc+mesh%cell(k)%dy*gauss_point(p)/2.0_dp
@@ -443,11 +444,9 @@ contains
                 case (1,2)
                    mesh%edge(F_iedge(i1))%dir=1
                    mesh%edge(F_iedge(i1))%length=(yR-yL)/(nedge*2**lev)
-                   mesh%edge(F_iedge(i1))%lengthN=(xR-xL)/(2**lev)
                 case (3,4)
                    mesh%edge(F_iedge(i1))%dir=2
                    mesh%edge(F_iedge(i1))%length=(xR-xL)/(nedge*2**lev)
-                   mesh%edge(F_iedge(i1))%lengthN=(yR-yL)/(2**lev)
                 end select
 
                 select case (mesh%edge(F_iedge(i1))%dir)
@@ -495,6 +494,7 @@ contains
        call p4_free(C_corners)
        call p4_free(C_neighbors)
        call p4_free(C_nodes)
+       call p4_free(C_sisters)
     enddo
     call p4_free(edges)
     

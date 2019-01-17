@@ -8,22 +8,22 @@ module efficiency
   
 contains
   
-  subroutine exactTab(t,mesh,tab,exactSol,gauss_weight,order)
+  subroutine exactTab(t,mesh,tab,exactSol)
     real(dp), intent(in) :: t
     type (meshStruct), intent(in) :: mesh
     real(dp), dimension(:,:), intent(inout) :: tab
     procedure (sub_exactsol), pointer, intent(in) :: exactSol
-    real(dp), dimension(:), intent(in) :: gauss_weight
-    integer, intent(in) :: order
     integer :: k,p1,p2
-    real(dp) :: s
+    real(dp) :: s,Xg,Yg
 
     do k=1,mesh%nc
        tab(k,1)=0.0_dp
-       do p1=1,order
-          do p2=1,order
-             call exactSol(mesh%cell(k)%X_gauss(p1),mesh%cell(k)%Y_gauss(p2),t,s)
-             tab(k,1)=tab(k,1)+s*gauss_weight(p1)*gauss_weight(p2)/4.0_dp
+       do p1=1,6
+          do p2=1,6
+             Xg=mesh%cell(k)%xc+gauss_point6(p1)*mesh%cell(k)%dx/2.0_dp
+             Yg=mesh%cell(k)%yc+gauss_point6(p2)*mesh%cell(k)%dy/2.0_dp
+             call exactSol(Xg,Yg,t,s)
+             tab(k,1)=tab(k,1)+s*gauss_weight6(p1)*gauss_weight6(p2)/4.0_dp
           enddo
        enddo
     enddo
@@ -31,14 +31,12 @@ contains
     return
   end subroutine exactTab
 
-  subroutine userSol(t,mesh,sol,str_equa,exactSol,gauss_weight,order)
+  subroutine userSol(t,mesh,sol,str_equa,exactSol)
     real(dp), intent(in) :: t
     type(meshStruct), intent(in) :: mesh
     type(solStruct), intent(inout) :: sol
     character(len=20), intent(in) :: str_equa
     procedure (sub_exactsol), pointer, intent(in) :: exactSol
-    real(dp), dimension(:), intent(in) :: gauss_weight
-    integer, intent(in) :: order
     integer :: i,k
     character(len=20) :: str
 
@@ -46,10 +44,10 @@ contains
        select case (sol%var_user(i))
        case(1)
           sol%name_user(i)="SolAnal"
-          call exactTab(t,mesh,sol%user(:,i:i),exactSol,gauss_weight,order)
+          call exactTab(t,mesh,sol%user(:,i:i),exactSol)
        case(2)
           sol%name_user(i)="Error"
-          call exactTab(t,mesh,sol%user(:,i:i),exactSol,gauss_weight,order)
+          call exactTab(t,mesh,sol%user(:,i:i),exactSol)
           sol%user(:,i:i)=abs(sol%user(:,i:i)-sol%val(:,1:1))
        case(3)
           if (trim(str_equa)=="euler") then

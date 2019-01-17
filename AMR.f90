@@ -76,8 +76,8 @@ contains
     do k=1,mesh%nc
        sol_coarsen(k)=0
        sol_refine(k)=0
-       if (sol%val(k,isol)<1.0_dp.and.mesh%cell(k)%level>6) sol_coarsen(k)=1
-       if (sol%val(k,isol)>1.0_dp) sol_refine(k)=1
+       if (sol%val(k,isol)<0.5_dp.and.mesh%cell(k)%level>6) sol_coarsen(k)=1
+       if (sol%val(k,isol)>0.5_dp) sol_refine(k)=1
     enddo
     
     return
