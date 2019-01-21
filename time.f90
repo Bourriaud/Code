@@ -93,8 +93,8 @@ contains
           sub2=edge%sub(2)
           deg=min(mesh%cell(ac1)%deg,mesh%cell(ac2)%deg)
           mesh%edge(j)%deg=deg
-          call reconstruct(mesh,mesh%cell(ac1)%X_gauss,mesh%cell(ac1)%Y_gauss,sol,ac1,deg+1,gauss_weight)
-          call reconstruct(mesh,mesh%cell(ac2)%X_gauss,mesh%cell(ac2)%Y_gauss,sol,ac2,deg+1,gauss_weight)
+          call reconstruct(mesh,sol,ac1,deg+1,gauss_weight)
+          call reconstruct(mesh,sol,ac2,deg+1,gauss_weight)
           if (deg+1==order) then
              mesh%cell(ac1)%polMax=mesh%cell(ac1)%polCoef
              mesh%cell(ac2)%polMax=mesh%cell(ac2)%polCoef

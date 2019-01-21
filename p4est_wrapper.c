@@ -708,7 +708,6 @@ static int coarsen_value (p4est_t* p4est, p4est_topidx_t which_tree, p4est_quadr
 
 static int refine_value (p4est_t* p4est, p4est_topidx_t which_tree, p4est_quadrant_t* q)
 {
-  double X[3];
   p4est_topidx_t tt;
   var_t* data;
 
@@ -720,7 +719,7 @@ static int refine_value (p4est_t* p4est, p4est_topidx_t which_tree, p4est_quadra
 
 static void replace_fn (p4est_t* p4est, p4est_topidx_t which_tree, int num_outgoing, p4est_quadrant_t* outgoing[], int num_incoming, p4est_quadrant_t* incoming[])
 {
-  var_t *parent_data,*child_data,*child_data2;
+  var_t *parent_data,*child_data,*data;
   int i,j,isol;
   double h;
 
@@ -758,7 +757,6 @@ static void replace_fn (p4est_t* p4est, p4est_topidx_t which_tree, int num_outgo
           parent_data->u4 = child_data->u;
           break;
       }
-      free(child_data->u);free(child_data->u1);free(child_data->u2);free(child_data->u3);free(child_data->u4);
     }
   }
   else
@@ -819,7 +817,11 @@ static void replace_fn (p4est_t* p4est, p4est_topidx_t which_tree, int num_outgo
           break;
       }
     }
-    free(parent_data->u);free(parent_data->u1);free(parent_data->u2);free(parent_data->u3);free(parent_data->u4);
+  }
+  for (i=0;i<num_outgoing;i++)
+  {
+    data = (var_t *) outgoing[i]->p.user_data;
+    free(data->u1);free(data->u2);free(data->u3);free(data->u4);//free(data->u);
   }
 }
 
@@ -856,7 +858,6 @@ void p4_adapt (p4est_t* p4est, sc_array_t* quadrants, double* sol, double* sol_i
   p4est_coarsen_ext(p4est,coarsen_recursive,callback_orphans,coarsen_value,NULL,replace_fn);
   p4est_refine_ext(p4est,refine_recursive,maxlevel,refine_value,NULL,replace_fn);
   p4est_balance_ext (p4est,P4EST_CONNECT_FULL,NULL,replace_fn);
-
 }
 
 void p4_new_sol (sc_array_t* quadrants, double** sol_out)

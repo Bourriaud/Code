@@ -162,7 +162,7 @@ contains
     do k=1,mesh%nc
        sol_coarsen(k)=0
        sol_refine(k)=0
-       call reconstruct(mesh,mesh%cell(k)%X_gauss2,mesh%cell(k)%Y_gauss2,sol,k,2,gauss_weight2)
+       call reconstruct(mesh,sol,k,2,gauss_weight2)
        grad=sqrt(mesh%cell(k)%polCoef(1,isol)**2+mesh%cell(k)%polCoef(2,isol)**2)
        if (grad<0.001_dp.and.mesh%cell(k)%level>level-2) sol_coarsen(k)=1
        if (grad>0.01_dp) sol_refine(k)=1

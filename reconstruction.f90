@@ -38,7 +38,7 @@ contains
        do i1=0,d-i2
           alpha(1)=i1
           alpha(2)=i2
-          call quad_monome(c,alpha,mesh%cell(k)%X_gauss,mesh%cell(k)%Y_gauss,gauss_weight,intk)
+          call quad_monome(mesh,c,alpha,k,gauss_weight,intk)
           do isol=1,sol%nvar
              u(isol)=u(isol)+pol(i,isol)*((x-xc)**alpha(1)*(y-yc)**alpha(2)-intk)
           enddo
@@ -49,7 +49,7 @@ contains
     do i1=1,d
        alpha(1)=i1
        alpha(2)=0
-       call quad_monome(c,alpha,mesh%cell(k)%X_gauss,mesh%cell(k)%Y_gauss,gauss_weight,intk)
+       call quad_monome(mesh,c,alpha,k,gauss_weight,intk)
        do isol=1,sol%nvar
           u(isol)=u(isol)+pol(i,isol)*((x-xc)**alpha(1)*(y-yc)**alpha(2)-intk)
        enddo
@@ -61,9 +61,8 @@ contains
     return
   end subroutine evaluate
   
-  subroutine reconstruct(mesh,X_gauss,Y_gauss,sol,k,order,gauss_weight)
+  subroutine reconstruct(mesh,sol,k,order,gauss_weight)
     type(meshStruct), intent(inout) :: mesh
-    real(dp), dimension(:), intent(in) :: X_gauss,Y_gauss
     type(solStruct), intent(in) :: sol
     integer, intent(in) :: k,order
     real(dp), dimension(:), intent(in) :: gauss_weight
@@ -86,15 +85,15 @@ contains
     c(1)=mesh%cell(k)%xc
     c(2)=mesh%cell(k)%yc
     i=1
-    
+
     do i2=1,d
        do i1=0,d-i2
           alpha(1)=i1
           alpha(2)=i2
-          call quad_monome(c,alpha,X_gauss,Y_gauss,gauss_weight,intk)
+          call quad_monome(mesh,c,alpha,k,gauss_weight,intk)
           do j=2,Ni+1
              Kj=mesh%cell(stencil(j))%dx*mesh%cell(stencil(j))%dy
-             call quad_monome(c,alpha,X_gauss,Y_gauss,gauss_weight,intj)
+             call quad_monome(mesh,c,alpha,stencil(j),gauss_weight,intj)
              X(j-1,i)=intj-intk
           enddo
           i=i+1
@@ -104,10 +103,10 @@ contains
     do i1=1,d
        alpha(1)=i1
        alpha(2)=0
-       call quad_monome(c,alpha,X_gauss,Y_gauss,gauss_weight,intk)
+       call quad_monome(mesh,c,alpha,k,gauss_weight,intk)
        do j=2,Ni+1
           Kj=mesh%cell(stencil(j))%dx*mesh%cell(stencil(j))%dy
-          call quad_monome(c,alpha,X_gauss,Y_gauss,gauss_weight,intj)
+          call quad_monome(mesh,c,alpha,stencil(j),gauss_weight,intj)
           X(j-1,i)=intj-intk
        enddo
        i=i+1
@@ -118,13 +117,13 @@ contains
           U(i,isol)=sol%val(stencil(i+1),isol)-sol%val(k,isol)
        enddo
     enddo
-    
+
     if (allocated(mesh%cell(k)%polCoef)) deallocate(mesh%cell(k)%polCoef)
     allocate(mesh%cell(k)%polCoef(Nj,sol%nvar))
     do isol=1,sol%nvar
        call solve(X,U(:,isol),mesh%cell(k)%polCoef(:,isol))
     enddo
-    
+
     deallocate(stencil,X,U)
 
     return
@@ -272,16 +271,17 @@ contains
        enddo
        x(n-j+1)=x(n-j+1)/L(n-j+1,n-j+1)
     enddo
-    
+
     deallocate(L,x1)
     
     return
   end subroutine cholesky
 
-  subroutine quad_monome(c,alpha,X_gauss,Y_gauss,gauss_weight,int)
-    real(dp), dimension(:), intent(in) :: X_gauss,Y_gauss
+  subroutine quad_monome(mesh,c,alpha,k,gauss_weight,int)
+    type(meshStruct), intent(in) :: mesh
     real(dp), dimension(2), intent(in) :: c
     integer, dimension(2), intent(in) :: alpha
+    integer, intent(in) :: k
     real(dp), dimension(:), intent(in) :: gauss_weight
     real(dp), intent(out) :: int
     integer :: p1,p2
@@ -290,11 +290,15 @@ contains
     int=0.0_dp
     do p1=1,size(gauss_weight)
        do p2=1,size(gauss_weight)
-          call polynomialProduct(X_gauss(p1),Y_gauss(p2),c,alpha,s)
+          if (size(gauss_weight)==2) then
+             call polynomialProduct(mesh%cell(k)%X_gauss2(p1),mesh%cell(k)%Y_gauss2(p2),c,alpha,s)
+          else
+             call polynomialProduct(mesh%cell(k)%X_gauss(p1),mesh%cell(k)%Y_gauss(p2),c,alpha,s)
+          endif
           int=int+s*gauss_weight(p1)*gauss_weight(p2)/4.0_dp
        enddo
     enddo
-    
+
     return
   end subroutine quad_monome
   

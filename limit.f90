@@ -225,11 +225,11 @@ contains
     integer :: j,neigh
     real(dp) :: Xmin,Xmax,Ymin,Ymax
 
-    call reconstruct(mesh,mesh%cell(k)%X_gauss,mesh%cell(k)%Y_gauss,sol,k,3,gauss_weight)
+    call reconstruct(mesh,sol,k,3,gauss_weight)
     do j=1,size(mesh%cell(k)%neigh)
        neigh=mesh%cell(k)%neigh(j)
        if (neigh>0) then
-          call reconstruct(mesh,mesh%cell(k)%X_gauss,mesh%cell(k)%Y_gauss,sol,neigh,3,gauss_weight)
+          call reconstruct(mesh,sol,neigh,3,gauss_weight)
        endif
     enddo
 
