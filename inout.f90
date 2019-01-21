@@ -191,6 +191,7 @@ contains
 
           allocate(mesh%cell(k)%node(4),mesh%cell(k)%neigh(8),mesh%cell(k)%edge(4))
           allocate(mesh%cell(k)%X_gauss(size(gauss_point)),mesh%cell(k)%Y_gauss(size(gauss_point)))
+          allocate(mesh%cell(k)%polMax(order*(order-1)/2+order-1,sol%nvar))
 
           mesh%cell(k)%corner(1)=(j-1)*(nx+1)+i
           mesh%cell(k)%corner(2)=(j-1)*(nx+1)+i+1
@@ -220,6 +221,10 @@ contains
           do p=1,size(gauss_point)
              mesh%cell(k)%X_gauss(p)=xc+dx*gauss_point(p)/2.0_dp
              mesh%cell(k)%Y_gauss(p)=yc+dy*gauss_point(p)/2.0_dp
+          enddo
+          do p=1,size(gauss_point2)
+             mesh%cell(k)%X_gauss2(p)=mesh%cell(k)%xc+mesh%cell(k)%dx*gauss_point2(p)/2.0_dp
+             mesh%cell(k)%Y_gauss2(p)=mesh%cell(k)%yc+mesh%cell(k)%dy*gauss_point2(p)/2.0_dp
           enddo
           
           if (i==1) then
@@ -331,11 +336,11 @@ contains
     return
   end subroutine buildMesh
 
-  subroutine buildP4EST(level,p4est)
+  subroutine buildP4EST(level,connectivity,p4est)
     integer, intent(in) :: level
-    type(c_ptr), intent(out) :: p4est
+    type(c_ptr), intent(out) :: connectivity,p4est
 
-    call p4_new(level,p4est)
+    call p4_new(level,connectivity,p4est)
 
     return
   end subroutine buildP4EST
@@ -350,9 +355,9 @@ contains
     type(c_ptr), intent(out) :: quadrants
     integer(c_int) :: tt
     type(c_ptr) :: p4_mesh,nodes,edges
-    type(c_ptr) :: C_corners,C_neighbors,C_sub,C_cell1,C_cell2,C_iedge,C_period,C_nodes,C_sisters
+    type(c_ptr) :: C_corners,C_neighbors,C_sub,C_cell1,C_cell2,C_iedge,C_period,C_nodes
     integer, dimension(:), pointer :: F_corners,F_neighbors,F_sub,F_cell1,F_cell2
-    integer, dimension(:), pointer :: F_iedge,F_period,F_nodes,F_sisters
+    integer, dimension(:), pointer :: F_iedge,F_period,F_nodes
     integer :: k,i,lev,p,Nneigh,N_edge,Nnodes,ie,nedge,i1,iloc
     real(dp) :: a,b,c,center,diff
 
@@ -372,12 +377,13 @@ contains
     ie=0
     do k=1,mesh%nc
        call p4_get_cell(p4est,p4_mesh,tt,quadrants,nodes,edges,k-1,mesh%cell(k)%xc,mesh%cell(k)%yc, &
-            mesh%cell(k)%dx,mesh%cell(k)%dy,C_corners,Nneigh,C_neighbors,Nnodes,C_nodes,N_edge,lev,C_sisters)
+            mesh%cell(k)%dx,mesh%cell(k)%dy,C_corners,Nneigh,C_neighbors,Nnodes,C_nodes,N_edge,lev)
 
        allocate(mesh%cell(k)%node(Nnodes))
        allocate(mesh%cell(k)%neigh(Nneigh))
        allocate(mesh%cell(k)%X_gauss(max(size(gauss_point),2)))
        allocate(mesh%cell(k)%Y_gauss(max(size(gauss_point),2)))
+       allocate(mesh%cell(k)%polMax(order*(order-1)/2+order-1,sol%nvar))
        
        mesh%cell(k)%xc=(xR-xL)*mesh%cell(k)%xc+xL
        mesh%cell(k)%yc=(yR-yL)*mesh%cell(k)%yc+yL
@@ -388,16 +394,18 @@ contains
        call c_f_pointer(C_corners,F_corners,(/4/))
        call c_f_pointer(C_nodes,F_nodes,(/Nnodes/))
        call c_f_pointer(C_neighbors,F_neighbors,(/12/))
-       call c_f_pointer(C_sisters,F_sisters,(/4/))
        
        mesh%cell(k)%corner=F_corners
        mesh%cell(k)%node=F_nodes
        mesh%cell(k)%neigh(1:Nneigh)=F_neighbors(1:Nneigh)
-       mesh%cell(k)%sisters=F_sisters
-       !print*,k,F_sisters
+
        do p=1,size(gauss_point)
           mesh%cell(k)%X_gauss(p)=mesh%cell(k)%xc+mesh%cell(k)%dx*gauss_point(p)/2.0_dp
           mesh%cell(k)%Y_gauss(p)=mesh%cell(k)%yc+mesh%cell(k)%dy*gauss_point(p)/2.0_dp
+       enddo
+       do p=1,size(gauss_point2)
+          mesh%cell(k)%X_gauss2(p)=mesh%cell(k)%xc+mesh%cell(k)%dx*gauss_point2(p)/2.0_dp
+          mesh%cell(k)%Y_gauss2(p)=mesh%cell(k)%yc+mesh%cell(k)%dy*gauss_point2(p)/2.0_dp
        enddo
 
        allocate(mesh%cell(k)%edge(N_edge))
@@ -494,9 +502,9 @@ contains
        call p4_free(C_corners)
        call p4_free(C_neighbors)
        call p4_free(C_nodes)
-       call p4_free(C_sisters)
     enddo
     call p4_free(edges)
+    call p4_destroy_mesh(p4_mesh,nodes)
     
     return
   end subroutine buildMesh_P4EST

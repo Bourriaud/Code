@@ -31,14 +31,14 @@ program main
   procedure (sub_time), pointer :: time_scheme
   procedure (sub_adapt), pointer :: fn_adapt
   real(dp), dimension(:), allocatable :: gauss_point,gauss_weight
-  type(c_ptr) :: p4est,quadrants
+  type(c_ptr) :: p4est,connectivity,quadrants
   logical :: bool_AMR
 
   call get_config(config_file)
   call init(config_file,test_case,xL,xR,yL,yR,level,nvar,cfl,tf,fs,namefile,sol, &
        str_equa,str_flux,str_time_scheme,order,L_str_criteria,L_var_criteria,L_eps, &
        gauss_point,gauss_weight,bool_AMR,str_fn_adapt,f_adapt)
-  call buildP4EST(level,p4est)
+  call buildP4EST(level,connectivity,p4est)
   call buildMesh_P4EST(p4est,xL,xR,yL,yR,gauss_point,order,mesh,sol,quadrants)
   !call buildmesh(xL,xR,yL,yR,64,64,gauss_point,order,mesh,sol)
   call init_FV(test_case,str_equa,str_flux,str_time_scheme,str_fn_adapt,IC_func, &
@@ -48,8 +48,9 @@ program main
 
   if (bool_AMR) then
      do i=1,1
-        call adapt(fn_adapt,p4est,quadrants,mesh,sol)
+        call adapt(fn_adapt,p4est,quadrants,mesh,sol,level,order,gauss_weight,gauss_point)
         call buildMesh_P4EST(p4est,xL,xR,yL,yR,gauss_point,order,mesh,sol,quadrants)
+        call new_sol(mesh,quadrants,sol)
         call IC(IC_func,mesh,sol,order)
         call BC(nvar,mesh)
      enddo
@@ -57,9 +58,9 @@ program main
   
   call userSol(0.0_dp,mesh,sol,str_equa,exactSol)
   call writeSol(mesh,sol,namefile,0)
-  call calculation(mesh,sol,order,cfl,tf,fs,namefile,str_equa, &
+  call calculation(mesh,sol,level,order,cfl,tf,fs,namefile,str_equa, &
        f_equa,flux,speed,time_scheme,exactSol, &
-       L_str_criteria,L_var_criteria,L_eps,gauss_weight, &
+       L_str_criteria,L_var_criteria,L_eps,gauss_weight,gauss_point, &
        bool_AMR,fn_adapt,f_adapt)
 
   call userSol(tf,mesh,sol,str_equa,exactSol)
@@ -81,6 +82,7 @@ program main
   deallocate(sol%val,sol%user,sol%name,sol%var_user,sol%name_user,sol%conserv_var)
   deallocate(L_str_criteria,L_var_criteria,L_eps)
   deallocate(gauss_point,gauss_weight)
+  call p4_destroy(connectivity,p4est)
 
 contains
 
@@ -197,13 +199,13 @@ contains
     return
   end subroutine init_FV
 
-  subroutine calculation(mesh,sol,order,cfl,tf,fs,namefile,str_equa, &
+  subroutine calculation(mesh,sol,level,order,cfl,tf,fs,namefile,str_equa, &
        f_equa,flux,speed,time_scheme,exactSol, &
-       L_str_criteria,L_var_criteria,L_eps,gauss_weight, &
+       L_str_criteria,L_var_criteria,L_eps,gauss_weight,gauss_point, &
        bool_AMR,fn_adapt,f_adapt)
     type(meshStruct), intent(inout) :: mesh
     type(solStruct), intent(inout) :: sol
-    integer, intent(in) :: order
+    integer, intent(in) :: level,order
     real(dp), intent(in) :: cfl,tf
     integer, intent(in) :: fs,f_adapt
     character(len=20),intent(in) :: namefile,str_equa
@@ -216,7 +218,7 @@ contains
     character(len=20), dimension(:), intent(in) :: L_str_criteria
     integer, dimension(:), intent(in) :: L_var_criteria
     real(dp), dimension(:), intent(in) :: L_eps
-    real(dp), dimension(:), intent(in) :: gauss_weight
+    real(dp), dimension(:), intent(in) :: gauss_weight,gauss_point
     logical, intent(in) :: bool_AMR
     integer :: n
     real(dp) :: t
@@ -228,7 +230,7 @@ contains
        call time_scheme(mesh,sol,str_equa,f_equa,flux,speed,order,cfl,t,n,tf, &
             L_str_criteria,L_var_criteria,L_eps,gauss_weight)
        if (bool_AMR.and.mod(n,f_adapt)==0) then
-          call adapt(fn_adapt,p4est,quadrants,mesh,sol)
+          call adapt(fn_adapt,p4est,quadrants,mesh,sol,level,order,gauss_weight,gauss_point)
           call buildMesh_P4EST(p4est,xL,xR,yL,yR,gauss_point,order,mesh,sol,quadrants)
           call new_sol(mesh,quadrants,sol)
           call BC(nvar,mesh)

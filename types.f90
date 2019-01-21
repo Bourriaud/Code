@@ -31,10 +31,11 @@ module types
      integer, dimension(:), allocatable :: neigh
      integer, dimension(:), allocatable :: edge
      real(dp), dimension(:), allocatable :: X_gauss,Y_gauss
+     real(dp), dimension(2) :: X_gauss2,Y_gauss2
      logical :: accept
      integer :: deg
      integer :: level
-     integer, dimension(4) :: sisters
+     real(dp), dimension(:,:), allocatable :: polMax
   end type cellStruct
   
   type :: meshStruct
@@ -127,12 +128,13 @@ module types
        real(dp), intent(out) :: s
      end subroutine sub_exactsol
 
-     subroutine sub_adapt(mesh,sol,maxlevel,coarsen_recursive,refine_recursive,sol_coarsen,sol_refine)
+     subroutine sub_adapt(mesh,sol,level,maxlevel,coarsen_recursive,refine_recursive,sol_coarsen,sol_refine)
        use constant
        import meshStruct
        import solStruct
        type(meshStruct), intent(inout) :: mesh
        type(solStruct), intent(in) :: sol
+       integer, intent(in) :: level
        integer, intent(out) :: maxlevel,coarsen_recursive,refine_recursive
        integer, dimension(:), intent(inout) :: sol_coarsen,sol_refine
      end subroutine sub_adapt
@@ -141,10 +143,10 @@ module types
 
   interface
 
-     subroutine p4_new(level,p4est) bind(C)
+     subroutine p4_new(level,connectivity,p4est) bind(C)
        use, intrinsic :: ISO_C_BINDING
        integer(c_int), value, intent(in) :: level
-       type(c_ptr), intent(out) :: p4est
+       type(c_ptr), intent(out) :: connectivity,p4est
      end subroutine p4_new
      
      subroutine p4_build_mesh(p4est,tt,mesh,quadrants,nodes,edges,np,nc,ne) bind(C)
@@ -164,13 +166,13 @@ module types
      end subroutine p4_get_node
 
      subroutine p4_get_cell(p4est,mesh,tt,quadrants,nodes,edges,k,xc,yc,dx,dy, &
-          corners,Nneigh,neighbors,Nnodes,cell_nodes,N_edge,level,sisters) bind(C)
+          corners,Nneigh,neighbors,Nnodes,cell_nodes,N_edge,level) bind(C)
        use, intrinsic :: ISO_C_BINDING
        type(c_ptr), value, intent(in) :: p4est,mesh,quadrants,nodes,edges
        integer(c_int), value, intent(in) :: tt
        integer(c_int), value, intent(in) :: k
        real(c_double), intent(out) :: xc,yc,dx,dy
-       type(c_ptr), intent(out) :: corners,neighbors,cell_nodes,sisters
+       type(c_ptr), intent(out) :: corners,neighbors,cell_nodes
        integer(c_int), intent(out) :: Nneigh,Nnodes,N_edge,level
      end subroutine p4_get_cell
 
@@ -182,10 +184,10 @@ module types
        type(c_ptr), intent(out) :: iedge_out,cell1,cell2,sub,period
      end subroutine p4_get_edge
 
-     subroutine p4_adapt(p4est,quadrants,sol,nsol,sol_coarsen,sol_refine,maxlevel, &
+     subroutine p4_adapt(p4est,quadrants,sol,sol_interp,nsol,sol_coarsen,sol_refine,maxlevel, &
           coarsen_recursive,refine_recursive) bind(C)
        use, intrinsic :: ISO_C_BINDING
-       type(c_ptr), value, intent(in) :: p4est,quadrants,sol
+       type(c_ptr), value, intent(in) :: p4est,quadrants,sol,sol_interp
        type(c_ptr), value, intent(in) :: sol_coarsen,sol_refine
        integer(c_int), value, intent(in) :: nsol,maxlevel,coarsen_recursive,refine_recursive
      end subroutine p4_adapt
@@ -200,6 +202,16 @@ module types
        use, intrinsic :: ISO_C_BINDING
        type(c_ptr), value, intent(in) :: ptr
      end subroutine p4_free
+
+     subroutine p4_destroy(connectivity,p4est) bind(C)
+       use, intrinsic :: ISO_C_BINDING
+       type(c_ptr), value, intent(in) :: connectivity,p4est
+     end subroutine p4_destroy
+
+     subroutine p4_destroy_mesh(mesh,nodes) bind(C)
+       use, intrinsic :: ISO_C_BINDING
+       type(c_ptr), value, intent(in) :: mesh,nodes
+     end subroutine p4_destroy_mesh
      
   end interface
 

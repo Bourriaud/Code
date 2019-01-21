@@ -224,10 +224,10 @@ contains
     SL=min(-abs(u1(1+dir)/u1(1))-a1,-abs(u2(1+dir)/u2(1))-a2)
     SR=max(abs(u1(1+dir)/u1(1))+a1,abs(u2(1+dir)/u2(1))+a2)
 
-    if (SL>0.0_dp) then
+    if (SL>=0.0_dp) then
        call f_equa(u1,F1vect)
        F(:)=F1vect(:,dir)
-    else if (SR<0.0_dp) then
+    else if (SR<=0.0_dp) then
        call f_equa(u2,F2vect)
        F(:)=F2vect(:,dir)
     else

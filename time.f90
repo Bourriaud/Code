@@ -50,7 +50,7 @@ contains
     integer, dimension(:), intent(in) :: L_var_criteria
     real(dp), dimension(:), intent(in) :: L_eps
     real(dp), dimension(:), intent(in) :: gauss_weight
-    integer :: k,i,j,p,cell1,cell2,dir,count,deg,sub1,sub2
+    integer :: k,i,j,p,cell1,cell2,dir,count,deg,sub1,sub2,ac1,ac2
     real(dp), dimension(:), allocatable :: u1,u2
     type(edgeStruct) :: edge
     integer, dimension(:), allocatable :: NOT_ACCEPTED_CELL,NOT_ACCEPTED_EDGE
@@ -84,15 +84,21 @@ contains
           edge=mesh%edge(j)
           cell1=edge%cell1
           cell2=edge%cell2
+          ac1=abs(cell1)
+          ac2=abs(cell2)
           dir=edge%dir
-          lengthN1=mesh%cell(abs(cell1))%dx
-          lengthN2=mesh%cell(abs(cell2))%dx
+          lengthN1=mesh%cell(ac1)%dx
+          lengthN2=mesh%cell(ac2)%dx
           sub1=edge%sub(1)
           sub2=edge%sub(2)
-          deg=min(mesh%cell(abs(cell1))%deg,mesh%cell(abs(cell2))%deg)
+          deg=min(mesh%cell(ac1)%deg,mesh%cell(ac2)%deg)
           mesh%edge(j)%deg=deg
-          call reconstruct(mesh,sol,abs(cell1),deg+1,gauss_weight)
-          call reconstruct(mesh,sol,abs(cell2),deg+1,gauss_weight)
+          call reconstruct(mesh,mesh%cell(ac1)%X_gauss,mesh%cell(ac1)%Y_gauss,sol,ac1,deg+1,gauss_weight)
+          call reconstruct(mesh,mesh%cell(ac2)%X_gauss,mesh%cell(ac2)%Y_gauss,sol,ac2,deg+1,gauss_weight)
+          if (deg+1==order) then
+             mesh%cell(ac1)%polMax=mesh%cell(ac1)%polCoef
+             mesh%cell(ac2)%polMax=mesh%cell(ac2)%polCoef
+          endif
           do p=1,order
              if (.not.edge%flux_acc(p)) then
                 if (cell1<0) then
