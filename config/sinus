@@ -11,8 +11,8 @@ Sinus	ICBC
 1.	tf
 transport	equation
 godunov	flux
-euler_exp	time scheme
-1	space order
+SSPRK3	time scheme
+3	space order
 -------------------- Limitation parameters -------------------------------
 1	number of detection criterias
 DMPu2 1 1.0e-4	detection criteria + variable + sensibility
@@ -28,3 +28,4 @@ var1	var 1
 TRUE	AMR
 sinus	adaptation function
 1	adaptation frequency
+1	recursivity

@@ -757,7 +757,7 @@ CC = gcc
 CCDEPMODE = depmode=gcc3
 CFLAGS = -g -O2
 CPP = gcc -E
-CPPFLAGS = 
+CPPFLAGS = -DSC_LOG_PRIORITY=SC_LP_ERROR
 CXX = g++
 CXXCPP = g++ -E
 CXXDEPMODE = depmode=gcc3

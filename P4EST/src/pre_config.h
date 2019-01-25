@@ -20,7 +20,7 @@
 #define CPP "gcc -E"
 
 /* C preprocessor flags */
-#define CPPFLAGS ""
+#define CPPFLAGS "-DSC_LOG_PRIORITY=SC_LP_ERROR"
 
 /* Define to 1 if your C++ compiler doesn't accept -c and -o together. */
 /* #undef CXX_NO_MINUS_C_MINUS_O */

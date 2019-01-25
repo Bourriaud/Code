@@ -27,10 +27,10 @@ contains
   
   subroutine init(config_file,test_case,xL,xR,yL,yR,level,nvar,cfl,tf,fs,namefile,sol, &
        str_equa,str_flux,str_time_scheme,order,L_str_criteria,L_var_criteria,L_eps, &
-       gauss_point,gauss_weight,bool_AMR,fn_adapt,f_adapt)
+       gauss_point,gauss_weight,bool_AMR,fn_adapt,f_adapt,recursivity)
     character(len=20), intent(out) :: config_file,test_case,namefile,str_equa,str_flux,str_time_scheme
     real(dp), intent(out) :: xL,xR,yL,yR,cfl,tf
-    integer, intent(out) :: level,nvar,fs,order,f_adapt
+    integer, intent(out) :: level,nvar,fs,order,f_adapt,recursivity
     type(solStruct), intent(out) :: sol
     character(len=20), dimension(:), allocatable, intent(out) :: L_str_criteria
     integer, dimension(:), allocatable, intent(out) :: L_var_criteria
@@ -83,6 +83,7 @@ contains
     read(11,*)bool_AMR
     read(11,*)fn_adapt
     read(11,*)f_adapt
+    read(11,*)recursivity
     
     close(11)
     
@@ -505,6 +506,7 @@ contains
     enddo
     call p4_free(edges)
     call p4_destroy_mesh(p4_mesh,nodes)
+    print*,"Mesh created with ",mesh%nc," quadrants"
     
     return
   end subroutine buildMesh_P4EST
@@ -582,6 +584,7 @@ contains
     real(dp), intent(in) :: t
     integer, intent(in) :: n
 
+    print*,"-----------------------------------------"
     print*,"t=",t,"itération ",n
     call check_conservativity(mesh,sol)
     print*,"-----------------------------------------"

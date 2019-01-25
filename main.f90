@@ -16,7 +16,7 @@ program main
   type(meshStruct) :: mesh
   type(solStruct) :: sol
   real(dp) :: xL,xR,yL,yR,cfl,tf,error
-  integer :: level,nvar,fs,order,i,f_adapt
+  integer :: level,nvar,fs,order,i,f_adapt,recursivity
   integer, dimension(:), allocatable :: L_var_criteria
   real(dp), dimension(:), allocatable :: L_eps
   character(len=20) :: config_file,test_case,namefile,str_equa,str_flux,str_time_scheme
@@ -37,7 +37,7 @@ program main
   call get_config(config_file)
   call init(config_file,test_case,xL,xR,yL,yR,level,nvar,cfl,tf,fs,namefile,sol, &
        str_equa,str_flux,str_time_scheme,order,L_str_criteria,L_var_criteria,L_eps, &
-       gauss_point,gauss_weight,bool_AMR,str_fn_adapt,f_adapt)
+       gauss_point,gauss_weight,bool_AMR,str_fn_adapt,f_adapt,recursivity)
   call buildP4EST(level,connectivity,p4est)
   call buildMesh_P4EST(p4est,xL,xR,yL,yR,gauss_point,order,mesh,sol,quadrants)
   !call buildmesh(xL,xR,yL,yR,64,64,gauss_point,order,mesh,sol)
@@ -47,7 +47,7 @@ program main
   call BC(nvar,mesh)
 
   if (bool_AMR) then
-     do i=1,1
+     do i=1,recursivity
         call adapt(fn_adapt,p4est,quadrants,mesh,sol,level,order,gauss_weight,gauss_point)
         call buildMesh_P4EST(p4est,xL,xR,yL,yR,gauss_point,order,mesh,sol,quadrants)
         call new_sol(mesh,quadrants,sol)
@@ -61,7 +61,7 @@ program main
   call calculation(mesh,sol,level,order,cfl,tf,fs,namefile,str_equa, &
        f_equa,flux,speed,time_scheme,exactSol, &
        L_str_criteria,L_var_criteria,L_eps,gauss_weight,gauss_point, &
-       bool_AMR,fn_adapt,f_adapt)
+       bool_AMR,fn_adapt,f_adapt,recursivity)
 
   call userSol(tf,mesh,sol,str_equa,exactSol)
   select case (trim(test_case))
@@ -202,12 +202,11 @@ contains
   subroutine calculation(mesh,sol,level,order,cfl,tf,fs,namefile,str_equa, &
        f_equa,flux,speed,time_scheme,exactSol, &
        L_str_criteria,L_var_criteria,L_eps,gauss_weight,gauss_point, &
-       bool_AMR,fn_adapt,f_adapt)
+       bool_AMR,fn_adapt,f_adapt,recursivity)
     type(meshStruct), intent(inout) :: mesh
     type(solStruct), intent(inout) :: sol
-    integer, intent(in) :: level,order
+    integer, intent(in) :: level,order,fs,f_adapt,recursivity
     real(dp), intent(in) :: cfl,tf
-    integer, intent(in) :: fs,f_adapt
     character(len=20),intent(in) :: namefile,str_equa
     procedure (sub_f), pointer, intent(in) :: f_equa
     procedure (sub_flux), pointer, intent(in) :: flux
@@ -220,20 +219,22 @@ contains
     real(dp), dimension(:), intent(in) :: L_eps
     real(dp), dimension(:), intent(in) :: gauss_weight,gauss_point
     logical, intent(in) :: bool_AMR
-    integer :: n
+    integer :: n,i
     real(dp) :: t
     
     t=0.0_dp
     n=1
-    call check_conservativity(mesh,sol)
+    call print(mesh,sol,0.0_dp,0)
     do while (t<tf)
        call time_scheme(mesh,sol,str_equa,f_equa,flux,speed,order,cfl,t,n,tf, &
             L_str_criteria,L_var_criteria,L_eps,gauss_weight)
        if (bool_AMR.and.mod(n,f_adapt)==0) then
-          call adapt(fn_adapt,p4est,quadrants,mesh,sol,level,order,gauss_weight,gauss_point)
-          call buildMesh_P4EST(p4est,xL,xR,yL,yR,gauss_point,order,mesh,sol,quadrants)
-          call new_sol(mesh,quadrants,sol)
-          call BC(nvar,mesh)
+          do i=1,recursivity
+             call adapt(fn_adapt,p4est,quadrants,mesh,sol,level,order,gauss_weight,gauss_point)
+             call buildMesh_P4EST(p4est,xL,xR,yL,yR,gauss_point,order,mesh,sol,quadrants)
+             call new_sol(mesh,quadrants,sol)
+             call BC(nvar,mesh)
+          enddo
        endif
        if (mod(n,fs)==0.or.t>=tf) then
           call userSol(t,mesh,sol,str_equa,exactSol)
