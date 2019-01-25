@@ -719,7 +719,7 @@ static int refine_value (p4est_t* p4est, p4est_topidx_t which_tree, p4est_quadra
 
 static void replace_fn (p4est_t* p4est, p4est_topidx_t which_tree, int num_outgoing, p4est_quadrant_t* outgoing[], int num_incoming, p4est_quadrant_t* incoming[])
 {
-  var_t *parent_data,*child_data,*data;
+  var_t *parent_data,*child_data;
   int i,j,isol;
   double h;
 
@@ -729,11 +729,8 @@ static void replace_fn (p4est_t* p4est, p4est_topidx_t which_tree, int num_outgo
     parent_data = (var_t *) incoming[0]->p.user_data;
     child_data = (var_t *) outgoing[0]->p.user_data;
     parent_data->u = (double*) malloc(sizeof(double)*child_data->nsol);
-    parent_data->u1 = (double*) malloc(sizeof(double)*child_data->nsol);
-    parent_data->u2 = (double*) malloc(sizeof(double)*child_data->nsol);
-    parent_data->u3 = (double*) malloc(sizeof(double)*child_data->nsol);
-    parent_data->u4 = (double*) malloc(sizeof(double)*child_data->nsol);
     parent_data->nsol=child_data->nsol;
+    parent_data->refine=0;
     for (isol=0;isol<child_data->nsol;isol++){parent_data->u[isol] = 0.;}
     for (i=0;i<P4EST_CHILDREN;i++)
     {
@@ -757,6 +754,7 @@ static void replace_fn (p4est_t* p4est, p4est_topidx_t which_tree, int num_outgo
           parent_data->u4 = child_data->u;
           break;
       }
+      free(child_data->u1);free(child_data->u2);free(child_data->u3);free(child_data->u4);
     }
   }
   else
@@ -773,6 +771,7 @@ static void replace_fn (p4est_t* p4est, p4est_topidx_t which_tree, int num_outgo
       child_data->u3 = (double*) malloc(sizeof(double)*parent_data->nsol);
       child_data->u4 = (double*) malloc(sizeof(double)*parent_data->nsol);
       child_data->nsol=parent_data->nsol;
+      parent_data->coarsen=0;
       switch (i)
       {
         case 0:
@@ -817,11 +816,7 @@ static void replace_fn (p4est_t* p4est, p4est_topidx_t which_tree, int num_outgo
           break;
       }
     }
-  }
-  for (i=0;i<num_outgoing;i++)
-  {
-    data = (var_t *) outgoing[i]->p.user_data;
-    free(data->u1);free(data->u2);free(data->u3);free(data->u4);//free(data->u);
+    free(parent_data->u);free(parent_data->u1);free(parent_data->u2);free(parent_data->u3);free(parent_data->u4);
   }
 }
 
