@@ -4,7 +4,7 @@ OBJS = main.o constant.o inout.o efficiency.o types.o phys.o FV.o time.o reconst
 
 INC = -I/home/imb/abourriaud/Documents/Code/P4EST/local/include
 LIBP = -L/home/imb/abourriaud/Documents/Code/P4EST/local/lib
-LIBS = -lp4est -lsc -lmpi
+LIBS = -lp4est -lsc
 
 CC = gcc
 CCFLAGS = -O0

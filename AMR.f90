@@ -14,14 +14,11 @@ contains
     type(solStruct), intent(in) :: sol
     integer, intent(in) :: level,order
     real(dp), dimension(:), intent(in) :: gauss_weight,gauss_point
-    type(c_ptr) :: C_coarsen_fn,C_refine_fn,C_init_fn
-    character(len=20), pointer :: f_coarsen,f_refine,f_init
     type(c_ptr) :: C_sol,C_sol_coarsen,C_sol_refine,C_sol_interp
-    real(dp), dimension(:,:), pointer :: F_sol,F_sol_interp
-    integer, dimension(:), pointer :: sol_coarsen,sol_refine
+    real(dp), dimension(:,:), allocatable, target :: F_sol,F_sol_interp
+    integer, dimension(:), allocatable, target :: sol_coarsen,sol_refine
     integer :: maxlevel,coarsen_recursive,refine_recursive
     
-    allocate(f_coarsen,f_refine,f_init)
     allocate(F_sol(mesh%nc,sol%nvar),F_sol_interp(4*mesh%nc,sol%nvar))
     allocate(sol_coarsen(mesh%nc),sol_refine(mesh%nc))
     
@@ -30,10 +27,6 @@ contains
     call interp(mesh,sol,order,gauss_weight,gauss_point,sol_refine,F_sol_interp)
     C_sol_interp=c_loc(F_sol_interp)
     
-    f_init='null'//c_null_char
-    C_coarsen_fn=c_loc(f_coarsen)
-    C_refine_fn=c_loc(f_refine)
-    C_init_fn=c_loc(f_init)
     F_sol=sol%val
     C_sol=c_loc(F_sol)
     C_sol_coarsen=c_loc(sol_coarsen)
@@ -42,7 +35,7 @@ contains
     call p4_adapt(p4est,quadrants,C_sol,C_sol_interp,sol%nvar,C_sol_coarsen,C_sol_refine,maxlevel, &
          coarsen_recursive,refine_recursive)
     
-    deallocate(f_coarsen,f_refine,f_init,F_sol,F_sol_interp,sol_coarsen,sol_refine)
+    deallocate(F_sol,F_sol_interp,sol_coarsen,sol_refine)
 
     return
   end subroutine adapt

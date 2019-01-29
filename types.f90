@@ -76,6 +76,7 @@ module types
      
      subroutine sub_flux (u1,u2,f_equa,dir,F)
        use constant
+       import sub_f
        real(dp), dimension(:), intent(in) :: u1,u2
        procedure (sub_f), pointer, intent(in) :: f_equa
        integer, intent(in) :: dir
@@ -84,6 +85,7 @@ module types
 
      subroutine sub_speed (u1,u2,f_equa,Smax)
        use constant
+       import sub_f
        real(dp), dimension(:), intent(in) :: u1,u2
        procedure (sub_f), pointer, intent(in) :: f_equa
        real(dp), dimension(2), intent(out) :: Smax
@@ -94,6 +96,9 @@ module types
        use constant
        import meshStruct
        import solStruct
+       import sub_f
+       import sub_flux
+       import sub_speed
        type(meshStruct), intent(inout) :: mesh
        type(solStruct), intent(inout) :: sol
        character(len=20), intent(in) :: str_equa

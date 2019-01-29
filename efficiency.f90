@@ -193,8 +193,9 @@ contains
   subroutine exactSol_none(x,y,t,s)
     real(dp), intent(in) :: x,y,t
     real(dp), intent(out) :: s
-    if(.false.)print*,x,y,t,s
-    
+    if(.false.)print*,x,y,t
+
+    s=0.0_dp
     print*,"There is no exact solution for this configuration"
     call exit()
 

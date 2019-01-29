@@ -14,8 +14,7 @@ contains
     character(len=20), intent(out) :: config_file
     logical :: file_exists
 
-    print*,"Configuration file : "
-    read*,config_file
+    call getarg(1,config_file)
     INQUIRE(file="config/"//trim(config_file), EXIST=file_exists)
     if (.not.file_exists) then
        print*,"Configuration file ",trim(config_file)," doesn't exist"
@@ -519,7 +518,7 @@ contains
     integer :: k,n
     integer :: i,nnodes
     character(len=34) :: completenamefile
-
+    
     write(completenamefile,'(A,A,I3.3,A)')'./results/',trim(namefile),nfile,'.vtk'
     open(11,file=completenamefile,form="formatted")
     
