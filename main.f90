@@ -45,7 +45,7 @@ program main
        BC,exactSol,f_equa,flux,speed,time_scheme,sol,fn_adapt)
   call IC(IC_func,mesh,sol,order)
   call BC(nvar,mesh)
-
+  
   if (bool_AMR) then
      do i=1,recursivity
         call adapt(fn_adapt,p4est,quadrants,mesh,sol,level,order,gauss_weight,gauss_point)
@@ -63,7 +63,7 @@ program main
        L_str_criteria,L_var_criteria,L_eps,gauss_weight,gauss_point, &
        bool_AMR,fn_adapt,f_adapt,recursivity)
 
-  call userSol(tf,mesh,sol,str_equa,exactSol)
+  !call userSol(tf,mesh,sol,str_equa,exactSol)
   select case (trim(test_case))
   case ('Sinus')
      call errorL1(mesh,sol%val(:,1),sol%user(:,1),error)
@@ -187,6 +187,8 @@ contains
     end select
 
     select case (trim(str_fn_adapt))
+    case ('zone')
+       fn_adapt => adapt_zone
     case ('sinus')
        fn_adapt => adapt_sinus
     case ('vortex')
@@ -219,11 +221,12 @@ contains
     real(dp), dimension(:), intent(in) :: L_eps
     real(dp), dimension(:), intent(in) :: gauss_weight,gauss_point
     logical, intent(in) :: bool_AMR
-    integer :: n,i
+    integer :: i,n,nout
     real(dp) :: t
     
     t=0.0_dp
     n=1
+    nout=1
     call print(mesh,sol,0.0_dp,0)
     do while (t<tf)
        call time_scheme(mesh,sol,str_equa,f_equa,flux,speed,order,cfl,t,n,tf, &
@@ -238,8 +241,9 @@ contains
        endif
        if (mod(n,fs)==0.or.t>=tf) then
           call userSol(t,mesh,sol,str_equa,exactSol)
-          call writeSol(mesh,sol,namefile,n/fs)
+          call writeSol(mesh,sol,namefile,nout)
           call print(mesh,sol,t,n)
+          nout=nout+1
        endif
        n=n+1
     enddo

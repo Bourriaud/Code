@@ -470,6 +470,10 @@ contains
                    endif
                    center=(a+b)/2.0_dp
                    diff=(b-a)/2.0_dp
+                   if (nedge/=1) then
+                      center=center+(i1-1.5_dp)*diff
+                      diff=diff/2.0_dp
+                   endif
                    do p=1,size(gauss_point)
                       mesh%edge(F_iedge(i1))%X_gauss(p)=c
                       mesh%edge(F_iedge(i1))%Y_gauss(p)=center+diff*gauss_point(p)
@@ -486,6 +490,10 @@ contains
                    endif
                    center=(a+b)/2.0_dp
                    diff=(b-a)/2.0_dp
+                   if (nedge/=1) then
+                      center=center-(i1-1.5_dp)*diff
+                      diff=diff/2.0_dp
+                   endif
                    do p=1,size(gauss_point)
                       mesh%edge(F_iedge(i1))%X_gauss(p)=center+diff*gauss_point(p)
                       mesh%edge(F_iedge(i1))%Y_gauss(p)=c
@@ -563,7 +571,7 @@ contains
           endif
        enddo
     enddo
-    
+
     do n=1,sol%nsolUser
        write(11,'(a,a,a)')"SCALARS ",sol%name_user(n)," float 1"
        write(11,'(a)')"LOOKUP_TABLE default"

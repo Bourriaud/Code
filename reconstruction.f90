@@ -30,7 +30,6 @@ contains
     c(2)=yc
     Kk=mesh%cell(k)%dx*mesh%cell(k)%dy
     d=order-1
-    
     u(:)=sol%val(k,:)
     i=1
 
