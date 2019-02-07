@@ -114,14 +114,12 @@ contains
     return
   end subroutine errorL2
 
-  subroutine check_conservativity(mesh,sol)
+  subroutine check_conservativity(mesh,sol,total)
     type(meshStruct), intent(in) :: mesh
     type(solStruct), intent(in) :: sol
+    real(dp), dimension(:), intent(inout) :: total
     real(dp) :: dx,dy
-    real(dp), dimension(:), allocatable :: total
     integer :: isol,k
-
-    allocate(total(sol%nvar))
     
     total=0.0_dp
     do k=1,mesh%nc
@@ -133,8 +131,6 @@ contains
     enddo
 
     print*,"Total quantities : ",total
-
-    deallocate(total)
 
     return
   end subroutine check_conservativity
@@ -176,9 +172,10 @@ contains
     real(dp), intent(in) :: x,y,t
     real(dp), intent(out) :: s
     real(dp) :: x0,y0,xmin,ymin,beta,r,Temp
+    if (.false.) print*,t
 
-    x0=-5.0_dp+mod(int(t+5.0_dp),10)+t-int(t)
-    y0=-5.0_dp+mod(int(t+5.0_dp),10)+t-int(t)
+    x0=0.0_dp!-5.0_dp+mod(int(t+5.0_dp),10)+t-int(t)
+    y0=0.0_dp!-5.0_dp+mod(int(t+5.0_dp),10)+t-int(t)
     beta=5.0_dp
     xmin=min(abs(x-x0),abs(x-x0-10.0_dp),abs(x-x0+10.0_dp))
     ymin=min(abs(y-y0),abs(y-y0-10.0_dp),abs(y-y0+10.0_dp))

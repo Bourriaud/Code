@@ -77,7 +77,7 @@ contains
     call buildStencil(mesh,k,N,stencil)
     Ni=size(stencil)-1
     Nj=d*(d+1)/2+d
-
+    
     allocate(X(Ni,Nj),U(Ni,sol%nvar))
 
     Kk=mesh%cell(k)%dx*mesh%cell(k)%dy
@@ -110,13 +110,13 @@ contains
        enddo
        i=i+1
     enddo
-
+    
     do i=1,Ni
        do isol=1,sol%nvar
           U(i,isol)=sol%val(stencil(i+1),isol)-sol%val(k,isol)
        enddo
     enddo
-
+    
     if (allocated(mesh%cell(k)%polCoef)) deallocate(mesh%cell(k)%polCoef)
     allocate(mesh%cell(k)%polCoef(Nj,sol%nvar))
     do isol=1,sol%nvar
@@ -179,7 +179,7 @@ contains
     stencil(1)=k
     i=1
     
-    do while (size(stencil)<ceiling(1.5*N))
+    do while (size(stencil)<ceiling(1.8*N))
        call couronne(mesh,stencil,i)
        i=i+1
     enddo

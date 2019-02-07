@@ -92,7 +92,7 @@ module types
      end subroutine sub_speed
 
      subroutine sub_time (mesh,sol,str_equa,f_equa,flux,speed,order,cfl,t,n,tf, &
-          L_str_criteria,L_var_criteria,L_eps,gauss_weight)
+          L_str_criteria,L_var_criteria,L_eps,gauss_weight,verbosity)
        use constant
        import meshStruct
        import solStruct
@@ -105,7 +105,7 @@ module types
        procedure (sub_f), pointer, intent(in) :: f_equa
        procedure (sub_flux), pointer, intent(in) :: flux
        procedure (sub_speed), pointer, intent(in) :: speed
-       integer, intent(in) :: order,n
+       integer, intent(in) :: order,n,verbosity
        real(dp), intent(in) :: cfl,tf
        real(dp), intent(inout) :: t
        character(len=20), dimension(:), intent(in) :: L_str_criteria
@@ -133,14 +133,14 @@ module types
        real(dp), intent(out) :: s
      end subroutine sub_exactsol
 
-     subroutine sub_adapt(mesh,sol,level,maxlevel,coarsen_recursive,refine_recursive,sol_coarsen,sol_refine)
+     subroutine sub_adapt(mesh,sol,level,minlevel,maxlevel,coarsen_recursive,refine_recursive,sol_coarsen,sol_refine)
        use constant
        import meshStruct
        import solStruct
        type(meshStruct), intent(inout) :: mesh
        type(solStruct), intent(in) :: sol
        integer, intent(in) :: level
-       integer, intent(out) :: maxlevel,coarsen_recursive,refine_recursive
+       integer, intent(out) :: minlevel,maxlevel,coarsen_recursive,refine_recursive
        integer, dimension(:), intent(inout) :: sol_coarsen,sol_refine
      end subroutine sub_adapt
      

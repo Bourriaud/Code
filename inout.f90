@@ -24,12 +24,12 @@ contains
     return
   end subroutine get_config
   
-  subroutine init(config_file,test_case,xL,xR,yL,yR,level,nvar,cfl,tf,fs,namefile,sol, &
+  subroutine init(config_file,test_case,xL,xR,yL,yR,level,nvar,cfl,tf,fs,namefile,verbosity,sol, &
        str_equa,str_flux,str_time_scheme,order,L_str_criteria,L_var_criteria,L_eps, &
        gauss_point,gauss_weight,bool_AMR,fn_adapt,f_adapt,recursivity)
     character(len=20), intent(out) :: config_file,test_case,namefile,str_equa,str_flux,str_time_scheme
     real(dp), intent(out) :: xL,xR,yL,yR,cfl,tf
-    integer, intent(out) :: level,nvar,fs,order,f_adapt,recursivity
+    integer, intent(out) :: level,nvar,fs,verbosity,order,f_adapt,recursivity
     type(solStruct), intent(out) :: sol
     character(len=20), dimension(:), allocatable, intent(out) :: L_str_criteria
     integer, dimension(:), allocatable, intent(out) :: L_var_criteria
@@ -67,6 +67,7 @@ contains
     read(11,*)blank
     read(11,*)fs
     read(11,*)namefile
+    read(11,*)verbosity
     read(11,*)nvar
     allocate(sol%name(nvar))
     do i=1,nvar
@@ -585,29 +586,29 @@ contains
     return
   end subroutine writeSol
 
-  subroutine print(mesh,sol,t,n)
+  subroutine print(mesh,sol,t,n,total)
     type(meshStruct), intent(in) :: mesh
     type(solStruct), intent(in) :: sol
     real(dp), intent(in) :: t
     integer, intent(in) :: n
+    real(dp), dimension(:), intent(inout) :: total
 
     print*,"-----------------------------------------"
     print*,"t=",t,"itération ",n
-    call check_conservativity(mesh,sol)
+    call check_conservativity(mesh,sol,total)
     print*,"-----------------------------------------"
     
     return
   end subroutine print
 
-  subroutine write_accept(mesh,NOT_ACCEPTED_CELL,n,count)
+  subroutine write_accept(mesh,NAC_cycle,NAC_reason,n)
     type(meshStruct), intent(in) :: mesh
-    integer, dimension(:), intent(in) :: NOT_ACCEPTED_CELL
-    integer, intent(in) :: n,count
-    integer :: k
-    integer :: i1,i2,i3,i4
+    integer, dimension(:), intent(in) :: NAC_cycle,NAC_reason
+    integer, intent(in) :: n
+    integer :: k,i,nnodes
     character(len=34) :: completenamefile
 
-    write(completenamefile,'(A,A,I3.3,I3.3,A)')'./results/','accept',n,count,'.vtk'
+    write(completenamefile,'(A,A,I3.3,A)')'./results/','accept',n,'.vtk'
     open(11,file=completenamefile,form="formatted")
     
     write(11,'(a)')"# vtk DataFile Version 2.0"
@@ -620,13 +621,18 @@ contains
        write(11,'(e15.8,a,e15.8,a,e15.8)')mesh%node(k)%x," ",mesh%node(k)%y," ",0.0_dp
     enddo
 
-    write(11,'(a,i8,i9)')"CELLS ",mesh%nc,5*mesh%nc
+    nnodes=0
     do k=1,mesh%nc
-       i1=mesh%cell(k)%corner(1)
-       i2=mesh%cell(k)%corner(2)
-       i3=mesh%cell(k)%corner(3)
-       i4=mesh%cell(k)%corner(4)
-       write(11,'(i1,i8,i8,i8,i8)')4,i1,i2,i3,i4
+       nnodes=nnodes+size(mesh%cell(k)%node)+1
+    enddo
+    write(11,'(a,i8,i9)')"CELLS ",mesh%nc,nnodes
+    do k=1,mesh%nc
+       nnodes=size(mesh%cell(k)%node)
+       write(11,'(i1)',advance='no')nnodes
+       do i=1,nnodes-1
+          write(11,'(i8)',advance='no')mesh%cell(k)%node(i)-1
+       enddo
+       write(11,'(i8)')mesh%cell(k)%node(nnodes)-1
     enddo
 
     write(11,'(a,i8)')"CELL_TYPES ",mesh%nc
@@ -635,19 +641,98 @@ contains
     enddo
     
     write(11,'(a,i8)')"CELL_DATA ",mesh%nc
-    write(11,'(a,a,a)')"SCALARS ","accept"," float 1"
+    write(11,'(a,a,a)')"SCALARS ","cycle"," float 1"
     write(11,'(a)')"LOOKUP_TABLE default"
     do k=1,mesh%nc
-       if (all(k/=NOT_ACCEPTED_CELL)) then
-          write(11,'(e15.8)')0.0_dp
-       else
-          write(11,'(e15.8)')1.0_dp
-       endif
+       write(11,'(e15.8)')real(NAC_cycle(k))
+    enddo
+    write(11,'(a,a,a)')"SCALARS ","reason"," float 1"
+    write(11,'(a)')"LOOKUP_TABLE default"
+    do k=1,mesh%nc
+       write(11,'(e15.8)')real(NAC_reason(k))
     enddo
     
     close(11)
     
     return
   end subroutine write_accept
+
+  subroutine write_output_header(test_case,xL,xR,yL,yR,level,cfl,tf,namefile, &
+       str_equa,str_flux,str_time_scheme,order,L_str_criteria, &
+       bool_AMR,str_fn_adapt,f_adapt,recursivity,levelmin,levelmax)
+    character(len=20), intent(in) :: test_case,namefile,str_equa,str_flux,str_time_scheme
+    real(dp), intent(in) :: xL,xR,yL,yR,cfl,tf
+    integer, intent(in) :: level,order,f_adapt,recursivity,levelmin,levelmax
+    character(len=20), dimension(:), allocatable, intent(in) :: L_str_criteria
+    character(len=20), intent(in) :: str_fn_adapt
+    logical, intent(in) :: bool_AMR
+    character(len=30) :: completenamefile
+    
+    write(completenamefile,'(a,a,a)')'./results/',trim(namefile),'.out'
+    open(12,file=trim(completenamefile),form="formatted")
+
+    write(12,'(a)')"-------------------- Configuration --------------------"
+    write(12,'(a,a)')"ICBC : ",trim(test_case)
+    write(12,'(a,es10.2,a,es10.2,a,es10.2,a,es10.2,a)')"Domain [",xl,";",xR,"] x [",yl,";",yR,"]"
+    write(12,'(a,i2)')"Initial level of mesh refinement : ",level
+    write(12,'(a,i2,a,i2)')"Level min : ",levelmin,"   Level max : ",levelmax
+    write(12,'(a,a)')"Equation : ",trim(str_equa)
+    write(12,'(a,f5.2)')"CFL : ",cfl
+    write(12,'(a,es10.2)')"Final time : ",tf
+    write(12,'(a,a)')"Flux : ",trim(str_flux)
+    write(12,'(a,a)')"Time scheme : ",trim(str_time_scheme)
+    write(12,'(a,i1)')"Order : ",order
+    write(12,'(a,i1)')"Number of detection criterias : ",size(L_str_criteria)
+    write(12,'(a)')"-------------------- AMR ------------------------------"
+    if (.NOT.bool_AMR) then
+       write(12,'(a)')"AMR : NO"
+    else
+       write(12,'(a)')"AMR : YES"
+       write(12,'(a,a)')"Adaptation function : ",trim(str_fn_adapt)
+       write(12,'(a,i5)')"Adaptation frequency : ",f_adapt
+       write(12,'(a,i1)')"Recursivity : ",recursivity
+    endif
+    write(12,'(a)')"-------------------- Calculation ----------------------"
+
+    return
+  end subroutine write_output_header
+
+  subroutine write_output_calculation(t,n,nc,total)
+    real(dp), intent(in) :: t
+    integer, intent(in) :: n,nc
+    real(dp), dimension(:), intent(in) :: total
+    integer :: i
+
+    write(12,'(a,es10.2,a,i10)')"t = ",t,"          itération ",n
+    write(12,'(a,i10)')"Number of cells : ",nc
+    write(12,'(a)',advance='no')"Total quantities : "
+    do i=1,size(total)-1
+       write(12,'(es22.15,a)',advance='no')total(i),"   "
+    enddo
+    write(12,'(es22.15)')total(size(total))
+
+    return
+  end subroutine write_output_calculation
+
+  subroutine write_output_summary(cpu,eL1,eL2,total_cell,average_cell)
+    real(dp), intent(in) :: cpu,eL1,eL2
+    integer :: total_cell,average_cell
+    
+    write(12,'(a)')"-------------------- Results --------------------------"
+    write(12,'(a,es10.3,a)')"CPU time : ",cpu," seconds"
+    write(12,'(a,i8)')"Average number of cells : ",average_cell
+    write(12,'(a,es10.3,a)')"CPU time per cell : ",cpu/total_cell," seconds"
+    if (eL1/=-1.0_dp) then
+       write(12,'(a,es10.3)')"L1 error : ",eL1
+       write(12,'(a,es10.3)')"L2 error : ",eL2
+    else
+       write(12,'(a)')"No analytical solution for this configuration"
+    endif
+
+    close(12)
+
+    return
+  end subroutine write_output_summary
+    
 
 end module inout

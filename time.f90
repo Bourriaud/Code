@@ -37,14 +37,15 @@ contains
     return
   end subroutine compute_timestep
 
-  subroutine advance(mesh,sol,sol2,str_equa,f_equa,flux,order,dt,n,L_str_criteria,L_var_criteria,L_eps,gauss_weight)
+  subroutine advance(mesh,sol,sol2,str_equa,f_equa,flux,order,dt,n, &
+       L_str_criteria,L_var_criteria,L_eps,gauss_weight,verbosity)
     type(meshStruct), intent(inout) :: mesh
     type(solStruct), intent(in) :: sol
     type(solStruct), intent(inout) :: sol2
     character(len=20), intent(in) :: str_equa
     procedure (sub_f), pointer, intent(in) :: f_equa
     procedure (sub_flux), pointer, intent(in) :: flux
-    integer, intent(in) :: order,n
+    integer, intent(in) :: order,n,verbosity
     real(dp), intent(in) :: dt
     character(len=20), dimension(:), intent(in) :: L_str_criteria
     integer, dimension(:), intent(in) :: L_var_criteria
@@ -54,6 +55,7 @@ contains
     real(dp), dimension(:), allocatable :: u1,u2
     type(edgeStruct) :: edge
     integer, dimension(:), allocatable :: NOT_ACCEPTED_CELL,NOT_ACCEPTED_EDGE
+    integer, dimension(:), allocatable :: NAC_cycle,NAC_reason
     type(solStruct) :: soltemp
     integer, dimension(2) :: L_deg
     real(dp) :: lengthN1,lengthN2
@@ -61,9 +63,11 @@ contains
 
     allocate(u1(sol%nvar),u2(sol%nvar))
     allocate(NOT_ACCEPTED_CELL(mesh%nc),NOT_ACCEPTED_EDGE(mesh%ne),soltemp%val(mesh%nc,sol%nvar))
+    allocate(NAC_cycle(mesh%nc),NAC_reason(mesh%nc))
     
     sol2=sol
     soltemp=sol
+    NAC_cycle=0
     
     do k=1,mesh%nc
        mesh%cell(k)%deg=order-1
@@ -135,123 +139,187 @@ contains
        
        deg=L_deg(min(count,size(L_deg)))
        call decrement(mesh,sol,soltemp,str_equa,deg,dt,L_str_criteria,L_var_criteria,L_eps, &
-            gauss_weight,NOT_ACCEPTED_CELL,NOT_ACCEPTED_EDGE)
+            gauss_weight,NOT_ACCEPTED_CELL,NOT_ACCEPTED_EDGE,NAC_reason,verbosity)
 
-       !if(count>1)call exit()
-       !if(size(NOT_ACCEPTED_CELL)>0)print*,NOT_ACCEPTED_CELL(1),count
-       !print*,size(NOT_ACCEPTED_CELL),count
-       !print*,"-----------------------------------"
-       !if(count==1)call write_accept(mesh,NOT_ACCEPTED_CELL,n,count)
+       if (verbosity>1) then
+          do k=1,size(NOT_ACCEPTED_CELL)
+             NAC_cycle(NOT_ACCEPTED_CELL(k))=NAC_cycle(NOT_ACCEPTED_CELL(k))+1
+          enddo
+          if (size(NOT_ACCEPTED_CELL)==0) then
+             call write_accept(mesh,NAC_cycle,NAC_reason,n)
+          endif
+       endif
 
     enddo
 
-    sol2%val=soltemp%val
-    deallocate(u1,u2,NOT_ACCEPTED_CELL,NOT_ACCEPTED_EDGE,soltemp%val)
+    sol2%val=soltemp%val-sol%val
+
+    deallocate(u1,u2,NOT_ACCEPTED_CELL,NOT_ACCEPTED_EDGE,soltemp%val,NAC_cycle,NAC_reason)
     
     return
   end subroutine advance
 
-  subroutine euler_exp(mesh,sol,str_equa,f_equa,flux,speed,order,cfl,t,n,tf,L_str_criteria,L_var_criteria,L_eps,gauss_weight)
+  subroutine euler_exp(mesh,sol,str_equa,f_equa,flux,speed,order,cfl,t,n,tf, &
+       L_str_criteria,L_var_criteria,L_eps,gauss_weight,verbosity)
     type(meshStruct), intent(inout) :: mesh
     type(solStruct), intent(inout) :: sol
     character(len=20), intent(in) :: str_equa
     procedure (sub_f), pointer, intent(in) :: f_equa
     procedure (sub_flux), pointer, intent(in) :: flux
     procedure (sub_speed), pointer, intent(in) :: speed
-    integer, intent(in) :: order,n
+    integer, intent(in) :: order,n,verbosity
     real(dp), intent(in) :: cfl,tf
     real(dp), intent(inout) :: t
     character(len=20), dimension(:), intent(in) :: L_str_criteria
     integer, dimension(:), intent(in) :: L_var_criteria
     real(dp), dimension(:), intent(in) :: L_eps
     real(dp), dimension(:), intent(in) :: gauss_weight
-    type(solStruct) :: sol1
+    type(solStruct) :: Fsol
     real(dp) :: dt
 
-    allocate(sol1%val(mesh%nc,sol%nvar))
-    sol1=sol
+    allocate(Fsol%val(mesh%nc,sol%nvar))
 
     call compute_timestep(mesh,sol,f_equa,speed,cfl,tf,t,dt)
 
-    call advance(mesh,sol,sol1,str_equa,f_equa,flux,order,dt,n,L_str_criteria,L_var_criteria,L_eps,gauss_weight)
-    sol%val=sol1%val
+    call advance(mesh,sol,Fsol,str_equa,f_equa,flux,order,dt,n, &
+         L_str_criteria,L_var_criteria,L_eps,gauss_weight,verbosity)
+    sol%val=sol%val+Fsol%val
 
     t=t+dt
 
-    deallocate(sol1%val)
+    deallocate(Fsol%val)
 
     return
   end subroutine euler_exp
 
-  subroutine SSPRK2(mesh,sol,str_equa,f_equa,flux,speed,order,cfl,t,n,tf,L_str_criteria,L_var_criteria,L_eps,gauss_weight)
+  subroutine SSPRK2(mesh,sol,str_equa,f_equa,flux,speed,order,cfl,t,n,tf, &
+       L_str_criteria,L_var_criteria,L_eps,gauss_weight,verbosity)
     type(meshStruct), intent(inout) :: mesh
     type(solStruct), intent(inout) :: sol
     character(len=20), intent(in) :: str_equa
     procedure (sub_f), pointer, intent(in) :: f_equa
     procedure (sub_flux), pointer, intent(in) :: flux
     procedure (sub_speed), pointer, intent(in) :: speed
-    integer, intent(in) :: order,n
+    integer, intent(in) :: order,n,verbosity
     real(dp), intent(in) :: cfl,tf
     real(dp), intent(inout) :: t
     character(len=20), dimension(:), intent(in) :: L_str_criteria
     integer, dimension(:), intent(in) :: L_var_criteria
     real(dp), dimension(:), intent(in) :: L_eps
     real(dp), dimension(:), intent(in) :: gauss_weight
-    type(solStruct) :: sol1,sol2
+    type(solStruct) :: sol1,Fsol,Fsol1
     real(dp) :: dt
 
-    allocate(sol1%val(mesh%nc,sol%nvar),sol2%val(mesh%nc,sol%nvar))
+    allocate(sol1%val(mesh%nc,sol%nvar),Fsol%val(mesh%nc,sol%nvar),Fsol1%val(mesh%nc,sol%nvar))
     sol1=sol
-    sol2=sol
 
     call compute_timestep(mesh,sol,f_equa,speed,cfl,tf,t,dt)
 
-    call advance(mesh,sol,sol1,str_equa,f_equa,flux,order,dt,n,L_str_criteria,L_var_criteria,L_eps,gauss_weight)
-    call advance(mesh,sol1,sol2,str_equa,f_equa,flux,order,dt,n,L_str_criteria,L_var_criteria,L_eps,gauss_weight)
-    sol%val=0.5_dp*(sol%val+sol2%val)
+    call advance(mesh,sol,Fsol,str_equa,f_equa,flux,order,dt,n, &
+         L_str_criteria,L_var_criteria,L_eps,gauss_weight,verbosity)
+    sol1%val=sol%val+Fsol%val
+    call advance(mesh,sol1,Fsol1,str_equa,f_equa,flux,order,dt,n, &
+         L_str_criteria,L_var_criteria,L_eps,gauss_weight,verbosity)
+    sol%val=0.5_dp*sol%val+0.5_dp*sol1%val+0.5_dp*Fsol1%val
 
     t=t+dt
 
-    deallocate(sol1%val,sol2%val)
+    deallocate(sol1%val,Fsol%val,Fsol1%val)
 
     return
   end subroutine SSPRK2
 
-  subroutine SSPRK3(mesh,sol,str_equa,f_equa,flux,speed,order,cfl,t,n,tf,L_str_criteria,L_var_criteria,L_eps,gauss_weight)
+  subroutine SSPRK3(mesh,sol,str_equa,f_equa,flux,speed,order,cfl,t,n,tf,L_str_criteria,L_var_criteria,L_eps,gauss_weight,verbosity)
     type(meshStruct), intent(inout) :: mesh
     type(solStruct), intent(inout) :: sol
     character(len=20), intent(in) :: str_equa
     procedure (sub_f), pointer, intent(in) :: f_equa
     procedure (sub_flux), pointer, intent(in) :: flux
     procedure (sub_speed), pointer, intent(in) :: speed
-    integer, intent(in) :: order,n
+    integer, intent(in) :: order,n,verbosity
     real(dp), intent(in) :: cfl,tf
     real(dp), intent(inout) :: t
     character(len=20), dimension(:), intent(in) :: L_str_criteria
     integer, dimension(:), intent(in) :: L_var_criteria
     real(dp), dimension(:), intent(in) :: L_eps
     real(dp), dimension(:), intent(in) :: gauss_weight
-    type(solStruct) :: sol1,sol2,sol3
+    type(solStruct) :: sol1,sol2,Fsol,Fsol1,Fsol2
     real(dp) :: dt
 
-    allocate(sol1%val(mesh%nc,sol%nvar),sol2%val(mesh%nc,sol%nvar),sol3%val(mesh%nc,sol%nvar))
+    allocate(sol1%val(mesh%nc,sol%nvar),sol2%val(mesh%nc,sol%nvar))
+    allocate(Fsol%val(mesh%nc,sol%nvar),Fsol1%val(mesh%nc,sol%nvar),Fsol2%val(mesh%nc,sol%nvar))
     sol1=sol
     sol2=sol
-    sol3=sol
 
     call compute_timestep(mesh,sol,f_equa,speed,cfl,tf,t,dt)
 
-    call advance(mesh,sol,sol1,str_equa,f_equa,flux,order,dt,n,L_str_criteria,L_var_criteria,L_eps,gauss_weight)
-    call advance(mesh,sol1,sol2,str_equa,f_equa,flux,order,dt,n,L_str_criteria,L_var_criteria,L_eps,gauss_weight)
-    sol2%val=0.75_dp*sol%val+0.25_dp*sol2%val    
-    call advance(mesh,sol2,sol3,str_equa,f_equa,flux,order,dt,n,L_str_criteria,L_var_criteria,L_eps,gauss_weight)
-    sol%val=1.0_dp/3.0_dp*sol%val+2.0_dp/3.0_dp*sol3%val
+    call advance(mesh,sol,Fsol,str_equa,f_equa,flux,order,dt,n, &
+         L_str_criteria,L_var_criteria,L_eps,gauss_weight,verbosity)
+    sol1%val=sol%val+Fsol%val
+    call advance(mesh,sol1,Fsol1,str_equa,f_equa,flux,order,dt,n, &
+         L_str_criteria,L_var_criteria,L_eps,gauss_weight,verbosity)
+    sol2%val=0.75_dp*sol%val+0.25_dp*sol1%val+0.25*Fsol1%val
+    call advance(mesh,sol2,Fsol2,str_equa,f_equa,flux,order,dt,n, &
+         L_str_criteria,L_var_criteria,L_eps,gauss_weight,verbosity)
+    sol%val=1.0_dp/3.0_dp*sol%val+2.0_dp/3.0_dp*sol2%val+2.0_dp/3.0_dp*Fsol2%val
 
     t=t+dt
 
-    deallocate(sol1%val,sol2%val,sol3%val)
+    deallocate(sol1%val,sol2%val,Fsol%val,Fsol1%val,Fsol2%val)
 
     return
   end subroutine SSPRK3
+
+  subroutine SSPRK4(mesh,sol,str_equa,f_equa,flux,speed,order,cfl,t,n,tf,L_str_criteria,L_var_criteria,L_eps,gauss_weight,verbosity)
+    type(meshStruct), intent(inout) :: mesh
+    type(solStruct), intent(inout) :: sol
+    character(len=20), intent(in) :: str_equa
+    procedure (sub_f), pointer, intent(in) :: f_equa
+    procedure (sub_flux), pointer, intent(in) :: flux
+    procedure (sub_speed), pointer, intent(in) :: speed
+    integer, intent(in) :: order,n,verbosity
+    real(dp), intent(in) :: cfl,tf
+    real(dp), intent(inout) :: t
+    character(len=20), dimension(:), intent(in) :: L_str_criteria
+    integer, dimension(:), intent(in) :: L_var_criteria
+    real(dp), dimension(:), intent(in) :: L_eps
+    real(dp), dimension(:), intent(in) :: gauss_weight
+    type(solStruct) :: sol1,sol2,sol3,sol4,Fsol,Fsol1,Fsol2,Fsol3,Fsol4
+    real(dp) :: dt
+
+    allocate(sol1%val(mesh%nc,sol%nvar),sol2%val(mesh%nc,sol%nvar),sol3%val(mesh%nc,sol%nvar),sol4%val(mesh%nc,sol%nvar))
+    allocate(Fsol%val(mesh%nc,sol%nvar),Fsol1%val(mesh%nc,sol%nvar),Fsol2%val(mesh%nc,sol%nvar))
+    allocate(Fsol3%val(mesh%nc,sol%nvar),Fsol4%val(mesh%nc,sol%nvar))
+
+    call compute_timestep(mesh,sol,f_equa,speed,cfl,tf,t,dt)
+    sol1=sol
+    sol2=sol
+    sol3=sol
+    sol4=sol
+
+    call advance(mesh,sol,Fsol,str_equa,f_equa,flux,order,dt,n, &
+         L_str_criteria,L_var_criteria,L_eps,gauss_weight,verbosity)
+    sol1%val=sol%val+0.391752226571890_dp*Fsol%val
+    call advance(mesh,sol1,Fsol1,str_equa,f_equa,flux,order,dt,n, &
+         L_str_criteria,L_var_criteria,L_eps,gauss_weight,verbosity)
+    sol2%val=0.444370493651235_dp*sol%val+0.555629506348765_dp*sol1%val+0.368410593050371_dp*Fsol1%val   
+    call advance(mesh,sol2,Fsol2,str_equa,f_equa,flux,order,dt,n, &
+         L_str_criteria,L_var_criteria,L_eps,gauss_weight,verbosity)
+    sol3%val=0.620101851488403_dp*sol%val+0.379898148511597_dp*sol2%val+0.251891774271694_dp*Fsol2%val
+    call advance(mesh,sol3,Fsol3,str_equa,f_equa,flux,order,dt,n, &
+         L_str_criteria,L_var_criteria,L_eps,gauss_weight,verbosity)
+    sol4%val=0.178079954393132_dp*sol%val+0.821920045606868_dp*sol3%val+0.544974750228521_dp*Fsol3%val
+    call advance(mesh,sol4,Fsol4,str_equa,f_equa,flux,order,dt,n, &
+         L_str_criteria,L_var_criteria,L_eps,gauss_weight,verbosity)
+    sol%val=0.517231671970585_dp*sol2%val+0.096059710526147_dp*sol3%val+0.386708617503269_dp*sol4%val+ &
+         0.063692468666290_dp*Fsol3%val+0.226007483236906_dp*Fsol4%val
+
+    t=t+dt
+
+    deallocate(sol1%val,sol2%val,sol3%val,sol4%val)
+    deallocate(Fsol%val,Fsol1%val,Fsol2%val,Fsol3%val,Fsol4%val)
+
+    return
+  end subroutine SSPRK4
 
 end module time

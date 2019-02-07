@@ -15,8 +15,9 @@ program main
 
   type(meshStruct) :: mesh
   type(solStruct) :: sol
-  real(dp) :: xL,xR,yL,yR,cfl,tf,error
-  integer :: level,nvar,fs,order,i,f_adapt,recursivity
+  real(dp) :: xL,xR,yL,yR,cfl,tf,eL1,eL2,tstart,tfinish
+  integer :: nvar,fs,verbosity,order,i,f_adapt,recursivity,total_cell,average_cell
+  integer :: level,minlevel,maxlevel
   integer, dimension(:), allocatable :: L_var_criteria
   real(dp), dimension(:), allocatable :: L_eps
   character(len=20) :: config_file,test_case,namefile,str_equa,str_flux,str_time_scheme
@@ -34,48 +35,56 @@ program main
   type(c_ptr) :: p4est,connectivity,quadrants
   logical :: bool_AMR
 
+  call CPU_TIME(tstart)
+  
   call get_config(config_file)
-  call init(config_file,test_case,xL,xR,yL,yR,level,nvar,cfl,tf,fs,namefile,sol, &
+  call init(config_file,test_case,xL,xR,yL,yR,level,nvar,cfl,tf,fs,namefile,verbosity,sol, &
        str_equa,str_flux,str_time_scheme,order,L_str_criteria,L_var_criteria,L_eps, &
        gauss_point,gauss_weight,bool_AMR,str_fn_adapt,f_adapt,recursivity)
   call buildP4EST(level,connectivity,p4est)
   call buildMesh_P4EST(p4est,xL,xR,yL,yR,gauss_point,order,mesh,sol,quadrants)
   !call buildmesh(xL,xR,yL,yR,64,64,gauss_point,order,mesh,sol)
   call init_FV(test_case,str_equa,str_flux,str_time_scheme,str_fn_adapt,IC_func, &
-       BC,exactSol,f_equa,flux,speed,time_scheme,sol,fn_adapt)
+       BC,exactSol,f_equa,flux,speed,time_scheme,sol,fn_adapt,cfl)
   call IC(IC_func,mesh,sol,order)
   call BC(nvar,mesh)
   
   if (bool_AMR) then
-     do i=1,recursivity
-        call adapt(fn_adapt,p4est,quadrants,mesh,sol,level,order,gauss_weight,gauss_point)
+     do i=0,recursivity-1
+        call adapt(fn_adapt,p4est,quadrants,mesh,sol,level+i,order,gauss_weight,gauss_point,minlevel,maxlevel)
         call buildMesh_P4EST(p4est,xL,xR,yL,yR,gauss_point,order,mesh,sol,quadrants)
         call new_sol(mesh,quadrants,sol)
         call IC(IC_func,mesh,sol,order)
         call BC(nvar,mesh)
      enddo
   endif
-  
+
+  if(verbosity>0) then
+     call write_output_header(test_case,xL,xR,yL,yR,level,cfl,tf,namefile, &
+       str_equa,str_flux,str_time_scheme,order,L_str_criteria, &
+       bool_AMR,str_fn_adapt,f_adapt,recursivity,minlevel,maxlevel)
+  endif
   call userSol(0.0_dp,mesh,sol,str_equa,exactSol)
   call writeSol(mesh,sol,namefile,0)
-  call calculation(mesh,sol,level,order,cfl,tf,fs,namefile,str_equa, &
+  call calculation(mesh,sol,level,order,cfl,tf,fs,namefile,verbosity,str_equa, &
        f_equa,flux,speed,time_scheme,exactSol, &
        L_str_criteria,L_var_criteria,L_eps,gauss_weight,gauss_point, &
-       bool_AMR,fn_adapt,f_adapt,recursivity)
+       bool_AMR,fn_adapt,f_adapt,recursivity,total_cell,average_cell)
 
-  !call userSol(tf,mesh,sol,str_equa,exactSol)
   select case (trim(test_case))
   case ('Sinus')
-     call errorL1(mesh,sol%val(:,1),sol%user(:,1),error)
-     call errorL2(mesh,sol%val(:,1),sol%user(:,1),error)
+     call errorL1(mesh,sol%val(:,1),sol%user(:,1),eL1)
+     call errorL2(mesh,sol%val(:,1),sol%user(:,1),eL2)
   case ('Sinus_dis')
-     call errorL1(mesh,sol%val(:,1),sol%user(:,1),error)
-     call errorL2(mesh,sol%val(:,1),sol%user(:,1),error)
+     call errorL1(mesh,sol%val(:,1),sol%user(:,1),eL1)
+     call errorL2(mesh,sol%val(:,1),sol%user(:,1),eL2)
   case ('Vortex')
-     call errorL1(mesh,sol%val(:,1),sol%user(:,1),error)
-     call errorL2(mesh,sol%val(:,1),sol%user(:,1),error)
+     call errorL1(mesh,sol%val(:,1),sol%user(:,1),eL1)
+     call errorL2(mesh,sol%val(:,1),sol%user(:,1),eL2)
   case default
      print*,"No analytical solution for this configuration"
+     eL1=-1.0_dp
+     eL2=-1.0_dp
   end select
   
   deallocate(mesh%node,mesh%edge,mesh%cell)
@@ -83,11 +92,17 @@ program main
   deallocate(L_str_criteria,L_var_criteria,L_eps)
   deallocate(gauss_point,gauss_weight)
   call p4_destroy(connectivity,p4est)
+  
+  call CPU_TIME(tfinish)
+  print*,"Calculation completed, time of execution : ",tfinish-tstart,"seconds"
+  if (verbosity>0) then
+     call write_output_summary(tfinish-tstart,eL1,eL2,total_cell,average_cell)
+  endif
 
 contains
 
   subroutine init_FV(test_case,str_equa,str_flux,str_time_scheme,str_fn_adapt,IC_func, &
-       BC,exactSol,f_equa,flux,speed,time_scheme,sol,fn_adapt)
+       BC,exactSol,f_equa,flux,speed,time_scheme,sol,fn_adapt,cfl)
     character(len=20), intent(in) :: test_case,str_equa,str_flux,str_time_scheme
     character(len=20), intent(in) :: str_fn_adapt
     procedure (sub_IC), pointer, intent(out) :: IC_func
@@ -99,6 +114,7 @@ contains
     procedure (sub_time), pointer, intent(out) :: time_scheme
     type(solStruct), intent(inout) :: sol
     procedure (sub_adapt), pointer, intent(out) :: fn_adapt
+    real(dp), intent(inout) :: cfl
     integer :: i
 
     select case (trim(test_case))
@@ -181,6 +197,9 @@ contains
        time_scheme => SSPRK2
     case ('SSPRK3')
        time_scheme => SSPRK3
+    case ('SSPRK4')
+       time_scheme => SSPRK4
+       cfl=cfl*1.50818004918983_dp
     case default
        print*,trim(str_time_scheme)," time scheme not implemented"
        call exit()
@@ -201,13 +220,13 @@ contains
     return
   end subroutine init_FV
 
-  subroutine calculation(mesh,sol,level,order,cfl,tf,fs,namefile,str_equa, &
+  subroutine calculation(mesh,sol,level,order,cfl,tf,fs,namefile,verbosity,str_equa, &
        f_equa,flux,speed,time_scheme,exactSol, &
        L_str_criteria,L_var_criteria,L_eps,gauss_weight,gauss_point, &
-       bool_AMR,fn_adapt,f_adapt,recursivity)
+       bool_AMR,fn_adapt,f_adapt,recursivity,total_cell,average_cell)
     type(meshStruct), intent(inout) :: mesh
     type(solStruct), intent(inout) :: sol
-    integer, intent(in) :: level,order,fs,f_adapt,recursivity
+    integer, intent(in) :: level,order,fs,verbosity,f_adapt,recursivity
     real(dp), intent(in) :: cfl,tf
     character(len=20),intent(in) :: namefile,str_equa
     procedure (sub_f), pointer, intent(in) :: f_equa
@@ -221,19 +240,32 @@ contains
     real(dp), dimension(:), intent(in) :: L_eps
     real(dp), dimension(:), intent(in) :: gauss_weight,gauss_point
     logical, intent(in) :: bool_AMR
-    integer :: i,n,nout
+    integer, intent(out) :: total_cell,average_cell
+    integer :: i,n,nout,minlevel,maxlevel
     real(dp) :: t
+    real(dp), dimension(:), allocatable :: total_quantities
+    character(len=30) :: AMRfile
+
+    allocate(total_quantities(sol%nvar))
     
     t=0.0_dp
     n=1
     nout=1
-    call print(mesh,sol,0.0_dp,0)
+    total_cell=mesh%nc
+    call print(mesh,sol,0.0_dp,0,total_quantities)
+    if (verbosity>0) then
+       call write_output_calculation(0.0_dp,0,mesh%nc,total_quantities)
+       write(AMRfile,'(A,A,A)')'./results/',trim(namefile),'_AMR.txt'
+       open(13,file=AMRfile,form="formatted")
+       write(13,'(i8,i8)')0,mesh%nc
+    endif
+    
     do while (t<tf)
        call time_scheme(mesh,sol,str_equa,f_equa,flux,speed,order,cfl,t,n,tf, &
-            L_str_criteria,L_var_criteria,L_eps,gauss_weight)
+            L_str_criteria,L_var_criteria,L_eps,gauss_weight,verbosity)
        if (bool_AMR.and.mod(n,f_adapt)==0) then
-          do i=1,recursivity
-             call adapt(fn_adapt,p4est,quadrants,mesh,sol,level,order,gauss_weight,gauss_point)
+          do i=0,recursivity-1
+             call adapt(fn_adapt,p4est,quadrants,mesh,sol,level+i,order,gauss_weight,gauss_point,minlevel,maxlevel)
              call buildMesh_P4EST(p4est,xL,xR,yL,yR,gauss_point,order,mesh,sol,quadrants)
              call new_sol(mesh,quadrants,sol)
              call BC(nvar,mesh)
@@ -242,12 +274,20 @@ contains
        if (mod(n,fs)==0.or.t>=tf) then
           call userSol(t,mesh,sol,str_equa,exactSol)
           call writeSol(mesh,sol,namefile,nout)
-          call print(mesh,sol,t,n)
+          call print(mesh,sol,t,n,total_quantities)
+          if (verbosity>0) call write_output_calculation(t,n,mesh%nc,total_quantities)
           nout=nout+1
        endif
+       if (verbosity>0) write(13,'(i8,i8)')n,mesh%nc
+       total_cell=total_cell+mesh%nc
        n=n+1
     enddo
+    average_cell=total_cell/n
 
+    if (verbosity>0) close(13)
+    deallocate(total_quantities)
+    
+    return
   end subroutine calculation
   
 end program main

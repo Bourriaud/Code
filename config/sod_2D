@@ -22,6 +22,7 @@ DMPu2 4 1.0e-3
 -------------------- Output parameters -----------------------------------
 5	save frequency
 sod_2D	namefile
+0 	verbosity
 4	nvar
 rho	var 1
 rhou	var 2

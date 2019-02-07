@@ -22,6 +22,7 @@ DMPu2 4 1.0e-3
 -------------------- Output parameters -----------------------------------
 10	save frequency
 123_	namefile
+0 	verbosity
 4	nvar
 rho	var 1
 rhou	var 2

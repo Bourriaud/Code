@@ -9,19 +9,19 @@ module limit
 contains
 
   subroutine decrement(mesh,sol,soltemp,str_equa,deg,dt,L_str_criteria,L_var_criteria,L_eps, &
-       gauss_weight,NOT_ACCEPTED_CELL,NOT_ACCEPTED_EDGE)
+       gauss_weight,NOT_ACCEPTED_CELL,NOT_ACCEPTED_EDGE,NAC_reason,verbosity)
     type(meshStruct), intent(inout) :: mesh
     type(solStruct), intent(in) :: sol
     type(solStruct), intent(inout) :: soltemp
     character(len=20), intent(in) :: str_equa
-    integer, intent(in) :: deg
+    integer, intent(in) :: deg,verbosity
     real(dp), intent(in) :: dt
     integer, dimension(:), intent(in) :: L_var_criteria
     character(len=20), dimension(:), intent(in) :: L_str_criteria
     real(dp), dimension(:), intent(in) :: L_eps
     real(dp), dimension(:), intent(in) :: gauss_weight
     type(solStruct) :: sol2
-    integer, dimension(:), allocatable, intent(inout) :: NOT_ACCEPTED_CELL,NOT_ACCEPTED_EDGE
+    integer, dimension(:), allocatable, intent(inout) :: NOT_ACCEPTED_CELL,NOT_ACCEPTED_EDGE,NAC_reason
     integer, dimension(:), allocatable :: NAC,NAE
     integer :: i,j,k,n,p,isol,nc,ne,cell1,cell2,edge,sub1,sub2
     procedure (sub_criteria), pointer :: criteria
@@ -35,6 +35,7 @@ contains
     NAC=0
     NAE=0
     sol2=soltemp
+    if (verbosity>1.and.size(NOT_ACCEPTED_CELL)==mesh%nc) NAC_reason=0
     
     do n=1,size(L_str_criteria)
        
@@ -56,6 +57,9 @@ contains
           k=NOT_ACCEPTED_CELL(i)
           call criteria(mesh,sol,sol2,k,isol,L_eps(n),gauss_weight,str_equa,accept)
           if (.not.accept) then
+             if (verbosity>1) then
+                if (size(NOT_ACCEPTED_CELL)==mesh%nc.and.NAC_reason(k)==0) NAC_reason(k)=n
+             endif
              do j=1,size(mesh%cell(k)%edge)
                 edge=mesh%cell(k)%edge(j)
                 cell1=mesh%edge(edge)%cell1
@@ -137,7 +141,7 @@ contains
     NOT_ACCEPTED_EDGE=NAE(1:ne)
 
     deallocate(NAC,NAE)
-    
+
     return
   end subroutine decrement
 

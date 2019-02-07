@@ -1,28 +1,31 @@
 -------------------- Test case -------------------------------------------
-Test	ICBC
+Sinus	ICBC
 -------------------- Geometrical parameters ------------------------------
 0.	xL
-3.	xR
+10.	xR
 0.	yL
-3.	yR
+10.	yR
 -------------------- Numerical parameters --------------------------------
-2	level
-1.	cfl
-1.5	tf
+4	level
+0.95	cfl
+1.	tf
 transport	equation
 godunov	flux
-euler_exp	time scheme
+SSPRK3	time scheme
 1	space order
 -------------------- Limitation parameters -------------------------------
 0	number of detection criterias
 -------------------- Output parameters -----------------------------------
 1	save frequency
-test	namefile
+sinus	namefile
+0 	verbosity
 1	nvar
 var1	var 1
-0	nsolUser
+2	nsolUser
+1	var_user : solAnal
+2	var_user : error
 -------------------- AMR parameters --------------------------------------
 FALSE	AMR
 sinus	adaptation function
-1	adaptation frequency
+1000	adaptation frequency
 1	recursivity

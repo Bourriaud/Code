@@ -474,8 +474,8 @@ contains
     r=sqrt(x**2+y**2)
     T=1.0_dp-(gamma-1.0_dp)*beta**2*exp(1-r**2)/(8.0_dp*gamma*(pi**2))
     U(1)=T**(1.0_dp/(gamma-1.0_dp))
-    U(2)=1.0_dp-y*beta*exp(0.5_dp*(1-r**2))/(2.0_dp*pi)
-    U(3)=1.0_dp+x*beta*exp(0.5_dp*(1-r**2))/(2.0_dp*pi)
+    U(2)=0.0_dp-y*beta*exp(0.5_dp*(1-r**2))/(2.0_dp*pi)
+    U(3)=0.0_dp+x*beta*exp(0.5_dp*(1-r**2))/(2.0_dp*pi)
     U(4)=U(1)**gamma
 
     do i=1,4
