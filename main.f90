@@ -199,7 +199,10 @@ contains
        time_scheme => SSPRK3
     case ('SSPRK4')
        time_scheme => SSPRK4
-       cfl=cfl*1.50818004918983_dp
+       !cfl=cfl*1.50818004918983_dp
+    case ('SSPRK5')
+       time_scheme => SSPRK5
+       !cfl=cfl*3.39533683277420_dp
     case default
        print*,trim(str_time_scheme)," time scheme not implemented"
        call exit()

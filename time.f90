@@ -322,4 +322,86 @@ contains
     return
   end subroutine SSPRK4
 
+  subroutine SSPRK5(mesh,sol,str_equa,f_equa,flux,speed,order,cfl,t,n,tf,L_str_criteria,L_var_criteria,L_eps,gauss_weight,verbosity)
+    type(meshStruct), intent(inout) :: mesh
+    type(solStruct), intent(inout) :: sol
+    character(len=20), intent(in) :: str_equa
+    procedure (sub_f), pointer, intent(in) :: f_equa
+    procedure (sub_flux), pointer, intent(in) :: flux
+    procedure (sub_speed), pointer, intent(in) :: speed
+    integer, intent(in) :: order,n,verbosity
+    real(dp), intent(in) :: cfl,tf
+    real(dp), intent(inout) :: t
+    character(len=20), dimension(:), intent(in) :: L_str_criteria
+    integer, dimension(:), intent(in) :: L_var_criteria
+    real(dp), dimension(:), intent(in) :: L_eps
+    real(dp), dimension(:), intent(in) :: gauss_weight
+    type(solStruct) :: sol1,sol2,sol3,sol4,sol5,sol6,sol7,sol8,sol9
+    type(solStruct) :: Fsol,Fsol1,Fsol2,Fsol3,Fsol4,Fsol5,Fsol6,Fsol7,Fsol8,Fsol9
+    real(dp) :: dt
+    
+    allocate(sol1%val(mesh%nc,sol%nvar),sol2%val(mesh%nc,sol%nvar),sol3%val(mesh%nc,sol%nvar))
+    allocate(sol4%val(mesh%nc,sol%nvar),sol5%val(mesh%nc,sol%nvar),sol6%val(mesh%nc,sol%nvar))
+    allocate(sol7%val(mesh%nc,sol%nvar),sol8%val(mesh%nc,sol%nvar),sol9%val(mesh%nc,sol%nvar))
+    allocate(Fsol%val(mesh%nc,sol%nvar),Fsol1%val(mesh%nc,sol%nvar),Fsol2%val(mesh%nc,sol%nvar))
+    allocate(Fsol3%val(mesh%nc,sol%nvar),Fsol4%val(mesh%nc,sol%nvar),Fsol5%val(mesh%nc,sol%nvar))
+    allocate(Fsol6%val(mesh%nc,sol%nvar),Fsol7%val(mesh%nc,sol%nvar),Fsol8%val(mesh%nc,sol%nvar),Fsol9%val(mesh%nc,sol%nvar))
+
+    call compute_timestep(mesh,sol,f_equa,speed,cfl,tf,t,dt)
+    sol1=sol
+    sol2=sol
+    sol3=sol
+    sol4=sol
+    sol5=sol
+    sol6=sol
+    sol7=sol
+    sol8=sol
+    sol9=sol
+
+    call advance(mesh,sol,Fsol,str_equa,f_equa,flux,order,dt,n, &
+         L_str_criteria,L_var_criteria,L_eps,gauss_weight,verbosity)
+    sol1%val=sol%val+0.173586107937995_dp*Fsol%val
+    call advance(mesh,sol1,Fsol1,str_equa,f_equa,flux,order,dt,n, &
+         L_str_criteria,L_var_criteria,L_eps,gauss_weight,verbosity)
+    sol2%val=0.258168167463650_dp*sol%val+0.741831832536350_dp*sol1%val+0.218485490268790_dp*Fsol1%val  
+    call advance(mesh,sol2,Fsol2,str_equa,f_equa,flux,order,dt,n, &
+         L_str_criteria,L_var_criteria,L_eps,gauss_weight,verbosity)
+    sol3%val=0.037493531856076_dp*sol1%val+0.962506468143924_dp*sol2%val+ &
+         0.011042654588541_dp*Fsol1%val+0.283478934653295_dp*Fsol2%val
+    call advance(mesh,sol3,Fsol3,str_equa,f_equa,flux,order,dt,n, &
+         L_str_criteria,L_var_criteria,L_eps,gauss_weight,verbosity)
+    sol4%val=0.595955269449077_dp*sol%val+0.404044730550923_dp*sol2%val+0.118999896166647_dp*Fsol2%val
+    call advance(mesh,sol4,Fsol4,str_equa,f_equa,flux,order,dt,n, &
+         L_str_criteria,L_var_criteria,L_eps,gauss_weight,verbosity)
+    sol5%val=0.331848124368345_dp*sol%val+0.008466192609453_dp*sol3%val+0.659685683022202_dp*sol4%val+ &
+         0.025030881091201_dp*Fsol%val-0.002493476502164_dp*Fsol3%val+0.194291675763785_dp*Fsol4%val
+    call advance(mesh,sol5,Fsol5,str_equa,f_equa,flux,order,dt,n, &
+         L_str_criteria,L_var_criteria,L_eps,gauss_weight,verbosity)
+    sol6%val=0.086976414344414_dp*sol%val+0.913023585655586_dp*sol5%val+0.268905157462563_dp*Fsol5%val
+    call advance(mesh,sol6,Fsol6,str_equa,f_equa,flux,order,dt,n, &
+         L_str_criteria,L_var_criteria,L_eps,gauss_weight,verbosity)
+    sol7%val=0.075863700003186_dp*sol%val+0.267513039663395_dp*sol2%val+0.656623260333419_dp*sol6%val+ &
+         0.066115378914543_dp*Fsol2%val+0.193389726166555_dp*Fsol6%val
+    call advance(mesh,sol7,Fsol7,str_equa,f_equa,flux,order,dt,n, &
+         L_str_criteria,L_var_criteria,L_eps,gauss_weight,verbosity)
+    sol8%val=0.005212058095597_dp*sol%val+0.407430107306541_dp*sol3%val+0.587357834597862_dp*sol7%val- &
+         0.119996962708895_dp*Fsol3%val+0.172989562899406_dp*Fsol7%val
+    call advance(mesh,sol8,Fsol8,str_equa,f_equa,flux,order,dt,n, &
+         L_str_criteria,L_var_criteria,L_eps,gauss_weight,verbosity)
+    sol9%val=0.122832051947995_dp*sol%val+0.877167948052005_dp*sol8%val+ &
+         0.000000000000035_dp*Fsol%val+0.258344898092277_dp*Fsol8%val
+    call advance(mesh,sol9,Fsol9,str_equa,f_equa,flux,order,dt,n, &
+         L_str_criteria,L_var_criteria,L_eps,gauss_weight,verbosity)
+    sol%val=0.075346276482673_dp*sol%val+0.000425904246091_dp*sol1%val+0.064038648145995_dp*sol5%val+ &
+         0.354077936287492_dp*sol6%val+0.506111234837749_dp*sol9%val+0.016982542367506_dp*Fsol%val+ &
+         0.018860764424857_dp*Fsol5%val+0.098896719553054_dp*Fsol6%val+0.149060685217562_dp*Fsol9%val
+
+    t=t+dt
+
+    deallocate(sol1%val,sol2%val,sol3%val,sol4%val,sol5%val,sol6%val,sol7%val,sol8%val,sol9%val)
+    deallocate(Fsol%val,Fsol1%val,Fsol2%val,Fsol3%val,Fsol4%val,Fsol5%val,Fsol6%val,Fsol7%val,Fsol8%val,Fsol9%val)
+    
+    return
+  end subroutine SSPRK5
+
 end module time

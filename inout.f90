@@ -107,8 +107,8 @@ contains
        gauss_point=gauss_point5
        gauss_weight=gauss_weight5
     case(6)
-       gauss_point=gauss_point5
-       gauss_weight=gauss_weight5
+       gauss_point=gauss_point6
+       gauss_weight=gauss_weight6
     case default
        print*,"Space order too high, no good enough quadrature implemented"
        call exit()

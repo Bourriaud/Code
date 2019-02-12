@@ -74,8 +74,8 @@ contains
     
     d=order-1
     call Nequa(d,N)
-    call buildStencil(mesh,k,N,stencil)
-    Ni=size(stencil)-1
+    call buildStencil(mesh,k,N,order,stencil)
+    Ni=size(stencil)
     Nj=d*(d+1)/2+d
     
     allocate(X(Ni,Nj),U(Ni,sol%nvar))
@@ -90,10 +90,10 @@ contains
           alpha(1)=i1
           alpha(2)=i2
           call quad_monome(mesh,c,alpha,k,gauss_weight,intk)
-          do j=2,Ni+1
+          do j=1,Ni
              Kj=mesh%cell(stencil(j))%dx*mesh%cell(stencil(j))%dy
              call quad_monome(mesh,c,alpha,stencil(j),gauss_weight,intj)
-             X(j-1,i)=intj-intk
+             X(j,i)=intj-intk
           enddo
           i=i+1
        enddo
@@ -103,17 +103,17 @@ contains
        alpha(1)=i1
        alpha(2)=0
        call quad_monome(mesh,c,alpha,k,gauss_weight,intk)
-       do j=2,Ni+1
+       do j=1,Ni
           Kj=mesh%cell(stencil(j))%dx*mesh%cell(stencil(j))%dy
           call quad_monome(mesh,c,alpha,stencil(j),gauss_weight,intj)
-          X(j-1,i)=intj-intk
+          X(j,i)=intj-intk
        enddo
        i=i+1
     enddo
     
     do i=1,Ni
        do isol=1,sol%nvar
-          U(i,isol)=sol%val(stencil(i+1),isol)-sol%val(k,isol)
+          U(i,isol)=sol%val(stencil(i),isol)-sol%val(k,isol)
        enddo
     enddo
     
@@ -169,9 +169,9 @@ contains
     return
   end subroutine couronne
   
-  subroutine buildStencil(mesh,k,N,stencil)
+  subroutine buildStencil(mesh,k,N,order,stencil)
     type(meshStruct), intent(in) :: mesh
-    integer, intent(in) :: k,N
+    integer, intent(in) :: k,N,order
     integer, dimension(:), allocatable, intent(out) :: stencil
     integer :: i
 
@@ -179,7 +179,7 @@ contains
     stencil(1)=k
     i=1
     
-    do while (size(stencil)<ceiling(1.8*N))
+    do while (size(stencil)<ceiling(size_stencil(order)*N))
        call couronne(mesh,stencil,i)
        i=i+1
     enddo
