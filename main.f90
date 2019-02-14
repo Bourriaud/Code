@@ -193,16 +193,19 @@ contains
     select case (trim(str_time_scheme))
     case ('euler_exp')
        time_scheme => euler_exp
+       cfl=cfl*0.5_dp
     case ('SSPRK2')
        time_scheme => SSPRK2
+       cfl=cfl*0.5_dp
     case ('SSPRK3')
        time_scheme => SSPRK3
+       cfl=cfl*0.5_dp
     case ('SSPRK4')
        time_scheme => SSPRK4
-       !cfl=cfl*1.50818004918983_dp
+       cfl=cfl*1.50818004918983_dp*0.5_dp
     case ('SSPRK5')
        time_scheme => SSPRK5
-       !cfl=cfl*3.39533683277420_dp
+       cfl=cfl*3.39533683277420_dp*0.5_dp
     case default
        print*,trim(str_time_scheme)," time scheme not implemented"
        call exit()
