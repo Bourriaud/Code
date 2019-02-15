@@ -25,6 +25,7 @@ var1	var 1
 2	nsolUser
 1	var_user : solAnal
 2	var_user : error
+sinus_dis	analytical solution
 -------------------- AMR parameters --------------------------------------
 FALSE	AMR
 sinus	adaptation function

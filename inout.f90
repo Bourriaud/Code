@@ -26,7 +26,7 @@ contains
   
   subroutine init(config_file,test_case,xL,xR,yL,yR,level,nvar,cfl,tf,fs,namefile,verbosity,sol, &
        str_equa,str_flux,str_time_scheme,order,L_str_criteria,L_var_criteria,L_eps, &
-       gauss_point,gauss_weight,bool_AMR,fn_adapt,f_adapt,recursivity)
+       gauss_point,gauss_weight,str_exactSol,exact_file,bool_AMR,fn_adapt,f_adapt,recursivity)
     character(len=20), intent(out) :: config_file,test_case,namefile,str_equa,str_flux,str_time_scheme
     real(dp), intent(out) :: xL,xR,yL,yR,cfl,tf
     integer, intent(out) :: level,nvar,fs,verbosity,order,f_adapt,recursivity
@@ -35,7 +35,7 @@ contains
     integer, dimension(:), allocatable, intent(out) :: L_var_criteria
     real(dp), dimension(:), allocatable, intent(out) :: L_eps
     real(dp), dimension(:), allocatable, intent(out) :: gauss_point,gauss_weight
-    character(len=20), intent(out) :: fn_adapt
+    character(len=20), intent(out) :: fn_adapt,str_exactSol,exact_file
     logical, intent(out) :: bool_AMR
     character(len=20) :: blank
     integer :: i,ncriteria
@@ -79,6 +79,7 @@ contains
     do i=1,sol%nsolUser
        read(11,*)sol%var_user(i)
     enddo
+    read(11,*)str_exactSol,exact_file
     read(11,*)blank
     read(11,*)bool_AMR
     read(11,*)fn_adapt

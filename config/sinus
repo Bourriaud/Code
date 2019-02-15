@@ -19,14 +19,15 @@ DMPu2 1 1.0e-4	detection criteria + variable + sensibility
 -------------------- Output parameters -----------------------------------
 1	save frequency
 sinus	namefile
-2 	verbosity
+1	verbosity
 1	nvar
 var1	var 1
 2	nsolUser
 1	var_user : solAnal
 2	var_user : error
+sinus	analytical solution
 -------------------- AMR parameters --------------------------------------
-TRUE	AMR
+FALSE	AMR
 sinus	adaptation function
 1	adaptation frequency
 1	recursivity

@@ -30,6 +30,7 @@ rhov	var 3
 E	var 4
 1	nsolUser
 104	var_user : p
+none	analytical solution
 -------------------- AMR parameters --------------------------------------
 FALSE	AMR
 shu	adaptation function

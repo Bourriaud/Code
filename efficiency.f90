@@ -31,11 +31,50 @@ contains
     return
   end subroutine exactTab
 
-  subroutine userSol(t,mesh,sol,str_equa,exactSol)
+  subroutine exactTab2(mesh,exact_file,tab)
+    type (meshStruct), intent(in) :: mesh
+    character (len=20), intent(in) :: exact_file
+    real(dp), dimension(:,:), intent(inout) :: tab
+    character (len=20) :: namefile
+    integer :: n,i,k,p1,p2
+    real(dp), dimension(:), allocatable :: x
+    real(dp), dimension(:), allocatable :: solAnal
+    real(dp) :: Xg,Yg
+
+    namefile="sol/"//trim(exact_file)
+    open(14,file=namefile,form="formatted")
+
+    read(14,*)n
+    allocate(x(n),solAnal(n))
+    
+    do k=1,n
+       read(14,*)x(k),solAnal(k)
+    enddo
+
+    do k=1,mesh%nc
+       tab(k,1)=0.0_dp
+       do p1=1,6
+          do p2=1,6
+             Xg=mesh%cell(k)%xc+gauss_point6(p1)*mesh%cell(k)%dx/2.0_dp
+             Yg=mesh%cell(k)%yc+gauss_point6(p2)*mesh%cell(k)%dy/2.0_dp
+             i=ceiling(Xg/(2*x(1)))
+             tab(k,1)=tab(k,1)+solAnal(i)*gauss_weight6(p1)*gauss_weight6(p2)/4.0_dp
+          enddo
+       enddo
+    enddo
+
+    deallocate(x,solAnal)
+
+    close(14)
+    
+    
+  end subroutine exactTab2
+
+  subroutine userSol(t,mesh,sol,str_equa,exactSol,exact_file)
     real(dp), intent(in) :: t
     type(meshStruct), intent(in) :: mesh
     type(solStruct), intent(inout) :: sol
-    character(len=20), intent(in) :: str_equa
+    character(len=20), intent(in) :: str_equa,exact_file
     procedure (sub_exactsol), pointer, intent(in) :: exactSol
     integer :: i,k
     character(len=20) :: str
@@ -44,10 +83,18 @@ contains
        select case (sol%var_user(i))
        case(1)
           sol%name_user(i)="SolAnal"
-          call exactTab(t,mesh,sol%user(:,i:i),exactSol)
+          if (trim(exact_file)=="none") then
+             call exactTab(t,mesh,sol%user(:,i:i),exactSol)
+          else
+             call exactTab2(mesh,exact_file,sol%user(:,i:i))
+          endif
        case(2)
           sol%name_user(i)="Error"
-          call exactTab(t,mesh,sol%user(:,i:i),exactSol)
+          if (trim(exact_file)=="none") then
+             call exactTab(t,mesh,sol%user(:,i:i),exactSol)
+          else
+             call exactTab2(mesh,exact_file,sol%user(:,i:i))
+          endif
           sol%user(:,i:i)=abs(sol%user(:,i:i)-sol%val(:,1:1))
        case(3)
           if (trim(str_equa)=="euler") then
@@ -184,8 +231,7 @@ contains
     s=Temp**(1.0_dp/(gamma-1.0_dp))
 
     return
-  end subroutine exactSol_vortex
-    
+  end subroutine exactSol_vortex    
 
   subroutine exactSol_none(x,y,t,s)
     real(dp), intent(in) :: x,y,t

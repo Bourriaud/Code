@@ -31,6 +31,7 @@ E	var 4
 2	nsolUser
 3	var_user : internal energy
 104	var_user : p
+none	analytical solution
 -------------------- AMR parameters --------------------------------------
 FALSE	AMR
 123	adaptation function

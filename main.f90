@@ -21,7 +21,7 @@ program main
   integer, dimension(:), allocatable :: L_var_criteria
   real(dp), dimension(:), allocatable :: L_eps
   character(len=20) :: config_file,test_case,namefile,str_equa,str_flux,str_time_scheme
-  character(len=20) :: str_fn_adapt
+  character(len=20) :: str_fn_adapt,str_exactSol,exact_file
   character(len=20), dimension(:), allocatable :: L_str_criteria
   procedure (sub_IC), pointer :: IC_func
   procedure (sub_BC), pointer :: BC
@@ -40,12 +40,12 @@ program main
   call get_config(config_file)
   call init(config_file,test_case,xL,xR,yL,yR,level,nvar,cfl,tf,fs,namefile,verbosity,sol, &
        str_equa,str_flux,str_time_scheme,order,L_str_criteria,L_var_criteria,L_eps, &
-       gauss_point,gauss_weight,bool_AMR,str_fn_adapt,f_adapt,recursivity)
+       gauss_point,gauss_weight,str_exactSol,exact_file,bool_AMR,str_fn_adapt,f_adapt,recursivity)
   call buildP4EST(level,connectivity,p4est)
   call buildMesh_P4EST(p4est,xL,xR,yL,yR,gauss_point,order,mesh,sol,quadrants)
   !call buildmesh(xL,xR,yL,yR,64,64,gauss_point,order,mesh,sol)
   call init_FV(test_case,str_equa,str_flux,str_time_scheme,str_fn_adapt,IC_func, &
-       BC,exactSol,f_equa,flux,speed,time_scheme,sol,fn_adapt,cfl)
+       BC,exactSol,f_equa,flux,speed,time_scheme,sol,fn_adapt,cfl,str_exactSol,exact_file)
   call IC(IC_func,mesh,sol,order)
   call BC(nvar,mesh)
   
@@ -64,21 +64,24 @@ program main
        str_equa,str_flux,str_time_scheme,order,L_str_criteria, &
        bool_AMR,str_fn_adapt,f_adapt,recursivity,minlevel,maxlevel)
   endif
-  call userSol(0.0_dp,mesh,sol,str_equa,exactSol)
+  call userSol(0.0_dp,mesh,sol,str_equa,exactSol,exact_file)
   call writeSol(mesh,sol,namefile,0)
   call calculation(mesh,sol,level,order,cfl,tf,fs,namefile,verbosity,str_equa, &
        f_equa,flux,speed,time_scheme,exactSol, &
        L_str_criteria,L_var_criteria,L_eps,gauss_weight,gauss_point, &
-       bool_AMR,fn_adapt,f_adapt,recursivity,total_cell,average_cell)
+       bool_AMR,fn_adapt,f_adapt,recursivity,total_cell,average_cell,exact_file)
 
-  select case (trim(test_case))
-  case ('Sinus')
+  select case (trim(str_exactSol))
+  case ('sinus')
      call errorL1(mesh,sol%val(:,1),sol%user(:,1),eL1)
      call errorL2(mesh,sol%val(:,1),sol%user(:,1),eL2)
-  case ('Sinus_dis')
+  case ('sinus_dis')
      call errorL1(mesh,sol%val(:,1),sol%user(:,1),eL1)
      call errorL2(mesh,sol%val(:,1),sol%user(:,1),eL2)
-  case ('Vortex')
+  case ('vortex')
+     call errorL1(mesh,sol%val(:,1),sol%user(:,1),eL1)
+     call errorL2(mesh,sol%val(:,1),sol%user(:,1),eL2)
+  case ('file')
      call errorL1(mesh,sol%val(:,1),sol%user(:,1),eL1)
      call errorL2(mesh,sol%val(:,1),sol%user(:,1),eL2)
   case default
@@ -102,9 +105,9 @@ program main
 contains
 
   subroutine init_FV(test_case,str_equa,str_flux,str_time_scheme,str_fn_adapt,IC_func, &
-       BC,exactSol,f_equa,flux,speed,time_scheme,sol,fn_adapt,cfl)
+       BC,exactSol,f_equa,flux,speed,time_scheme,sol,fn_adapt,cfl,str_exactSol,exact_file)
     character(len=20), intent(in) :: test_case,str_equa,str_flux,str_time_scheme
-    character(len=20), intent(in) :: str_fn_adapt
+    character(len=20), intent(in) :: str_fn_adapt,str_exactSol
     procedure (sub_IC), pointer, intent(out) :: IC_func
     procedure (sub_BC), pointer, intent(out) :: BC
     procedure (sub_exactsol), pointer, intent(out) :: exactSol
@@ -115,45 +118,37 @@ contains
     type(solStruct), intent(inout) :: sol
     procedure (sub_adapt), pointer, intent(out) :: fn_adapt
     real(dp), intent(inout) :: cfl
+    character(len=20), intent(inout) :: exact_file
     integer :: i
 
     select case (trim(test_case))
     case ('Sinus')
        IC_func => IC_func_sinus
        BC => BC_sinus
-       exactSol => exactSol_sinus
     case ('Sinus_dis')
        IC_func => IC_func_sinus_dis
        BC => BC_sinus_dis
-       exactSol => exactSol_sinus_dis
     case ('Sod')
        IC_func => IC_func_sod
        BC => BC_sod
-       exactSol => exactSol_none
     case ('Sod_2D')
        IC_func => IC_func_sod_2D
        BC => BC_sod_2D
-       exactSol => exactSol_none
     case ('Sod_mod')
        IC_func => IC_func_sod_mod
        BC => BC_sod_mod
-       exactSol => exactSol_none
     case ('Shu')
        IC_func => IC_func_shu
        BC => BC_shu
-       exactSol => exactSol_none
     case ('123')
        IC_func => IC_func_123
        BC => BC_123
-       exactSol => exactSol_none
     case ('Vortex')
        IC_func => IC_func_vortex
        BC => BC_vortex
-       exactSol => exactSol_vortex
     case ('RP2D_3')
        IC_func => IC_func_RP2D_3
        BC => BC_RP2D_3
-       exactSol => exactSol_none
     case default
        print*,"Test case ",trim(test_case)," not implemented"
        call exit()
@@ -223,18 +218,38 @@ contains
        call exit()
     end select
 
+    select case (trim(str_exactSol))
+    case ('sinus')
+       exactSol => exactSol_sinus
+       exact_file="none"
+    case ('sinus_dis')
+       exactSol => exactSol_sinus_dis
+       exact_file="none"
+    case ('vortex')
+       exactSol => exactSol_vortex
+       exact_file="none"
+    case ('file')
+       exactSol => exactSol_none
+    case ('none')
+       exactSol => exactSol_none
+       exact_file="none"
+    case default
+       print*,"Exact solution ",trim(str_exactSol)," not implemented"
+       call exit()
+    end select
+
     return
   end subroutine init_FV
 
   subroutine calculation(mesh,sol,level,order,cfl,tf,fs,namefile,verbosity,str_equa, &
        f_equa,flux,speed,time_scheme,exactSol, &
        L_str_criteria,L_var_criteria,L_eps,gauss_weight,gauss_point, &
-       bool_AMR,fn_adapt,f_adapt,recursivity,total_cell,average_cell)
+       bool_AMR,fn_adapt,f_adapt,recursivity,total_cell,average_cell,exact_file)
     type(meshStruct), intent(inout) :: mesh
     type(solStruct), intent(inout) :: sol
     integer, intent(in) :: level,order,fs,verbosity,f_adapt,recursivity
     real(dp), intent(in) :: cfl,tf
-    character(len=20),intent(in) :: namefile,str_equa
+    character(len=20),intent(in) :: namefile,str_equa,exact_file
     procedure (sub_f), pointer, intent(in) :: f_equa
     procedure (sub_flux), pointer, intent(in) :: flux
     procedure (sub_speed), pointer, intent(in) :: speed
@@ -278,7 +293,7 @@ contains
           enddo
        endif
        if (mod(n,fs)==0.or.t>=tf) then
-          call userSol(t,mesh,sol,str_equa,exactSol)
+          call userSol(t,mesh,sol,str_equa,exactSol,exact_file)
           call writeSol(mesh,sol,namefile,nout)
           call print(mesh,sol,t,n,total_quantities)
           if (verbosity>0) call write_output_calculation(t,n,mesh%nc,total_quantities)

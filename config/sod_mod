@@ -30,6 +30,7 @@ rhov	var 3
 E	var 4
 1	nsolUser
 104	var_user : p
+file	sod_mod	analytical solution
 -------------------- AMR parameters --------------------------------------
 FALSE	AMR
 sod	adaptation function
