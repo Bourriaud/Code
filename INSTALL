@@ -1,0 +1,9 @@
+Installer P4EST :
+- ./configure CPPFLAGS="-DSC_LOG_PRIORITIES=SC_LP_ERROR"
+- make
+- make install
+
+Installe Code :
+- Modifier le chemin vers les fichiers dans le makefile
+- (Modifier le compilateur si besoin)
+- make
