@@ -32,12 +32,12 @@ contains
     C_sol=c_loc(F_sol)
     C_sol_coarsen=c_loc(sol_coarsen)
     C_sol_refine=c_loc(sol_refine)
-    
+
     call p4_adapt(p4est,quadrants,C_sol,C_sol_interp,sol%nvar,C_sol_coarsen,C_sol_refine,maxlevel, &
          coarsen_recursive,refine_recursive)
-    
-    deallocate(F_sol,F_sol_interp,sol_coarsen,sol_refine)
 
+    deallocate(F_sol,F_sol_interp,sol_coarsen,sol_refine)
+    
     return
   end subroutine adapt
 
@@ -109,7 +109,7 @@ contains
     type(c_ptr) :: C_sol
     real(dp), dimension(:), pointer :: F_sol
     integer :: k,isol
-
+    
     call p4_new_sol(quadrants,C_sol)
     call c_f_pointer(C_sol,F_sol,(/sol%nvar*mesh%nc/))
     do k=1,mesh%nc
@@ -141,6 +141,7 @@ contains
     xmax=6.0_dp
     ymin=4.0_dp
     ymax=6.0_dp
+    
     do k=1,mesh%nc
        sol_coarsen(k)=0
        sol_refine(k)=0
@@ -167,6 +168,7 @@ contains
     coarsen_recursive=0
     refine_recursive=0
     isol=1
+    
     do k=1,mesh%nc
        sol_coarsen(k)=0
        sol_refine(k)=0
@@ -191,6 +193,7 @@ contains
     coarsen_recursive=0
     refine_recursive=0
     isol=1
+    
     do k=1,mesh%nc
        sol_coarsen(k)=0
        sol_refine(k)=0
@@ -202,6 +205,33 @@ contains
     
     return
   end subroutine adapt_vortex
+
+  subroutine adapt_sod(mesh,sol,level,minlevel,maxlevel,coarsen_recursive,refine_recursive,sol_coarsen,sol_refine)
+    type(meshStruct), intent(inout) :: mesh
+    type(solStruct), intent(in) :: sol
+    integer, intent(in) :: level
+    integer, intent(out) :: minlevel,maxlevel,coarsen_recursive,refine_recursive
+    integer, dimension(:), intent(inout) :: sol_coarsen,sol_refine
+    integer :: k,isol
+    real(dp) :: grad
+
+    minlevel=level-1
+    maxlevel=level+1
+    coarsen_recursive=0
+    refine_recursive=0
+    isol=1
+    
+    do k=1,mesh%nc
+       sol_coarsen(k)=0
+       sol_refine(k)=0
+       call reconstruct(mesh,sol,k,2,gauss_weight2)
+       grad=sqrt(mesh%cell(k)%polCoef(1,isol)**2+mesh%cell(k)%polCoef(2,isol)**2)
+       if (grad<0.2_dp.and.mesh%cell(k)%level>minlevel) sol_coarsen(k)=1
+       if (grad>0.5_dp) sol_refine(k)=1
+    enddo
+    
+    return
+  end subroutine adapt_sod
     
 
 end module AMR

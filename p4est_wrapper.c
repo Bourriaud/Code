@@ -771,7 +771,7 @@ static void replace_fn (p4est_t* p4est, p4est_topidx_t which_tree, int num_outgo
       child_data->u3 = (double*) malloc(sizeof(double)*parent_data->nsol);
       child_data->u4 = (double*) malloc(sizeof(double)*parent_data->nsol);
       child_data->nsol=parent_data->nsol;
-      parent_data->coarsen=0;
+      child_data->coarsen=0;
       switch (i)
       {
         case 0:
@@ -841,6 +841,7 @@ void p4_adapt (p4est_t* p4est, sc_array_t* quadrants, double* sol, double* sol_i
     data->nsol=nsol;
     data->coarsen=sol_coarsen[k];
     data->refine=sol_refine[k];
+
     for (isol=0;isol<nsol;isol++)
     {
       data->u[isol]=sol[isol*nc+k];
@@ -850,8 +851,8 @@ void p4_adapt (p4est_t* p4est, sc_array_t* quadrants, double* sol, double* sol_i
       data->u4[isol]=sol_interp[isol*4*nc+k+3*nc];
     }
   }
-  p4est_coarsen_ext(p4est,coarsen_recursive,callback_orphans,coarsen_value,NULL,replace_fn);
   p4est_refine_ext(p4est,refine_recursive,maxlevel,refine_value,NULL,replace_fn);
+  p4est_coarsen_ext(p4est,coarsen_recursive,callback_orphans,coarsen_value,NULL,replace_fn);
   p4est_balance_ext (p4est,P4EST_CONNECT_FULL,NULL,replace_fn);
 }
 

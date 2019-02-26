@@ -3,7 +3,8 @@ Installer P4EST :
 - make
 - make install
 
-Installe Code :
+Installer Code :
 - Modifier le chemin vers les fichiers dans le makefile
 - (Modifier le compilateur si besoin)
 - make
+- mkdir results (si results n'existe pas)

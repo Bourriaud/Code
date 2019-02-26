@@ -125,7 +125,7 @@ contains
              endif
           enddo
        enddo
-       
+
        do k=1,size(NOT_ACCEPTED_EDGE)
           cell1=mesh%edge(NOT_ACCEPTED_EDGE(k))%cell1
           cell2=mesh%edge(NOT_ACCEPTED_EDGE(k))%cell2
@@ -262,7 +262,7 @@ contains
     call advance(mesh,sol2,Fsol2,str_equa,f_equa,flux,order,dt,n, &
          L_str_criteria,L_var_criteria,L_eps,gauss_weight,verbosity)
     sol%val=1.0_dp/3.0_dp*sol%val+2.0_dp/3.0_dp*sol2%val+2.0_dp/3.0_dp*Fsol2%val
-
+    
     t=t+dt
 
     deallocate(sol1%val,sol2%val,Fsol%val,Fsol1%val,Fsol2%val)

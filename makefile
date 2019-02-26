@@ -8,6 +8,7 @@ LIBS = -lp4est -lsc
 
 CC = gcc
 CCFLAGS = -O0
+CCFLAGS3 = -O2
 
 F90 = gfortran
 F90FLAGS = -O0 -Wall -ffpe-trap=invalid,overflow -fcheck=all -pedantic

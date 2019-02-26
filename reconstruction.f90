@@ -119,6 +119,7 @@ contains
     
     if (allocated(mesh%cell(k)%polCoef)) deallocate(mesh%cell(k)%polCoef)
     allocate(mesh%cell(k)%polCoef(Nj,sol%nvar))
+
     do isol=1,sol%nvar
        call solve(X,U(:,isol),mesh%cell(k)%polCoef(:,isol))
     enddo
@@ -173,16 +174,24 @@ contains
     type(meshStruct), intent(in) :: mesh
     integer, intent(in) :: k,N,order
     integer, dimension(:), allocatable, intent(out) :: stencil
-    integer :: i
+    integer, dimension(:), allocatable :: stencil2
+    integer :: i,s
 
-    allocate(stencil(1))
-    stencil(1)=k
+    allocate(stencil2(1))
+    stencil2(1)=k
     i=1
+    s=ceiling(size_stencil(order)*N)
     
-    do while (size(stencil)<ceiling(size_stencil(order)*N))
-       call couronne(mesh,stencil,i)
+    do while (size(stencil2)<s)
+       call couronne(mesh,stencil2,i)
        i=i+1
     enddo
+
+    s=size(stencil2)-1
+    allocate(stencil(s))
+    stencil(1:s)=stencil2(2:s+1)
+    
+    deallocate(stencil2)
 
     return
   end subroutine buildStencil
@@ -220,8 +229,9 @@ contains
           b(i)=b(i)+X(k,i)*U(k)
        enddo
     enddo
-
+    
     call cholesky(A,b,R)
+    !call QR(X,b,R)
 
     deallocate(A,b)
 
@@ -275,6 +285,65 @@ contains
     
     return
   end subroutine cholesky
+
+  subroutine QR(A,b,x)
+    real(dp), dimension(:,:), intent(in) :: A
+    real(dp), dimension(:), intent(in) :: b
+    real(dp), dimension(:), intent(inout) :: x
+    real(dp), dimension(:,:), allocatable :: R
+    real(dp), dimension(:), allocatable :: w,w2
+    integer :: k,k2,j,m,n
+    real(dp) :: norm,s,u1,tau
+
+    m=size(A(:,1))
+    n=size(A(1,:))
+    allocate(R(m,n),w(m),w2(n))
+    R=A
+
+    do j=1,n
+       norm=0
+       do k=j,m
+          norm=norm+R(k,j)**2
+       enddo
+       norm=sqrt(norm)
+       s=sign(1.0_dp,-R(j,j))
+       u1=R(j,j)-s*norm
+       w(j:m)=R(j:m,j)/u1
+       w(j)=1
+       tau=-s*u1/norm
+       w2=0.0_dp
+       do k2=1,n
+          do k=j,m
+             w2(k2)=w2(k2)+w(k)*R(k,k2)
+          enddo
+       enddo
+       do k=j,m
+          do k2=1,n
+             R(k,k2)=R(k,k2)-tau*w(k)*w2(k2)
+          enddo
+       enddo
+    enddo
+    
+    do j=1,n
+       w2(j)=b(j)
+       do k=1,j-1
+          w2(j)=w2(j)-w2(k)*R(k,j)
+       enddo
+       w2(j)=w2(j)/R(j,j)
+    enddo
+    
+    do j=1,n
+       x(n-j+1)=w2(n-j+1)
+       do k=1,j-1
+          x(n-j+1)=x(n-j+1)-x(n-k+1)*R(n-j+1,n-k+1)
+       enddo
+       x(n-j+1)=x(n-j+1)/R(n-j+1,n-j+1)
+    enddo
+
+    deallocate(R,w,w2)
+
+    return
+  end subroutine QR
 
   subroutine quad_monome(mesh,c,alpha,k,gauss_weight,int)
     type(meshStruct), intent(in) :: mesh

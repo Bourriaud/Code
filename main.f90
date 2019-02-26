@@ -213,6 +213,8 @@ contains
        fn_adapt => adapt_sinus
     case ('vortex')
        fn_adapt => adapt_vortex
+    case ('sod')
+       fn_adapt => adapt_sod
     case default
        print*,trim(str_fn_adapt)," adaptation function not implemented"
        call exit()
