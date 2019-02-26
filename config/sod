@@ -11,8 +11,8 @@ Sod	ICBC
 0.25	tf
 euler	equation
 HLL	flux
-SSPRK3	time scheme
-3	space order
+SSPRK5	time scheme
+5	space order
 -------------------- Limitation parameters -------------------------------
 4	number of detection criterias
 PAD 1 1.0e-4	detection criteria + variable + sensibility
@@ -20,7 +20,7 @@ DMPu2 1 1.0e-4
 DMPu2 2 1.0e-4
 DMPu2 4 1.0e-3
 -------------------- Output parameters -----------------------------------
-10	save frequency
+1	save frequency
 sod	namefile
 0 	verbosity
 4	nvar
@@ -35,6 +35,6 @@ E	var 4
 file	sod	analytical solution
 -------------------- AMR parameters --------------------------------------
 FALSE	AMR
-zone	adaptation function
+sod	adaptation function
 1	adaptation frequency
 1	recursivity

@@ -11,15 +11,15 @@ Sinus	ICBC
 1.	tf
 transport	equation
 godunov	flux
-SSPRK3	time scheme
-3	space order
+SSPRK5	time scheme
+5	space order
 -------------------- Limitation parameters -------------------------------
 1	number of detection criterias
 DMPu2 1 1.0e-4	detection criteria + variable + sensibility
 -------------------- Output parameters -----------------------------------
 1	save frequency
 sinus	namefile
-1	verbosity
+0	verbosity
 1	nvar
 var1	var 1
 2	nsolUser

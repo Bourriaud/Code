@@ -31,15 +31,16 @@ contains
     return
   end subroutine exactTab
 
-  subroutine exactTab2(mesh,exact_file,tab)
+  subroutine exactTab2(mesh,exact_file,dim,tab)
     type (meshStruct), intent(in) :: mesh
     character (len=20), intent(in) :: exact_file
+    integer, intent(in) :: dim
     real(dp), dimension(:,:), intent(inout) :: tab
     character (len=20) :: namefile
     integer :: n,i,k,p1,p2
     real(dp), dimension(:), allocatable :: x
     real(dp), dimension(:), allocatable :: solAnal
-    real(dp) :: Xg,Yg
+    real(dp) :: Xg,Yg,dx,c,r
 
     namefile="sol/"//trim(exact_file)
     open(14,file=namefile,form="formatted")
@@ -50,14 +51,24 @@ contains
     do k=1,n
        read(14,*)x(k),solAnal(k)
     enddo
+    dx=(x(n)-x(1))/real(n-1)
+    if (dim==2) then
+       c=(x(1)+x(n))/2
+    endif
 
     do k=1,mesh%nc
        tab(k,1)=0.0_dp
        do p1=1,6
           do p2=1,6
              Xg=mesh%cell(k)%xc+gauss_point6(p1)*mesh%cell(k)%dx/2.0_dp
-             Yg=mesh%cell(k)%yc+gauss_point6(p2)*mesh%cell(k)%dy/2.0_dp
-             i=ceiling(Xg/(2*x(1)))
+             if (dim==1) then
+                r=Xg
+             else
+                Yg=mesh%cell(k)%yc+gauss_point6(p2)*mesh%cell(k)%dy/2.0_dp
+                r=sqrt((Xg-c)**2+(Yg-c)**2)
+             endif
+             r=r-x(1)
+             i=ceiling(r/dx)
              tab(k,1)=tab(k,1)+solAnal(i)*gauss_weight6(p1)*gauss_weight6(p2)/4.0_dp
           enddo
        enddo
@@ -70,12 +81,13 @@ contains
     
   end subroutine exactTab2
 
-  subroutine userSol(t,mesh,sol,str_equa,exactSol,exact_file)
+  subroutine userSol(t,mesh,sol,str_equa,exactSol,exact_file,dim)
     real(dp), intent(in) :: t
     type(meshStruct), intent(in) :: mesh
     type(solStruct), intent(inout) :: sol
     character(len=20), intent(in) :: str_equa,exact_file
     procedure (sub_exactsol), pointer, intent(in) :: exactSol
+    integer, intent(in) :: dim
     integer :: i,k
     character(len=20) :: str
 
@@ -86,14 +98,14 @@ contains
           if (trim(exact_file)=="none") then
              call exactTab(t,mesh,sol%user(:,i:i),exactSol)
           else
-             call exactTab2(mesh,exact_file,sol%user(:,i:i))
+             call exactTab2(mesh,exact_file,dim,sol%user(:,i:i))
           endif
        case(2)
           sol%name_user(i)="Error"
           if (trim(exact_file)=="none") then
              call exactTab(t,mesh,sol%user(:,i:i),exactSol)
           else
-             call exactTab2(mesh,exact_file,sol%user(:,i:i))
+             call exactTab2(mesh,exact_file,dim,sol%user(:,i:i))
           endif
           sol%user(:,i:i)=abs(sol%user(:,i:i)-sol%val(:,1:1))
        case(3)

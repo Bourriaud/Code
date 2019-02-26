@@ -165,10 +165,10 @@ contains
 
     allocate(U(size(S)))
 
-    r0=0.25_dp
+    r0=0.5_dp
     r=sqrt(x**2+y**2)
     
-    if (r>r0) then
+    if (r<r0) then
        U(1)=1.0_dp
        U(2)=0.0_dp
        U(3)=0.0_dp
@@ -201,10 +201,10 @@ contains
        allocate(mesh%edge(i)%bound(nvar))
        if (mesh%edge(i)%cell1<0.or.mesh%edge(i)%cell2<0) then
           mesh%edge(i)%boundType='DIRICHLET'
-          bound(1)=1.0_dp
+          bound(1)=0.125_dp
           bound(2)=0.0_dp
           bound(3)=0.0_dp
-          bound(4)=1.0_dp
+          bound(4)=0.1_dp
           do isol=1,nvar
              call conserv(bound(:),"euler               ",isol,mesh%edge(i)%bound(isol))
           enddo
