@@ -68,7 +68,7 @@ contains
     integer, dimension(:), allocatable :: stencil
     real(dp), dimension(:,:), allocatable :: X,U
     integer :: d,N,Ni,Nj,i,i1,i2,j,isol
-    real(dp) :: Kk,Kj,intk,intj
+    real(dp) :: Kk,Kj,intk,intj,pond
     real(dp), dimension(2) :: c
     integer, dimension(2) :: alpha
     
@@ -83,6 +83,7 @@ contains
     Kk=mesh%cell(k)%dx*mesh%cell(k)%dy
     c(1)=mesh%cell(k)%xc
     c(2)=mesh%cell(k)%yc
+    pond=1.5_dp
     i=1
 
     do i2=1,d
@@ -93,7 +94,7 @@ contains
           do j=1,Ni
              Kj=mesh%cell(stencil(j))%dx*mesh%cell(stencil(j))%dy
              call quad_monome(mesh,c,alpha,stencil(j),gauss_weight,intj)
-             X(j,i)=intj-intk
+             X(j,i)=(intj-intk)/(((mesh%cell(stencil(j))%xc-c(1))**2+(mesh%cell(stencil(j))%yc-c(2))**2)**(pond/4.0_dp))
           enddo
           i=i+1
        enddo
@@ -106,14 +107,15 @@ contains
        do j=1,Ni
           Kj=mesh%cell(stencil(j))%dx*mesh%cell(stencil(j))%dy
           call quad_monome(mesh,c,alpha,stencil(j),gauss_weight,intj)
-          X(j,i)=intj-intk
+          X(j,i)=(intj-intk)/(((mesh%cell(stencil(j))%xc-c(1))**2+(mesh%cell(stencil(j))%yc-c(2))**2)**(pond/4.0_dp))
        enddo
        i=i+1
     enddo
     
     do i=1,Ni
        do isol=1,sol%nvar
-          U(i,isol)=sol%val(stencil(i),isol)-sol%val(k,isol)
+          U(i,isol)=(sol%val(stencil(i),isol)-sol%val(k,isol))/ &
+               (((mesh%cell(stencil(i))%xc-c(1))**2+(mesh%cell(stencil(i))%yc-c(2))**2)**(pond/4.0_dp))
        enddo
     enddo
     

@@ -257,7 +257,7 @@ contains
        endif
     enddo
 
-    if (Xmax==0.0_dp) then
+    if (Xmax==0.0_dp.or.Ymax==0.0_dp) then
        extrema=.true.
     else
        if ((Xmin/Xmax>0.5_dp).and.(Ymin/Ymax>0.5_dp)) then

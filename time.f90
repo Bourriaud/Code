@@ -77,7 +77,7 @@ contains
        NOT_ACCEPTED_EDGE(k)=k
     enddo
 
-    L_deg(1)=0
+    L_deg(1)=1
     L_deg(2)=0
     
     count=0
