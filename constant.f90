@@ -23,6 +23,6 @@ module constant
        0.2386191860831969_dp,-0.9324695142031521_dp,0.9324695142031521_dp/)
   real(dp), dimension(6), parameter :: gauss_weight6=(/0.3607615730481386_dp,0.3607615730481386_dp,0.4679139345726910_dp, &
        0.4679139345726910_dp,0.1713244923791704_dp,0.1713244923791704_dp/)
-  real(dp), dimension(6), parameter :: size_stencil=(/1.5_dp,1.5_dp,1.5_dp,2.2_dp,2.2_dp,2.2_dp/)
+  real(dp), dimension(6), parameter :: size_stencil=(/1.5_dp,1.5_dp,1.5_dp,1.5_dp,1.5_dp,1.5_dp/)
 
 end module constant

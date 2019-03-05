@@ -121,7 +121,7 @@ contains
     
     if (allocated(mesh%cell(k)%polCoef)) deallocate(mesh%cell(k)%polCoef)
     allocate(mesh%cell(k)%polCoef(Nj,sol%nvar))
-
+    
     do isol=1,sol%nvar
        call solve(X,U(:,isol),mesh%cell(k)%polCoef(:,isol))
     enddo
@@ -147,13 +147,13 @@ contains
     integer, dimension(:), allocatable :: stencil2
     integer :: i,j,k,neigh
 
-    allocate(stencil2(2*(2*n+1)**2))
+    allocate(stencil2(3*(2*n+1)**2))
     stencil2=-1
     stencil2(1:size(stencil))=stencil
     k=size(stencil)
 
     do i=1,size(stencil)
-       do j=1,size(mesh%cell(stencil(i))%neigh)
+       do j=1,size(mesh%cell(stencil(i))%edge)
           neigh=mesh%cell(stencil(i))%neigh(j)
           if ((all(stencil2/=neigh)).and.(neigh>0)) then
              k=k+1

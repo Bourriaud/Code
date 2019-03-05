@@ -81,7 +81,7 @@ contains
     L_deg(2)=0
     
     count=0
-    do while (size(NOT_ACCEPTED_CELL)>0)
+    do while (size(NOT_ACCEPTED_EDGE)>0)
        count=count+1
        do i=1,size(NOT_ACCEPTED_EDGE)
           j=NOT_ACCEPTED_EDGE(i)
@@ -137,7 +137,7 @@ contains
           endif
        enddo
        
-       deg=L_deg(min(count,size(L_deg)))
+       deg=min(L_deg(min(count,size(L_deg))),order-1)
        call decrement(mesh,sol,soltemp,str_equa,deg,dt,L_str_criteria,L_var_criteria,L_eps, &
             gauss_weight,NOT_ACCEPTED_CELL,NOT_ACCEPTED_EDGE,NAC_reason,verbosity)
 

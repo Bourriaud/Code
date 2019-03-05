@@ -60,6 +60,9 @@ contains
              if (verbosity>1) then
                 if (size(NOT_ACCEPTED_CELL)==mesh%nc.and.NAC_reason(k)==0) NAC_reason(k)=n
              endif
+             mesh%cell(k)%deg=deg
+             nc=nc+1
+             NAC(nc)=k
              do j=1,size(mesh%cell(k)%edge)
                 edge=mesh%cell(k)%edge(j)
                 cell1=mesh%edge(edge)%cell1
@@ -79,16 +82,6 @@ contains
                          ne=ne+1
                          NAE(ne)=mesh%edge(edge)%period
                       endif
-                      if (all(NAC/=abs(cell1))) then
-                         mesh%cell(abs(cell1))%deg=deg
-                         nc=nc+1
-                         NAC(nc)=abs(cell1)
-                      endif
-                      if (all(NAC/=abs(cell2))) then
-                         mesh%cell(abs(cell2))%deg=deg
-                         nc=nc+1
-                         NAC(nc)=abs(cell2)
-                      endif
                       do p=1,size(gauss_weight)
                          call criteria_flux(mesh%edge(edge)%flux(p,:),mesh%edge(edge)%flux_acc(p))
                          if (.not.mesh%edge(edge)%flux_acc(p)) then
@@ -102,16 +95,6 @@ contains
                    case default
                       ne=ne+1
                       NAE(ne)=edge
-                      if (all(NAC/=cell1).and.cell1>0) then
-                         mesh%cell(cell1)%deg=deg
-                         nc=nc+1
-                         NAC(nc)=cell1
-                      endif
-                      if (all(NAC/=cell2).and.cell2>0) then
-                         mesh%cell(cell2)%deg=deg
-                         nc=nc+1
-                         NAC(nc)=cell2
-                      endif
                       do p=1,size(gauss_weight)
                          call criteria_flux(mesh%edge(edge)%flux(p,:),mesh%edge(edge)%flux_acc(p))
                          if (.not.mesh%edge(edge)%flux_acc(p)) then

@@ -226,8 +226,8 @@ contains
        sol_refine(k)=0
        call reconstruct(mesh,sol,k,2,gauss_weight2)
        grad=sqrt(mesh%cell(k)%polCoef(1,isol)**2+mesh%cell(k)%polCoef(2,isol)**2)
-       if (grad<0.2_dp.and.mesh%cell(k)%level>minlevel) sol_coarsen(k)=1
-       if (grad>0.5_dp) sol_refine(k)=1
+       if (grad<0.05_dp.and.mesh%cell(k)%level>minlevel) sol_coarsen(k)=1
+       if (grad>0.2_dp) sol_refine(k)=1
     enddo
     
     return
