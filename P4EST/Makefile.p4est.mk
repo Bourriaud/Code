@@ -3,7 +3,7 @@
 # Use `include /path/to/Makefile.p4est.mk' in your Makefile
 # to use p4est in your project without autotools
 
-p4est_prefix = /home/imb/abourriaud/Téléchargements/P4EST/local
+p4est_prefix = /home/imb/abourriaud/Documents/Code/P4EST/local
 p4est_exec_prefix = ${p4est_prefix}
 p4est_sysconfdir = ${p4est_prefix}/etc
 
@@ -19,6 +19,6 @@ P4EST_PKG_LDFLAGS = -L${p4est_exec_prefix}/lib
 P4EST_PKG_LIBS = -lp4est
 
 # These pull in everything needed by p4est
-P4EST_CPPFLAGS =  $(SC_PKG_CPPFLAGS) $(P4EST_PKG_CPPFLAGS)
+P4EST_CPPFLAGS = -DSC_LOG_PRIORITY=SC_LP_ERROR $(SC_PKG_CPPFLAGS) $(P4EST_PKG_CPPFLAGS)
 P4EST_LDFLAGS =  $(SC_PKG_LDFLAGS) $(P4EST_PKG_LDFLAGS)
 P4EST_LIBS = $(P4EST_PKG_LIBS) $(SC_PKG_LIBS) -lgomp -lpthread -llapack -lblas -lz -lm   

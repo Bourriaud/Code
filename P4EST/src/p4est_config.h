@@ -37,7 +37,7 @@
 
 /* C preprocessor flags */
 #ifndef P4EST_CPPFLAGS
-#define P4EST_CPPFLAGS ""
+#define P4EST_CPPFLAGS "-DSC_LOG_PRIORITY=SC_LP_ERROR"
 #endif
 
 /* Define to 1 if your C++ compiler doesn't accept -c and -o together. */

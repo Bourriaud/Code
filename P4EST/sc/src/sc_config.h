@@ -25,7 +25,7 @@
 
 /* C preprocessor flags */
 #ifndef SC_CPPFLAGS
-#define SC_CPPFLAGS ""
+#define SC_CPPFLAGS "-DSC_LOG_PRIORITY=SC_LP_ERROR"
 #endif
 
 /* CXX compiler */

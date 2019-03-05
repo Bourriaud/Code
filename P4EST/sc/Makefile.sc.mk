@@ -3,7 +3,7 @@
 # Use `include /path/to/Makefile.sc.mk' in your Makefile
 # to use libsc in your project without autotools
 
-sc_prefix = /home/imb/abourriaud/Téléchargements/P4EST/local
+sc_prefix = /home/imb/abourriaud/Documents/Code/P4EST/local
 sc_exec_prefix = ${sc_prefix}
 sc_sysconfdir = ${sc_prefix}/etc
 
@@ -17,6 +17,6 @@ SC_PKG_LDFLAGS = -L${sc_exec_prefix}/lib
 SC_PKG_LIBS = -lsc
 
 # These pull in everything needed by libsc
-SC_CPPFLAGS =  $(SC_PKG_CPPFLAGS)
+SC_CPPFLAGS = -DSC_LOG_PRIORITY=SC_LP_ERROR $(SC_PKG_CPPFLAGS)
 SC_LDFLAGS =  $(SC_PKG_LDFLAGS)
 SC_LIBS = $(SC_PKG_LIBS) -lgomp -lpthread -llapack -lblas -lz -lm   

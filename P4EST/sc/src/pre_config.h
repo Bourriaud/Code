@@ -14,7 +14,7 @@
 #define CPP "gcc -E"
 
 /* C preprocessor flags */
-#define CPPFLAGS ""
+#define CPPFLAGS "-DSC_LOG_PRIORITY=SC_LP_ERROR"
 
 /* CXX compiler */
 #define CXX "g++"
