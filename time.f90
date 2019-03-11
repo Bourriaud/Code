@@ -145,7 +145,7 @@ contains
           do k=1,size(NOT_ACCEPTED_CELL)
              NAC_cycle(NOT_ACCEPTED_CELL(k))=NAC_cycle(NOT_ACCEPTED_CELL(k))+1
           enddo
-          if (size(NOT_ACCEPTED_CELL)==0) then
+          if (size(NOT_ACCEPTED_EDGE)==0) then
              call write_accept(mesh,NAC_cycle,NAC_reason,n)
           endif
        endif

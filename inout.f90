@@ -652,6 +652,11 @@ contains
     do k=1,mesh%nc
        write(11,'(e15.8)')real(NAC_reason(k))
     enddo
+    write(11,'(a,a,a)')"SCALARS ","degree"," float 1"
+    write(11,'(a)')"LOOKUP_TABLE default"
+    do k=1,mesh%nc
+       write(11,'(e15.8)')real(mesh%cell(k)%deg+1)
+    enddo
     
     close(11)
     

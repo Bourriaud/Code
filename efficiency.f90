@@ -69,6 +69,7 @@ contains
              endif
              r=r-x(1)
              i=ceiling(r/dx)
+             if (i>n) i=n
              tab(k,1)=tab(k,1)+solAnal(i)*gauss_weight6(p1)*gauss_weight6(p2)/4.0_dp
           enddo
        enddo

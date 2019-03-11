@@ -153,7 +153,7 @@ contains
     enddo
 
     call norme2(sol2,k,isol,test)
-    if ((test-mini>=eps).and.(test-maxi<=eps)) then
+    if ((test-mini>=-eps).and.(test-maxi<=eps)) then
        accept=.true.
     else
        accept=.false.
