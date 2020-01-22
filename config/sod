@@ -1,26 +1,27 @@
 -------------------- Test case -------------------------------------------
 Sod	ICBC
+none restart.txt	Restart file
 -------------------- Geometrical parameters ------------------------------
 0.	xL
 1.	xR
 0.	yL
 1.	yR
 -------------------- Numerical parameters --------------------------------
-4	level
+7	level
 0.95	cfl
 0.25	tf
 euler	equation
-HLL	flux
-SSPRK5	time scheme
-5	space order
+rusanov	flux
+SSPRK2	time scheme
+2	space order
+false 	periodic stencil
 -------------------- Limitation parameters -------------------------------
-4	number of detection criterias
-PAD 1 1.0e-4	detection criteria + variable + sensibility
-DMPu2 1 1.0e-4
-DMPu2 2 1.0e-4
-DMPu2 4 1.0e-3
+2	number of detection criterias
+PAD 1 1.0e-14	detection criteria + variable + sensibility
+DMP 1 1.0e-9 DMPu2 2 1.0e-4 DMP 4 1.0e-5
 -------------------- Output parameters -----------------------------------
-1	save frequency
+10	save frequency
+10	print frequency
 sod	namefile
 0 	verbosity
 4	nvar

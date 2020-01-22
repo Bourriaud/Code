@@ -38,7 +38,7 @@ contains
     return   
   end subroutine BC_sinus
 
-!!!!!!!!!!!!!!!!!!!!!!!!!!!!! Sinus !!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!! Sinus_dis !!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
   subroutine IC_func_sinus_dis(x,y,S)
     real(dp), intent(in) :: x,y
@@ -73,6 +73,44 @@ contains
     
     return   
   end subroutine BC_sinus_dis
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!! Step Burgers !!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+  subroutine IC_func_step_burgers(x,y,S)
+    real(dp), intent(in) :: x,y
+    real(dp), dimension(:), intent(inout) :: S
+    if(.false.)print*,y
+
+    if (x<5.0_dp) then
+       S(1)=1.0_dp
+    else
+       S(1)=0.5_dp
+    endif
+    
+    return
+  end subroutine IC_func_step_burgers
+
+  subroutine BC_step_burgers(nvar,mesh)
+    integer, intent(in) :: nvar
+    type(meshStruct), intent(inout) :: mesh
+    integer :: i
+    
+    do i=1,mesh%ne
+       allocate(mesh%edge(i)%bound(nvar))
+       if (mesh%edge(i)%cell1<0) then
+          mesh%edge(i)%boundType='DIRICHLET'
+          mesh%edge(i)%bound=1.0_dp
+       elseif (mesh%edge(i)%cell2<0) then
+          mesh%edge(i)%boundType='DIRICHLET'
+          mesh%edge(i)%bound=0.5_dp
+       else
+          mesh%edge(i)%boundType='NOT A BOUNDARY'
+          mesh%edge(i)%bound=0.0_dp
+       endif
+    enddo
+    
+    return   
+  end subroutine BC_step_burgers
   
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!! Sod !!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
@@ -100,7 +138,7 @@ contains
        U(4)=0.1_dp
     endif
     
-    do i=1,4
+    do i=1,size(S)
        call conserv(U,"euler               ",i,S(i))
     enddo
 
@@ -245,7 +283,7 @@ contains
        U(4)=0.1_dp
     endif
     
-    do i=1,4
+    do i=1,size(S)
        call conserv(U,"euler               ",i,S(i))
     enddo
 
@@ -459,6 +497,142 @@ contains
     return   
   end subroutine BC_123
 
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!! Blastwave !!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+  subroutine IC_func_blastwave(x,y,S)
+    real(dp), intent(in) :: x,y
+    real(dp), dimension(:), intent(inout) :: S
+    real(dp), dimension(:), allocatable :: U
+    integer :: i
+    real(dp) :: x1,x2
+    if(.false.)print*,y
+
+    allocate(U(size(S)))
+
+    x1=0.1_dp
+    x2=0.9_dp
+    
+    if (x<x1) then
+       U(1)=1.0_dp
+       U(2)=0.0_dp
+       U(3)=0.0_dp
+       U(4)=1000.0_dp
+    elseif (x>x2) then
+       U(1)=1.0_dp
+       U(2)=0.0_dp
+       U(3)=0.0_dp
+       U(4)=100.0_dp
+    else
+       U(1)=1.0_dp
+       U(2)=0.0_dp
+       U(3)=0.0_dp
+       U(4)=0.01_dp
+    endif
+    
+    do i=1,size(S)
+       call conserv(U,"euler               ",i,S(i))
+    enddo
+
+    deallocate(U)
+    
+    return
+  end subroutine IC_func_blastwave
+
+  subroutine BC_blastwave(nvar,mesh)
+    integer, intent(in) :: nvar
+    type(meshStruct), intent(inout) :: mesh
+    integer :: i,isol
+    real(dp), dimension(:), allocatable :: bound
+
+    allocate(bound(nvar))
+    
+    do i=1,mesh%ne
+       allocate(mesh%edge(i)%bound(nvar))
+       if (mesh%edge(i)%cell1<0.or.(mesh%edge(i)%cell2<0)) then
+          mesh%edge(i)%boundType='WALL'
+          bound(:)=1.0_dp
+          do isol=1,nvar
+             call conserv(bound(:),"euler               ",isol,mesh%edge(i)%bound(isol))
+          enddo
+       else
+          mesh%edge(i)%boundType='NOT A BOUNDARY'
+          mesh%edge(i)%bound=0.0_dp
+       endif
+    enddo
+
+    deallocate(bound)
+    
+    return   
+  end subroutine BC_blastwave
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!! Test !!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+  subroutine IC_func_test(x,y,S)
+    real(dp), intent(in) :: x,y
+    real(dp), dimension(:), intent(inout) :: S
+    integer :: n
+    if(.false.)print*,y
+
+    n=floor(2.0_dp*x)
+    select case (n)
+    case(3)
+       S(1)=2.0_dp*x-3.0_dp
+    case(4)
+       S(1)=-2.0_dp*x+5.0_dp
+    case(7:8)
+       S(1)=1.0_dp
+    case(11:12)
+       S(1)=2.0_dp*sqrt(0.25_dp-(x-6.0_dp)**2)
+    case (15)
+       S(1)=-2.0_dp*sqrt(0.25_dp-(x-7.5_dp)**2)+1.0_dp
+    case (16)
+       S(1)=-2.0_dp*sqrt(0.25_dp-(x-8.5_dp)**2)+1.0_dp
+    case default
+       S(1)=0.0_dp
+    end select
+    !if(abs(x-3.5016666_dp)<0.001_dp) S(1)=0.3_dp
+    
+    return
+  end subroutine IC_func_test
+
+  subroutine BC_test(nvar,mesh)
+    integer, intent(in) :: nvar
+    type(meshStruct), intent(inout) :: mesh
+    integer :: i
+    
+    do i=1,mesh%ne
+       allocate(mesh%edge(i)%bound(nvar))
+       if (mesh%edge(i)%cell1<0.or.mesh%edge(i)%cell2<0) then
+          mesh%edge(i)%boundType='PERIODIC'
+          mesh%edge(i)%bound=0.0_dp
+       else
+          mesh%edge(i)%boundType='NOT A BOUNDARY'
+          mesh%edge(i)%bound=0.0_dp
+       endif
+    enddo
+    
+    return   
+  end subroutine BC_test
+
+  subroutine BC_test_burgers(nvar,mesh)
+    integer, intent(in) :: nvar
+    type(meshStruct), intent(inout) :: mesh
+    integer :: i
+    
+    do i=1,mesh%ne
+       allocate(mesh%edge(i)%bound(nvar))
+       if (mesh%edge(i)%cell1<0.or.mesh%edge(i)%cell2<0) then
+          mesh%edge(i)%boundType='DIRICHLET'
+          mesh%edge(i)%bound=0.0_dp
+       else
+          mesh%edge(i)%boundType='NOT A BOUNDARY'
+          mesh%edge(i)%bound=0.0_dp
+       endif
+    enddo
+    
+    return   
+  end subroutine BC_test_burgers
+
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!! Vortex !!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   
   subroutine IC_func_vortex(x,y,S)
@@ -474,11 +648,11 @@ contains
     r=sqrt(x**2+y**2)
     T=1.0_dp-(gamma-1.0_dp)*beta**2*exp(1-r**2)/(8.0_dp*gamma*(pi**2))
     U(1)=T**(1.0_dp/(gamma-1.0_dp))
-    U(2)=0.0_dp-y*beta*exp(0.5_dp*(1-r**2))/(2.0_dp*pi)
-    U(3)=0.0_dp+x*beta*exp(0.5_dp*(1-r**2))/(2.0_dp*pi)
+    U(2)=1.0_dp-y*beta*exp(0.5_dp*(1-r**2))/(2.0_dp*pi)
+    U(3)=1.0_dp+x*beta*exp(0.5_dp*(1-r**2))/(2.0_dp*pi)
     U(4)=U(1)**gamma
 
-    do i=1,4
+    do i=1,size(S)
        call conserv(U,"euler               ",i,S(i))
     enddo
 
@@ -542,7 +716,7 @@ contains
        U(4)=1.5_dp
     endif
     
-    do i=1,4
+    do i=1,size(S)
        call conserv(U,"euler               ",i,S(i))
     enddo
 
@@ -575,9 +749,9 @@ contains
     return   
   end subroutine BC_RP2D_3
 
-!!!!!!!!!!!!!!!!!!!!!!!!!!!!! Sinus !!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!! Test2 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-  subroutine IC_func_test(x,y,S)
+  subroutine IC_func_test2(x,y,S)
     real(dp), intent(in) :: x,y
     real(dp), dimension(:), intent(inout) :: S
     if(.false.)print*,y
@@ -589,9 +763,9 @@ contains
     endif
     
     return
-  end subroutine IC_func_test
+  end subroutine IC_func_test2
 
-  subroutine BC_test(nvar,mesh)
+  subroutine BC_test2(nvar,mesh)
     integer, intent(in) :: nvar
     type(meshStruct), intent(inout) :: mesh
     integer :: i
@@ -608,7 +782,152 @@ contains
     enddo
     
     return   
-  end subroutine BC_test
+  end subroutine BC_test2
 
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!! Sod_is !!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+  subroutine IC_func_sod_is(x,y,S)
+    real(dp), intent(in) :: x,y
+    real(dp), dimension(:), intent(inout) :: S
+    real(dp), dimension(:), allocatable :: U
+    integer :: i
+    real(dp) :: x0
+    if(.false.)print*,y
+
+    allocate(U(size(S)))
+
+    x0=0.0_dp
+    
+    if (x<x0) then
+       U(1)=2.0_dp
+       U(2)=0.0_dp
+       U(3)=0.0_dp
+    else
+       U(1)=1.0_dp
+       U(2)=0.0_dp
+       U(3)=0.0_dp
+    endif
+    
+    do i=1,size(S)
+       call conserv(U,"euler_is            ",i,S(i))
+    enddo
+
+    deallocate(U)
+    
+    return
+  end subroutine IC_func_sod_is
+
+  subroutine BC_sod_is(nvar,mesh)
+    integer, intent(in) :: nvar
+    type(meshStruct), intent(inout) :: mesh
+    integer :: i,isol
+    real(dp), dimension(:), allocatable :: bound
+
+    allocate(bound(nvar))
+    
+     do i=1,mesh%ne
+       allocate(mesh%edge(i)%bound(nvar))
+       if (mesh%edge(i)%cell1<0.and.mesh%edge(i)%dir==1) then
+          mesh%edge(i)%boundType='DIRICHLET'
+          bound(1)=2.0_dp
+          bound(2)=0.0_dp
+          bound(3)=0.0_dp
+          do isol=1,nvar
+             call conserv(bound(:),"euler               ",isol,mesh%edge(i)%bound(isol))
+          enddo
+       elseif (mesh%edge(i)%cell2<0.and.mesh%edge(i)%dir==1) then
+          mesh%edge(i)%boundType='DIRICHLET'
+          bound(1)=1.0_dp
+          bound(2)=0.0_dp
+          bound(3)=0.0_dp
+          do isol=1,nvar
+             call conserv(bound(:),"euler               ",isol,mesh%edge(i)%bound(isol))
+          enddo
+       elseif (mesh%edge(i)%cell1<0.and.mesh%edge(i)%dir==2) then
+          mesh%edge(i)%boundType='PERIODIC'
+          mesh%edge(i)%bound(:)=0.0_dp
+       elseif (mesh%edge(i)%cell2<0.and.mesh%edge(i)%dir==2) then
+          mesh%edge(i)%boundType='PERIODIC'
+          mesh%edge(i)%bound(:)=0.0_dp
+       else
+          mesh%edge(i)%boundType='NOT A BOUNDARY'
+          mesh%edge(i)%bound=0.0_dp
+       endif
+    enddo
+
+    deallocate(bound)
+    
+    return   
+  end subroutine BC_sod_is
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!! Riemann_M1 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+  subroutine IC_func_riemann_M1(x,y,S)
+    real(dp), intent(in) :: x,y
+    real(dp), dimension(:), intent(inout) :: S
+    real(dp), dimension(:), allocatable :: U
+    integer :: i
+    real(dp) :: x0
+    if(.false.)print*,y
+
+    allocate(U(size(S)))
+
+    x0=0.0_dp
+    
+    if (x<x0) then
+       U(1)=1.21054656e-6_dp
+       U(2)=0.0_dp
+       U(3)=0.0_dp
+    else
+       U(1)=6.12839196e-6_dp
+       U(2)=0.0_dp
+       U(3)=0.0_dp
+    endif
+    
+    do i=1,size(S)
+       call conserv(U,"M1                  ",i,S(i))
+    enddo
+
+    deallocate(U)
+    
+    return
+  end subroutine IC_func_riemann_M1
+
+  subroutine BC_riemann_M1(nvar,mesh)
+    integer, intent(in) :: nvar
+    type(meshStruct), intent(inout) :: mesh
+    integer :: i,isol
+    real(dp), dimension(:), allocatable :: bound
+
+    allocate(bound(nvar))
+    
+    do i=1,mesh%ne
+       allocate(mesh%edge(i)%bound(nvar))
+       if (mesh%edge(i)%cell1<0) then
+          mesh%edge(i)%boundType='DIRICHLET'
+          bound(1)=1.21054656e-6_dp
+          bound(2)=0.0_dp
+          bound(3)=0.0_dp
+          do isol=1,nvar
+             call conserv(bound(:),"M1                  ",isol,mesh%edge(i)%bound(isol))
+          enddo
+       elseif (mesh%edge(i)%cell2<0) then
+          mesh%edge(i)%boundType='DIRICHLET'
+          bound(1)=6.12839196e-6_dp
+          bound(2)=0.0_dp
+          bound(3)=0.0_dp
+          do isol=1,nvar
+             call conserv(bound(:),"M1                  ",isol,mesh%edge(i)%bound(isol))
+          enddo
+       else
+          mesh%edge(i)%boundType='NOT A BOUNDARY'
+          mesh%edge(i)%bound=0.0_dp
+       endif
+    enddo
+
+    deallocate(bound)
+    
+    return   
+  end subroutine BC_riemann_M1
 
 end module ICBC

@@ -4,6 +4,7 @@ module inout
   use types
   use efficiency
   use phys
+  use reconstruction
   use ISO_C_BINDING
   
   implicit none
@@ -24,18 +25,19 @@ contains
     return
   end subroutine get_config
   
-  subroutine init(config_file,test_case,xL,xR,yL,yR,level,nvar,cfl,tf,fs,namefile,verbosity,sol, &
-       str_equa,str_flux,str_time_scheme,order,L_str_criteria,L_var_criteria,L_eps, &
-       gauss_point,gauss_weight,str_exactSol,exact_file,bool_AMR,fn_adapt,f_adapt,recursivity)
+  subroutine init(config_file,test_case,restart_file,xL,xR,yL,yR,level,nvar,cfl,tf,fs,fp,namefile,verbosity,sol, &
+       str_equa,str_flux,str_time_scheme,order,period,L_str_criteria,L_var_criteria,L_eps, &
+       gauss_point,gauss_weight,str_exactSol,exact_file,bool_AMR,fn_adapt,f_adapt,recursivity,order_pc)
     character(len=20), intent(out) :: config_file,test_case,namefile,str_equa,str_flux,str_time_scheme
     real(dp), intent(out) :: xL,xR,yL,yR,cfl,tf
-    integer, intent(out) :: level,nvar,fs,verbosity,order,f_adapt,recursivity
+    integer, intent(out) :: level,nvar,fs,fp,verbosity,order,f_adapt,recursivity
     type(solStruct), intent(out) :: sol
+    logical, intent(out) :: period
     character(len=20), dimension(:), allocatable, intent(out) :: L_str_criteria
-    integer, dimension(:), allocatable, intent(out) :: L_var_criteria
+    integer, dimension(:), allocatable, intent(out) :: L_var_criteria,order_pc
     real(dp), dimension(:), allocatable, intent(out) :: L_eps
     real(dp), dimension(:), allocatable, intent(out) :: gauss_point,gauss_weight
-    character(len=20), intent(out) :: fn_adapt,str_exactSol,exact_file
+    character(len=20), intent(out) :: fn_adapt,str_exactSol,exact_file,restart_file
     logical, intent(out) :: bool_AMR
     character(len=20) :: blank
     integer :: i,ncriteria
@@ -45,6 +47,7 @@ contains
     
     read(11,*)blank
     read(11,*)test_case
+    read(11,*)restart_file
     read(11,*)blank
     read(11,*)xL
     read(11,*)xR
@@ -58,6 +61,7 @@ contains
     read(11,*)str_flux
     read(11,*)str_time_scheme
     read(11,*)order
+    read(11,*)period
     read(11,*)blank
     read(11,*)ncriteria
     allocate(L_str_criteria(ncriteria),L_var_criteria(ncriteria),L_eps(ncriteria))
@@ -66,6 +70,7 @@ contains
     enddo
     read(11,*)blank
     read(11,*)fs
+    read(11,*)fp
     read(11,*)namefile
     read(11,*)verbosity
     read(11,*)nvar
@@ -114,6 +119,8 @@ contains
        print*,"Space order too high, no good enough quadrature implemented"
        call exit()
     end select
+    allocate(order_pc(order+1))
+    order_pc=0
 
     return
   end subroutine init
@@ -151,16 +158,39 @@ contains
     
     return
   end subroutine IC
+
+  subroutine IC_restart(restart_file,mesh,sol)
+    character(len=20), intent(in) :: restart_file
+    type(meshStruct), intent(in) :: mesh
+    type(solStruct), intent(inout) :: sol
+    real(dp), dimension(:), allocatable :: U0
+    integer :: k
+
+    allocate(U0(sol%nvar+1))
+
+    open(145,file=trim(restart_file),form="formatted")
+    do k=1,mesh%nc
+       read(145,*)U0
+       sol%val(k,:)=U0(2:)
+    enddo
+    close(145)
+
+    deallocate(U0)
+    
+    return
+  end subroutine IC_restart
   
-  subroutine buildMesh(xL,xR,yL,yR,nx,ny,gauss_point,order,mesh,sol)
+  subroutine buildMesh(xL,xR,yL,yR,nx,ny,gauss_point,order,mesh,sol,period)
     real(dp), intent(in) :: xL,xR,yL,yR
     integer, intent(in) :: nx,ny,order
     real(dp), dimension(:), intent(in) :: gauss_point
     type(meshStruct), intent(inout) :: mesh
     type(solStruct), intent(inout) :: sol
-    integer :: i,j,k,p,dir
+    logical, intent(in) :: period
+    integer :: i,j,k,p,dir,Neq
     real(dp) :: dx,dy,a,b,c,center,diff,xc,yc
     type(edgeStruct) :: edge
+    integer, dimension(:), allocatable :: stencil
 
     dx=(xR-xL)/nx
     dy=(yR-yL)/ny
@@ -334,6 +364,18 @@ contains
           enddo
        end select
     enddo
+
+    do k=1,mesh%nc
+       call Nequa(order-1,Neq)
+       if (period) then
+          call buildStencil_period(mesh,k,Neq,order,stencil)
+       else
+          call buildStencil(mesh,k,Neq,order,stencil)
+       endif
+       allocate(mesh%cell(k)%stencil(size(stencil)))
+       mesh%cell(k)%stencil=stencil
+       deallocate(stencil)
+    enddo
     
     return
   end subroutine buildMesh
@@ -347,7 +389,7 @@ contains
     return
   end subroutine buildP4EST
   
-  subroutine buildMesh_P4EST(p4est,xL,xR,yL,yR,gauss_point,order,mesh,sol,quadrants)
+  subroutine buildMesh_P4EST(p4est,xL,xR,yL,yR,gauss_point,order,mesh,sol,quadrants,period)
     type(c_ptr), intent(in) :: p4est
     real(dp), intent(in) :: xL,xR,yL,yR
     integer, intent(in) :: order
@@ -355,13 +397,15 @@ contains
     type(meshStruct), intent(inout) :: mesh
     type(solStruct), intent(inout) :: sol
     type(c_ptr), intent(out) :: quadrants
+    logical, intent(in) :: period
     integer(c_int) :: tt
     type(c_ptr) :: p4_mesh,nodes,edges
     type(c_ptr) :: C_corners,C_neighbors,C_sub,C_cell1,C_cell2,C_iedge,C_period,C_nodes
     integer, dimension(:), pointer :: F_corners,F_neighbors,F_sub,F_cell1,F_cell2
     integer, dimension(:), pointer :: F_iedge,F_period,F_nodes
-    integer :: k,i,lev,p,Nneigh,N_edge,Nnodes,ie,nedge,i1,iloc
+    integer :: k,i,lev,p,Nneigh,N_edge,Nnodes,ie,nedge,i1,iloc,Neq
     real(dp) :: a,b,c,center,diff
+    integer, dimension(:), allocatable :: stencil
 
     call p4_build_mesh(p4est,tt,p4_mesh,quadrants,nodes,edges,mesh%np,mesh%nc,mesh%ne)
     
@@ -515,6 +559,19 @@ contains
     enddo
     call p4_free(edges)
     call p4_destroy_mesh(p4_mesh,nodes)
+
+    do k=1,mesh%nc
+       call Nequa(order-1,Neq)
+       if (period) then
+          call buildStencil_period(mesh,k,Neq,order,stencil)
+       else
+          call buildStencil(mesh,k,Neq,order,stencil)
+       endif
+       allocate(mesh%cell(k)%stencil(size(stencil)))
+       mesh%cell(k)%stencil=stencil
+       deallocate(stencil)
+    enddo
+    
     print*,"Mesh created with ",mesh%nc," quadrants"
     
     return
@@ -662,6 +719,39 @@ contains
     
     return
   end subroutine write_accept
+
+  subroutine write_orders_header()
+    character(len=30) :: completenamefile
+
+    write(completenamefile,'(A)')'./results/orders.out'
+    open(17,file=trim(completenamefile),form="formatted")
+    
+    return
+  end subroutine write_orders_header
+
+  subroutine write_orders(mesh,order,n)
+    type(meshStruct), intent(in) :: mesh
+    integer, intent(in) :: order,n
+    integer :: k
+    integer, dimension(:), allocatable :: order_list
+
+    allocate(order_list(order))
+
+    order_list=0
+    do k=1,mesh%nc
+       order_list(mesh%cell(k)%deg+1)=order_list(mesh%cell(k)%deg+1)+1
+    enddo
+
+    write(17,'(i5,a)',advance='no')n," "
+    do k=1,order
+       write(17,'(i6,a)',advance='no')order_list(k)," "
+    enddo
+    write(17,'(i6)')mesh%nc
+
+    deallocate(order_list)
+    
+    return
+  end subroutine write_orders
 
   subroutine write_output_header(test_case,xL,xR,yL,yR,level,cfl,tf,namefile, &
        str_equa,str_flux,str_time_scheme,order,L_str_criteria, &

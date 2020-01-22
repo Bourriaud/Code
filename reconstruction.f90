@@ -171,6 +171,38 @@ contains
     
     return
   end subroutine couronne
+
+  subroutine couronne_period(mesh,stencil,n)
+    type(meshStruct), intent(in) :: mesh
+    integer, dimension(:), allocatable, intent(inout) :: stencil
+    integer, intent(in) :: n
+    integer, dimension(:), allocatable :: stencil2
+    integer :: i,j,k,neigh
+
+    allocate(stencil2(3*(2*n+1)**2))
+    stencil2=-1
+    stencil2(1:size(stencil))=stencil
+    k=size(stencil)
+
+    do i=1,size(stencil)
+       do j=1,size(mesh%cell(stencil(i))%edge)
+          neigh=mesh%cell(stencil(i))%neigh(j)
+          if (all(stencil2/=abs(neigh))) then
+             k=k+1
+             stencil2(k)=abs(neigh)
+          endif
+       enddo
+    enddo
+
+    deallocate(stencil)
+    allocate(stencil(k))
+
+    stencil=stencil2(1:k)
+
+    deallocate(stencil2)
+    
+    return
+  end subroutine couronne_period
   
   subroutine buildStencil(mesh,k,N,order,stencil)
     type(meshStruct), intent(in) :: mesh
@@ -183,7 +215,7 @@ contains
     stencil2(1)=k
     i=1
     s=ceiling(size_stencil(order)*N)
-    
+
     do while (size(stencil2)<s)
        call couronne(mesh,stencil2,i)
        i=i+1
@@ -197,6 +229,32 @@ contains
 
     return
   end subroutine buildStencil
+
+  subroutine buildStencil_period(mesh,k,N,order,stencil)
+    type(meshStruct), intent(in) :: mesh
+    integer, intent(in) :: k,N,order
+    integer, dimension(:), allocatable, intent(out) :: stencil
+    integer, dimension(:), allocatable :: stencil2
+    integer :: i,s
+
+    allocate(stencil2(1))
+    stencil2(1)=k
+    i=1
+    s=ceiling(size_stencil(order)*N)
+    
+    do while (size(stencil2)<s)
+       call couronne_period(mesh,stencil2,i)
+       i=i+1
+    enddo
+
+    s=size(stencil2)-1
+    allocate(stencil(s))
+    stencil(1:s)=stencil2(2:s+1)
+    
+    deallocate(stencil2)
+
+    return
+  end subroutine buildStencil_period
 
   subroutine polynomialProduct(x,y,c,alpha,s)
     real(dp), intent(in) :: x,y
@@ -215,22 +273,24 @@ contains
     real(dp), dimension(:), intent(inout) :: R
     real(dp), dimension(:,:), allocatable :: A
     real(dp), dimension(:), allocatable :: b
-    integer :: i,j,k
+    !integer :: i,j,k
 
     allocate(A(size(R),size(R)),b(size(R)))
-    A=0.0_dp
-    b=0.0_dp
+    !A=0.0_dp
+    !b=0.0_dp
 
-    do i=1,size(R)
-       do j=1,size(R)
-          do k=1,size(U)
-             A(i,j)=A(i,j)+X(k,i)*X(k,j)
-          enddo
-       enddo
-       do k=1,size(U)
-          b(i)=b(i)+X(k,i)*U(k)
-       enddo
-    enddo
+    !do i=1,size(R)
+       !do j=1,size(R)
+          !do k=1,size(U)
+             !A(i,j)=A(i,j)+X(k,i)*X(k,j)
+          !enddo
+       !enddo
+       !do k=1,size(U)
+          !b(i)=b(i)+X(k,i)*U(k)
+       !enddo
+    !enddo
+    A=matmul(transpose(X),X)
+    b=matmul(transpose(X),U)
     
     call cholesky(A,b,R)
     !call QR(X,b,R)
@@ -355,19 +415,31 @@ contains
     real(dp), dimension(:), intent(in) :: gauss_weight
     real(dp), intent(out) :: int
     integer :: p1,p2
-    real(dp) :: s
-    
-    int=0.0_dp
-    do p1=1,size(gauss_weight)
-       do p2=1,size(gauss_weight)
-          if (size(gauss_weight)==2) then
+    real(dp) :: s,s2
+
+    if (size(gauss_weight)==2) then
+       int=0.0_dp
+       do p1=1,size(gauss_weight)
+          s2=0.0_dp
+          do p2=1,size(gauss_weight)
              call polynomialProduct(mesh%cell(k)%X_gauss2(p1),mesh%cell(k)%Y_gauss2(p2),c,alpha,s)
-          else
-             call polynomialProduct(mesh%cell(k)%X_gauss(p1),mesh%cell(k)%Y_gauss(p2),c,alpha,s)
-          endif
-          int=int+s*gauss_weight(p1)*gauss_weight(p2)/4.0_dp
+             s2=s2+s*gauss_weight(p2)
+          enddo
+          int=int+gauss_weight(p1)*s2
        enddo
-    enddo
+       int=int*0.25_dp
+    else
+       int=0.0_dp
+       do p1=1,size(gauss_weight)
+          s2=0.0_dp
+          do p2=1,size(gauss_weight)
+             call polynomialProduct(mesh%cell(k)%X_gauss(p1),mesh%cell(k)%Y_gauss(p2),c,alpha,s)
+             s2=s2+s*gauss_weight(p2)
+          enddo
+          int=int+gauss_weight(p1)*s2
+       enddo
+       int=int*0.25_dp
+    endif
 
     return
   end subroutine quad_monome

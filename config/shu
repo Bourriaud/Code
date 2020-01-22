@@ -1,5 +1,6 @@
 -------------------- Test case -------------------------------------------
 Shu	ICBC
+none restart.txt	Restart file
 -------------------- Geometrical parameters ------------------------------
 -5.	xL
 5.	xR
@@ -13,6 +14,7 @@ euler	equation
 HLL	flux
 SSPRK3	time scheme
 3	space order
+false 	periodic stencil
 -------------------- Limitation parameters -------------------------------
 4	number of detection criterias
 PAD 1 1.0e-4	detection criteria + variable + sensibility
@@ -21,6 +23,7 @@ DMPu2 2 1.0e-4
 DMPu2 4 1.0e-3
 -------------------- Output parameters -----------------------------------
 10	save frequency
+10	print frequency
 shu	namefile
 0 	verbosity
 4	nvar

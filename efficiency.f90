@@ -120,6 +120,28 @@ contains
              print*,"No internal energy computed for your equation"
              call exit()
           endif
+       case(4)
+          if (trim(str_equa)=="M1") then
+             sol%name_user(i)="F_anis"
+             do k=1,mesh%nc
+                sol%user(k,i)=sol%val(k,2)/(sol%val(k,1)*c)
+             enddo
+          else
+             print*,"No internal energy computed for your equation"
+             call exit()
+          endif
+       case(5)
+          if (trim(str_equa)=="M1") then
+             sol%name_user(i)="TR"
+             do k=1,mesh%nc
+                sol%user(k,i)=(sol%val(k,1)/7.56573085e-16_dp)**(0.25_dp)
+             enddo
+          else
+             print*,"No internal energy computed for your equation"
+             call exit()
+          endif
+       case(99)
+          sol%name_user(i)="User"
        case(101:109)
           write (str,"(I1)")sol%var_user(i)-100
           sol%name_user(i)="Uncons"//trim(str)
@@ -227,6 +249,58 @@ contains
 
     return
   end subroutine exactSol_sinus_dis
+
+  subroutine exactSol_test(x,y,t,s)
+    real(dp), intent(in) :: x,y,t
+    real(dp), intent(out) :: s
+    real(dp) :: a1,a2,x_period,scale
+    integer :: n
+    if(.false.)print*,y
+
+    a1=1.0_dp
+    a2=1.0_dp
+    scale=10.0_dp
+
+    x_period=x-a1*t-int((x-a1*t)/scale)*scale
+    if (x-a1*t<0.0_dp) x_period=x_period+scale
+    n=floor(2.0_dp*x_period)
+    select case (n)
+    case(3)
+       s=2.0_dp*(x_period)-3.0_dp
+    case(4)
+       s=-2.0_dp*(x_period)+5.0_dp
+    case(7:8)
+       s=1.0_dp
+    case(11:12)
+       s=2.0_dp*sqrt(0.25_dp-(x_period-6.0_dp)**2)
+    case (15)
+       s=-2.0_dp*sqrt(0.25_dp-(x_period-7.5_dp)**2)+1.0_dp
+    case (16)
+       s=-2.0_dp*sqrt(0.25_dp-(x_period-8.5_dp)**2)+1.0_dp
+    case default
+       s=0.0_dp
+    end select
+
+    return
+  end subroutine exactSol_test
+
+  subroutine exactSol_test2(x,y,t,s)
+    real(dp), intent(in) :: x,y,t
+    real(dp), intent(out) :: s
+    real(dp) :: a1,a2
+    if(.false.)print*,y
+
+    a1=1.0_dp
+    a2=1.0_dp
+
+    if (x-a1*t<1.5_dp) then
+       s=1.0_dp
+    else
+       s=0.0_dp
+    endif
+
+    return
+  end subroutine exactSol_test2
 
   subroutine exactSol_vortex(x,y,t,s)
     real(dp), intent(in) :: x,y,t

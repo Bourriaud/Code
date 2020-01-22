@@ -16,12 +16,13 @@ program main
   type(meshStruct) :: mesh
   type(solStruct) :: sol
   real(dp) :: xL,xR,yL,yR,cfl,tf,eL1,eL2,tstart,tfinish
-  integer :: nvar,fs,verbosity,order,i,f_adapt,recursivity,total_cell,average_cell
+  integer :: nvar,fs,fp,verbosity,order,i,f_adapt,recursivity,total_cell,average_cell
   integer :: level,minlevel,maxlevel,dim
-  integer, dimension(:), allocatable :: L_var_criteria
+  logical :: period
+  integer, dimension(:), allocatable :: L_var_criteria,order_pc
   real(dp), dimension(:), allocatable :: L_eps
   character(len=20) :: config_file,test_case,namefile,str_equa,str_flux,str_time_scheme
-  character(len=20) :: str_fn_adapt,str_exactSol,exact_file
+  character(len=20) :: str_fn_adapt,str_exactSol,exact_file,restart_file
   character(len=20), dimension(:), allocatable :: L_str_criteria
   procedure (sub_IC), pointer :: IC_func
   procedure (sub_BC), pointer :: BC
@@ -38,23 +39,33 @@ program main
   call CPU_TIME(tstart)
   
   call get_config(config_file)
-  call init(config_file,test_case,xL,xR,yL,yR,level,nvar,cfl,tf,fs,namefile,verbosity,sol, &
-       str_equa,str_flux,str_time_scheme,order,L_str_criteria,L_var_criteria,L_eps, &
-       gauss_point,gauss_weight,str_exactSol,exact_file,bool_AMR,str_fn_adapt,f_adapt,recursivity)
+  call init(config_file,test_case,restart_file,xL,xR,yL,yR,level,nvar,cfl,tf,fs,fp,namefile,verbosity,sol, &
+       str_equa,str_flux,str_time_scheme,order,period,L_str_criteria,L_var_criteria,L_eps, &
+       gauss_point,gauss_weight,str_exactSol,exact_file,bool_AMR,str_fn_adapt,f_adapt,recursivity,order_pc)
   call buildP4EST(level,connectivity,p4est)
-  call buildMesh_P4EST(p4est,xL,xR,yL,yR,gauss_point,order,mesh,sol,quadrants)
+  call buildMesh_P4EST(p4est,xL,xR,yL,yR,gauss_point,order,mesh,sol,quadrants,period)
   !call buildmesh(xL,xR,yL,yR,64,64,gauss_point,order,mesh,sol)
   call init_FV(test_case,str_equa,str_flux,str_time_scheme,str_fn_adapt,IC_func, &
        BC,exactSol,f_equa,flux,speed,time_scheme,sol,fn_adapt,cfl,str_exactSol,exact_file,dim)
-  call IC(IC_func,mesh,sol,order)
+  if (restart_file=="none") then
+     call IC(IC_func,mesh,sol,order)
+  else
+     call IC_restart(restart_file,mesh,sol)
+  endif
   call BC(nvar,mesh)
   
   if (bool_AMR) then
      do i=0,recursivity-1
         call adapt(fn_adapt,p4est,quadrants,mesh,sol,level+i,order,gauss_weight,gauss_point,minlevel,maxlevel)
-        call buildMesh_P4EST(p4est,xL,xR,yL,yR,gauss_point,order,mesh,sol,quadrants)
+        call buildMesh_P4EST(p4est,xL,xR,yL,yR,gauss_point,order,mesh,sol,quadrants,period)
         call new_sol(mesh,quadrants,sol)
-        call IC(IC_func,mesh,sol,order)
+        if (restart_file=="none") then
+           call IC(IC_func,mesh,sol,order)
+        else
+           !call IC_restart(restart_file,mesh,sol)
+           print*,"Restart not possible with AMR"
+           call exit()
+        endif
         call BC(nvar,mesh)
      enddo
   endif
@@ -63,25 +74,17 @@ program main
      call write_output_header(test_case,xL,xR,yL,yR,level,cfl,tf,namefile, &
        str_equa,str_flux,str_time_scheme,order,L_str_criteria, &
        bool_AMR,str_fn_adapt,f_adapt,recursivity,minlevel,maxlevel)
+     call write_orders_header()
   endif
   call userSol(0.0_dp,mesh,sol,str_equa,exactSol,exact_file,dim)
   call writeSol(mesh,sol,namefile,0)
-  call calculation(mesh,sol,level,order,cfl,tf,fs,namefile,verbosity,str_equa, &
-       f_equa,flux,speed,time_scheme,exactSol, &
+  call calculation(mesh,sol,level,order,cfl,tf,fs,fp,namefile,verbosity,str_equa, &
+       f_equa,flux,speed,time_scheme,exactSol,order_pc, &
        L_str_criteria,L_var_criteria,L_eps,gauss_weight,gauss_point, &
        bool_AMR,fn_adapt,f_adapt,recursivity,total_cell,average_cell,exact_file,dim)
 
   select case (trim(str_exactSol))
-  case ('sinus')
-     call errorL1(mesh,sol%val(:,1),sol%user(:,1),eL1)
-     call errorL2(mesh,sol%val(:,1),sol%user(:,1),eL2)
-  case ('sinus_dis')
-     call errorL1(mesh,sol%val(:,1),sol%user(:,1),eL1)
-     call errorL2(mesh,sol%val(:,1),sol%user(:,1),eL2)
-  case ('vortex')
-     call errorL1(mesh,sol%val(:,1),sol%user(:,1),eL1)
-     call errorL2(mesh,sol%val(:,1),sol%user(:,1),eL2)
-  case ('file')
+  case ('sinus','sinus_dis','vortex','test','file')
      call errorL1(mesh,sol%val(:,1),sol%user(:,1),eL1)
      call errorL2(mesh,sol%val(:,1),sol%user(:,1),eL2)
   case default
@@ -100,6 +103,8 @@ program main
   print*,"Calculation completed, time of execution : ",tfinish-tstart,"seconds"
   if (verbosity>0) then
      call write_output_summary(tfinish-tstart,eL1,eL2,total_cell,average_cell)
+     close(12)
+     close(17)
   endif
 
 contains
@@ -131,6 +136,18 @@ contains
        IC_func => IC_func_sinus_dis
        BC => BC_sinus_dis
        dim=2
+    case ('Test')
+       IC_func => IC_func_test
+       BC => BC_test
+       dim=1
+    case ('Test2')
+       IC_func => IC_func_test
+       BC => BC_test
+       dim=1
+    case ('Step_burgers')
+       IC_func => IC_func_step_burgers
+       BC => BC_step_burgers
+       dim=1
     case ('Sod')
        IC_func => IC_func_sod
        BC => BC_sod
@@ -143,6 +160,10 @@ contains
        IC_func => IC_func_sod_mod
        BC => BC_sod_mod
        dim=1
+    case ('Sod_is')
+       IC_func => IC_func_sod_is
+       BC => BC_sod_is
+       dim=1
     case ('Shu')
        IC_func => IC_func_shu
        BC => BC_shu
@@ -151,6 +172,10 @@ contains
        IC_func => IC_func_123
        BC => BC_123
        dim=2
+    case ('Blastwave')
+       IC_func => IC_func_blastwave
+       BC => BC_blastwave
+       dim=1
     case ('Vortex')
        IC_func => IC_func_vortex
        BC => BC_vortex
@@ -159,14 +184,23 @@ contains
        IC_func => IC_func_RP2D_3
        BC => BC_RP2D_3
        dim=2
+    case ('Riemann_M1')
+       IC_func => IC_func_riemann_M1
+       BC => BC_riemann_M1
+       dim=1
     case default
        print*,"Test case ",trim(test_case)," not implemented"
        call exit()
     end select
     
     select case (trim(str_equa))
-    case ('transport')
+    case ('advection')
        f_equa => f_transport
+       do i=1,sol%nvar
+          sol%conserv_var(i,1:2)=i
+       enddo
+    case ('burgers')
+       f_equa => f_burgers
        do i=1,sol%nvar
           sol%conserv_var(i,1:2)=i
        enddo
@@ -178,6 +212,20 @@ contains
        sol%conserv_var(3,1)=2
        sol%conserv_var(3,2)=3
        sol%conserv_var(4,1:2)=4
+    case ('euler_is')
+       f_equa => f_euler_is
+       sol%conserv_var(1,1:2)=1
+       sol%conserv_var(2,1)=2
+       sol%conserv_var(2,2)=3
+       sol%conserv_var(3,1)=2
+       sol%conserv_var(3,2)=3
+    case ('M1')
+       f_equa => f_M1
+       sol%conserv_var(1,1:2)=1
+       sol%conserv_var(2,1)=2
+       sol%conserv_var(2,2)=3
+       sol%conserv_var(3,1)=2
+       sol%conserv_var(3,2)=3
     case default
        print*,trim(str_equa)," equation not implemented"
        call exit()
@@ -185,11 +233,55 @@ contains
 
     select case (trim(str_flux))
     case ('godunov')
-       flux => flux_godunov
+       select case (trim(str_equa))
+       case('advection')
+          flux => flux_godunov_adv
+       case('burgers')
+          flux => flux_godunov_bur
+       case default
+          print*,trim(str_flux)," is not valid for equation ",trim(str_equa)
+          call exit()
+       end select
        speed => speed_godunov
     case ('HLL')
-       flux => flux_HLL
-       speed => speed_HLL
+       select case (trim(str_equa))
+       case('euler')
+          flux => flux_HLL
+          speed => speed_HLL
+       case('euler_is')
+          flux => flux_HLL_is
+          speed => speed_HLL_is
+       case default
+          print*,trim(str_flux)," is not valid for equation ",trim(str_equa)
+          call exit()
+       end select
+    case ('HLLc')
+       select case (trim(str_equa))
+       case('euler')
+          flux => flux_HLLc
+          speed => speed_HLLc
+       case('euler_is')
+          flux => flux_HLLc_is
+          speed => speed_HLLc_is
+       case default
+          print*,trim(str_flux)," is not valid for equation ",trim(str_equa)
+          call exit()
+       end select
+    case ('rusanov')
+       select case (trim(str_equa))
+       case('euler')
+          flux => flux_rusanov
+          speed => speed_rusanov
+       case('euler_is')
+          flux => flux_rusanov_is
+          speed => speed_rusanov_is
+       case('M1')
+          flux => flux_rusanov_M1
+          speed => speed_rusanov_M1
+       case default
+          print*,trim(str_flux)," is not valid for equation ",trim(str_equa)
+          call exit()
+       end select
     case default
        print*,trim(str_flux)," flux not implemented"
        call exit()
@@ -207,10 +299,12 @@ contains
        cfl=cfl*0.5_dp
     case ('SSPRK4')
        time_scheme => SSPRK4
-       cfl=cfl*1.50818004918983_dp*0.5_dp
+       cfl=cfl*0.5_dp
+       !cfl=cfl*1.50818004918983_dp*0.5_dp
     case ('SSPRK5')
        time_scheme => SSPRK5
-       cfl=cfl*3.39533683277420_dp*0.5_dp
+       cfl=cfl*0.5_dp
+       !cfl=cfl*3.39533683277420_dp*0.5_dp
     case default
        print*,trim(str_time_scheme)," time scheme not implemented"
        call exit()
@@ -240,6 +334,12 @@ contains
     case ('vortex')
        exactSol => exactSol_vortex
        exact_file="none"
+    case ('test')
+       exactSol => exactSol_test
+       exact_file="none"
+    case ('test2')
+       exactSol => exactSol_test2
+       exact_file="none"
     case ('file')
        exactSol => exactSol_none
     case ('none')
@@ -253,13 +353,13 @@ contains
     return
   end subroutine init_FV
 
-  subroutine calculation(mesh,sol,level,order,cfl,tf,fs,namefile,verbosity,str_equa, &
-       f_equa,flux,speed,time_scheme,exactSol, &
+  subroutine calculation(mesh,sol,level,order,cfl,tf,fs,fp,namefile,verbosity,str_equa, &
+       f_equa,flux,speed,time_scheme,exactSol,order_pc, &
        L_str_criteria,L_var_criteria,L_eps,gauss_weight,gauss_point, &
        bool_AMR,fn_adapt,f_adapt,recursivity,total_cell,average_cell,exact_file,dim)
     type(meshStruct), intent(inout) :: mesh
     type(solStruct), intent(inout) :: sol
-    integer, intent(in) :: level,order,fs,verbosity,f_adapt,recursivity,dim
+    integer, intent(in) :: level,order,fs,fp,verbosity,f_adapt,recursivity,dim
     real(dp), intent(in) :: cfl,tf
     character(len=20),intent(in) :: namefile,str_equa,exact_file
     procedure (sub_f), pointer, intent(in) :: f_equa
@@ -267,6 +367,7 @@ contains
     procedure (sub_speed), pointer, intent(in) :: speed
     procedure (sub_time), pointer, intent(in) :: time_scheme
     procedure (sub_exactsol), pointer, intent(in) :: exactSol
+    integer, dimension(:), intent(inout) :: order_pc
     procedure (sub_adapt), pointer, intent(in) :: fn_adapt
     character(len=20), dimension(:), intent(in) :: L_str_criteria
     integer, dimension(:), intent(in) :: L_var_criteria
@@ -295,11 +396,11 @@ contains
     
     do while (t<tf)
        call time_scheme(mesh,sol,str_equa,f_equa,flux,speed,order,cfl,t,n,tf, &
-            L_str_criteria,L_var_criteria,L_eps,gauss_weight,verbosity)
+            L_str_criteria,L_var_criteria,L_eps,gauss_weight,verbosity,order_pc)
        if (bool_AMR.and.mod(n,f_adapt)==0) then
           do i=0,recursivity-1
              call adapt(fn_adapt,p4est,quadrants,mesh,sol,level+i,order,gauss_weight,gauss_point,minlevel,maxlevel)
-             call buildMesh_P4EST(p4est,xL,xR,yL,yR,gauss_point,order,mesh,sol,quadrants)
+             call buildMesh_P4EST(p4est,xL,xR,yL,yR,gauss_point,order,mesh,sol,quadrants,period)
              call new_sol(mesh,quadrants,sol)
              call BC(nvar,mesh)
           enddo
@@ -307,9 +408,15 @@ contains
        if (mod(n,fs)==0.or.t>=tf) then
           call userSol(t,mesh,sol,str_equa,exactSol,exact_file,dim)
           call writeSol(mesh,sol,namefile,nout)
-          call print(mesh,sol,t,n,total_quantities)
-          if (verbosity>0) call write_output_calculation(t,n,mesh%nc,total_quantities)
+          if (verbosity>0) then
+             call write_output_calculation(t,n,mesh%nc,total_quantities)
+             call write_orders(mesh,order,n)
+          endif
+          print*,"Solution saved, iteration",n
           nout=nout+1
+       endif
+       if (mod(n,fp)==0.or.t>=tf) then
+          call print(mesh,sol,t,n,total_quantities)
        endif
        if (verbosity>0) write(13,'(i8,i8)')n,mesh%nc
        total_cell=total_cell+mesh%nc

@@ -5,6 +5,7 @@ module constant
   integer, parameter :: dp=8
   real(dp), parameter :: pi=4.0_dp*atan(1.0_dp)
   real(dp), parameter :: gamma=1.4_dp
+  real(dp), parameter :: c=2.99792458e8_dp
   real(dp), dimension(1), parameter :: gauss_point1=(/0.0_dp/)
   real(dp), dimension(1), parameter :: gauss_weight1=(/2.0_dp/)
   real(dp), dimension(2), parameter :: gauss_point2=(/-0.5773502691896257_dp,0.5773502691896257_dp/)

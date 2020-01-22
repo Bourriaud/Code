@@ -8,6 +8,7 @@ LIBS = -lp4est -lsc
 
 CC = gcc
 CCFLAGS = -O0
+CCFLAGS = -O0 -g -pg
 CCFLAGS3 = -O2
 
 F90 = gfortran
@@ -20,7 +21,7 @@ include /home/imb/abourriaud/Documents/Code/P4EST/Makefile.p4est.mk
 all: $(PROG)
 
 $(PROG): $(OBJS)
-	$(F90) -o $@ $(OBJS) $(INC) $(LIBP) $(LIBS)
+	$(F90) -pg -o $@ $(OBJS) $(INC) $(LIBP) $(LIBS)
 
 clean:
 	rm -f $(PROG) $(OBJS) *.mod test.o test
@@ -28,16 +29,16 @@ clean:
 .SUFFIXES: $(SUFFIXES) .c
 
 .c.o:
-	$(CC) $(CCFLAGS) -c $<  $(INC)
+	$(CC) $(CCFLAGS3) -c $<  $(INC)
 
 .SUFFIXES: $(SUFFIXES) .f90
 
 .f90.o:
-	$(F90) $(F90FLAGS) -c $<
+	$(F90) $(F90FLAGS3) -c $<
 
 main.o: constant.o inout.o efficiency.o types.o phys.o FV.o time.o reconstruction.o ICBC.o AMR.o
 
-inout.o: constant.o types.o efficiency.o phys.o
+inout.o: constant.o types.o efficiency.o phys.o reconstruction.o
 
 efficiency.o: constant.o types.o phys.o
 

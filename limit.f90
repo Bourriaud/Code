@@ -23,10 +23,11 @@ contains
     type(solStruct) :: sol2
     integer, dimension(:), allocatable, intent(inout) :: NOT_ACCEPTED_CELL,NOT_ACCEPTED_EDGE,NAC_reason
     integer, dimension(:), allocatable :: NAC,NAE
-    integer :: i,j,k,n,p,isol,nc,ne,cell1,cell2,edge,sub1,sub2
+    integer :: i,j,k,n,p,isol,nc,ne,cell1,cell2,edge,sub1,sub2,neigh
     procedure (sub_criteria), pointer :: criteria
     logical :: accept
     real(dp) :: lengthN1,lengthN2
+    if(.false.)print*,dt
 
     allocate(NAC(mesh%nc),NAE(mesh%ne))
 
@@ -36,6 +37,9 @@ contains
     NAE=0
     sol2=soltemp
     if (verbosity>1.and.size(NOT_ACCEPTED_CELL)==mesh%nc) NAC_reason=0
+    do k=1,mesh%nc
+       mesh%cell(k)%accept=.true.
+    enddo
     
     do n=1,size(L_str_criteria)
        
@@ -47,7 +51,17 @@ contains
        case ('DMPu2')
           criteria => DMPu2
        case('PAD')
-          criteria => PAD
+          select case (trim(str_equa))
+          case('euler')
+             criteria => PAD_euler
+          case('euler_is')
+             criteria => PAD_euler
+          case('M1')
+             criteria => PAD_M1
+          case default
+             print*,trim(L_str_criteria(n))," is not valid for equation ",trim(str_equa)
+             call exit()
+          end select
        case default
           print*,trim(L_str_criteria(n))," criteria not implemented"
           call exit()
@@ -55,66 +69,82 @@ contains
 
        do i=1,size(NOT_ACCEPTED_CELL)
           k=NOT_ACCEPTED_CELL(i)
-          call criteria(mesh,sol,sol2,k,isol,L_eps(n),gauss_weight,str_equa,accept)
+          if (mesh%cell(k)%deg==0) then
+             accept=.true.
+          else
+             call criteria(mesh,sol,sol2,k,isol,L_eps(n),gauss_weight,str_equa,accept)
+          endif
           if (.not.accept) then
              if (verbosity>1) then
                 if (size(NOT_ACCEPTED_CELL)==mesh%nc.and.NAC_reason(k)==0) NAC_reason(k)=n
              endif
              mesh%cell(k)%deg=deg
-             nc=nc+1
-             NAC(nc)=k
-             do j=1,size(mesh%cell(k)%edge)
-                edge=mesh%cell(k)%edge(j)
-                cell1=mesh%edge(edge)%cell1
-                cell2=mesh%edge(edge)%cell2
-                lengthN1=mesh%cell(abs(cell1))%dx
-                lengthN2=mesh%cell(abs(cell2))%dx
-                sub1=mesh%edge(edge)%sub(1)
-                sub2=mesh%edge(edge)%sub(2)
-                if (all(NAE/=edge).and.mesh%edge(edge)%deg>0) then
-                   
-                   select case (trim(mesh%edge(edge)%boundtype))
-                      
-                   case('PERIODIC')
-                      ne=ne+1
-                      NAE(ne)=edge
-                      if (cell1*cell2<0) then
-                         ne=ne+1
-                         NAE(ne)=mesh%edge(edge)%period
-                      endif
-                      do p=1,size(gauss_weight)
-                         call criteria_flux(mesh%edge(edge)%flux(p,:),mesh%edge(edge)%flux_acc(p))
-                         if (.not.mesh%edge(edge)%flux_acc(p)) then
-                            soltemp%val(abs(cell1),:)=soltemp%val(abs(cell1),:)+ &
-                                 gauss_weight(p)*mesh%edge(edge)%flux(p,:)*dt/(lengthN1*2.0_dp**(sub1+1))
-                            soltemp%val(abs(cell2),:)=soltemp%val(abs(cell2),:)- &
-                                 gauss_weight(p)*mesh%edge(edge)%flux(p,:)*dt/(lengthN2*2.0_dp**(sub2+1))
-                         endif
-                      enddo
-                      
-                   case default
-                      ne=ne+1
-                      NAE(ne)=edge
-                      do p=1,size(gauss_weight)
-                         call criteria_flux(mesh%edge(edge)%flux(p,:),mesh%edge(edge)%flux_acc(p))
-                         if (.not.mesh%edge(edge)%flux_acc(p)) then
-                            if (cell1>0) then
-                               soltemp%val(cell1,:)=soltemp%val(cell1,:)+ &
-                                    gauss_weight(p)*mesh%edge(edge)%flux(p,:)*dt/(lengthN1*2.0_dp**(sub1+1))
-                            endif
-                            if (cell2>0) then
-                               soltemp%val(cell2,:)=soltemp%val(cell2,:)- &
-                                    gauss_weight(p)*mesh%edge(edge)%flux(p,:)*dt/(lengthN2*2.0_dp**(sub2+1))
-                            endif
-                         endif
-                      enddo
-                   end select
-                   
+             if (all(NAC/=k)) then
+                nc=nc+1
+                NAC(nc)=k
+                mesh%cell(k)%accept=.false.
+                soltemp%val(k,:)=sol%val(k,:) !!!
+             endif
+             do j=1,size(mesh%cell(k)%stencil)
+                neigh=mesh%cell(k)%stencil(j)
+                if (all(NAC/=neigh)) then
+                   nc=nc+1
+                   NAC(nc)=neigh
+                   mesh%cell(neigh)%accept=.false.
+                   soltemp%val(neigh,:)=sol%val(neigh,:) !!!
                 endif
              enddo
           endif
        enddo
 
+       do i=1,nc
+          k=NAC(i)
+          do j=1,size(mesh%cell(k)%edge)
+             edge=mesh%cell(k)%edge(j)
+             cell1=mesh%edge(edge)%cell1
+             cell2=mesh%edge(edge)%cell2
+             lengthN1=mesh%cell(abs(cell1))%dx
+             lengthN2=mesh%cell(abs(cell2))%dx
+             sub1=mesh%edge(edge)%sub(1)
+             sub2=mesh%edge(edge)%sub(2)
+             if (all(NAE/=edge)) then
+
+                select case (trim(mesh%edge(edge)%boundtype))
+
+                case('PERIODIC')
+                   ne=ne+1
+                   NAE(ne)=edge
+                   if (cell1*cell2<0) then
+                      ne=ne+1
+                      NAE(ne)=mesh%edge(edge)%period
+                   endif
+                   !call criteria_flux(mesh%edge(edge)%flux(1,:),mesh%edge(edge)%flux_acc(1))
+                   !soltemp%val(abs(cell1),:)=soltemp%val(abs(cell1),:)+ &
+                        !gauss_weight1(1)*mesh%edge(edge)%flux(1,:)*dt/(lengthN1*2.0_dp**(sub1+1))
+                   !soltemp%val(abs(cell2),:)=soltemp%val(abs(cell2),:)- &
+                           !gauss_weight1(1)*mesh%edge(edge)%flux(1,:)*dt/(lengthN2*2.0_dp**(sub2+1))
+
+                case default
+                   ne=ne+1
+                   NAE(ne)=edge
+                   !call criteria_flux(mesh%edge(edge)%flux(1,:),mesh%edge(edge)%flux_acc(1))
+                   !if (cell1>0) then
+                      !soltemp%val(cell1,:)=soltemp%val(cell1,:)+ &
+                           !gauss_weight1(1)*mesh%edge(edge)%flux(1,:)*dt/(lengthN1*2.0_dp**(sub1+1))
+                   !endif
+                   !if (cell2>0) then
+                      !soltemp%val(cell2,:)=soltemp%val(cell2,:)- &
+                           !gauss_weight1(1)*mesh%edge(edge)%flux(1,:)*dt/(lengthN2*2.0_dp**(sub2+1))
+                   !endif
+                end select
+
+                do p=1,size(gauss_weight)
+                   call criteria_flux(mesh%edge(edge)%flux(p,:),mesh%edge(edge)%flux_acc(p))
+                enddo
+                
+             endif
+          enddo
+       enddo
     enddo
 
     deallocate(NOT_ACCEPTED_CELL,NOT_ACCEPTED_EDGE)
@@ -137,13 +167,13 @@ contains
     character(len=20), intent(in) :: str_equa
     logical, intent(out) :: accept
     integer :: j,neigh
-    real(dp) :: mini,maxi,test
+    real(dp) :: mini,maxi,test,eps2
     if(.false.)print*,gauss_weight,str_equa
 
     call norme2(sol,k,isol,mini)
     call norme2(sol,k,isol,maxi)
-    do j=1,size(mesh%cell(k)%neigh)
-       neigh=abs(mesh%cell(k)%neigh(j))
+    do j=1,size(mesh%cell(k)%stencil)     !neigh ?
+       neigh=abs(mesh%cell(k)%stencil(j))
        call norme2(sol,neigh,isol,test)
        if (test<mini) then
           mini=test
@@ -152,8 +182,9 @@ contains
        endif
     enddo
 
+    eps2=max(eps,eps*(maxi-mini))
     call norme2(sol2,k,isol,test)
-    if ((test-mini>=-eps).and.(test-maxi<=eps)) then
+    if ((test-mini>=-eps2).and.(test-maxi<=eps2)) then
        accept=.true.
     else
        accept=.false.
@@ -171,14 +202,14 @@ contains
     character(len=20), intent(in) :: str_equa
     logical, intent(out) :: accept
     integer :: i,j,neigh
-    real(dp) :: mini,maxi,test
+    real(dp) :: mini,maxi,test,eps2
     logical :: extrema
     if(.false.)print*,str_equa
 
     call norme2(sol,k,isol,mini)
     call norme2(sol,k,isol,maxi)
-    do j=1,size(mesh%cell(k)%neigh)
-       neigh=abs(mesh%cell(k)%neigh(j))
+    do j=1,size(mesh%cell(k)%stencil)     !neigh ?
+       neigh=abs(mesh%cell(k)%stencil(j))
        call norme2(sol,neigh,isol,test)
        if (test<mini) then
           mini=test
@@ -187,8 +218,9 @@ contains
        endif
     enddo
 
+    eps2=max(eps,eps*(maxi-mini))
     call norme2(sol2,k,isol,test)
-    if ((test-mini>=-eps).and.(test-maxi<=eps)) then
+    if ((test-mini>=-eps2).and.(test-maxi<=eps2)) then
        accept=.true.
     else
        accept=.false.
@@ -199,7 +231,7 @@ contains
           endif
        enddo
     endif
-
+       
     return
   end subroutine DMPu2
 
@@ -209,11 +241,11 @@ contains
     integer, intent(in) :: k,isol
     real(dp), dimension(:), intent(in) :: gauss_weight
     logical, intent(out) :: extrema
-    integer :: j,neigh
+    integer :: j,neigh,test_min,test_max
     real(dp) :: Xmin,Xmax,Ymin,Ymax
 
     call reconstruct(mesh,sol,k,3,gauss_weight)
-    do j=1,size(mesh%cell(k)%neigh)
+    do j=1,size(mesh%cell(k)%edge)
        neigh=mesh%cell(k)%neigh(j)
        if (neigh>0) then
           call reconstruct(mesh,sol,neigh,3,gauss_weight)
@@ -224,17 +256,21 @@ contains
     Xmax=mesh%cell(k)%polCoef(5,isol)
     Ymin=mesh%cell(k)%polCoef(3,isol)
     Ymax=mesh%cell(k)%polCoef(3,isol)
-    do j=1,size(mesh%cell(k)%neigh)
+    test_min=k
+    test_max=k
+    do j=1,size(mesh%cell(k)%edge)
        neigh=mesh%cell(k)%neigh(j)
        if (neigh>0) then
-          if (mesh%cell(neigh)%polCoef(5,isol)<Xmin) then
+          if (abs(mesh%cell(neigh)%polCoef(5,isol))<abs(Xmin)) then
              Xmin=mesh%cell(neigh)%polCoef(5,isol)
-          else if (mesh%cell(neigh)%polCoef(5,isol)>Xmax) then
+             test_min=neigh
+          else if (abs(mesh%cell(neigh)%polCoef(5,isol))>abs(Xmax)) then
              Xmax=mesh%cell(neigh)%polCoef(5,isol)
+             test_max=neigh
           endif
-          if (mesh%cell(neigh)%polCoef(3,isol)<Ymin) then
+          if (abs(mesh%cell(neigh)%polCoef(3,isol))<abs(Ymin)) then
              Ymin=mesh%cell(neigh)%polCoef(3,isol)
-          else if (mesh%cell(neigh)%polCoef(3,isol)>Ymax) then
+          else if (abs(mesh%cell(neigh)%polCoef(3,isol))>abs(Ymax)) then
              Ymax=mesh%cell(neigh)%polCoef(3,isol)
           endif
        endif
@@ -251,9 +287,9 @@ contains
     endif
 
     deallocate(mesh%cell(k)%polCoef)
-    do j=1,size(mesh%cell(k)%neigh)
+    do j=1,size(mesh%cell(k)%edge)
        neigh=mesh%cell(k)%neigh(j)
-       if (neigh>0) then
+       if (neigh/=k.and.neigh>0) then
           deallocate(mesh%cell(neigh)%polCoef)
        endif
     enddo
@@ -261,7 +297,7 @@ contains
     return
   end subroutine u2
 
-  subroutine PAD(mesh,sol,sol2,k,isol,eps,gauss_weight,str_equa,accept)
+  subroutine PAD_euler(mesh,sol,sol2,k,isol,eps,gauss_weight,str_equa,accept)
     type(meshStruct), intent(inout) :: mesh
     type(solStruct), intent(in) :: sol,sol2
     integer, intent(in) :: k,isol
@@ -273,15 +309,39 @@ contains
     if(.false.)print*,eps,gauss_weight,isol,mesh%nc,sol%nsolUser
 
     call unconserv(sol2%val(k,:),str_equa,1,rho)
-    call unconserv(sol2%val(k,:),str_equa,4,p)
-    if (rho>=0.0_dp.and.p>=0.0_dp) then
-       accept=.true.
-    else
-       accept=.false.
+    accept=.false.
+    if (rho>eps) then
+       call unconserv(sol2%val(k,:),str_equa,4,p)
+       if (p>eps) then
+          accept=.true.
+       endif
     endif
 
     return
-  end subroutine PAD
+  end subroutine PAD_euler
+
+  subroutine PAD_M1(mesh,sol,sol2,k,isol,eps,gauss_weight,str_equa,accept)
+    type(meshStruct), intent(inout) :: mesh
+    type(solStruct), intent(in) :: sol,sol2
+    integer, intent(in) :: k,isol
+    real(dp), intent(in) :: eps
+    real(dp), dimension(:), intent(in) :: gauss_weight
+    character(len=20), intent(in) :: str_equa
+    logical, intent(out) :: accept
+    real(dp) :: test
+    if(.false.)print*,gauss_weight,isol,mesh%nc,sol%nsolUser
+    if(.false.)call unconserv(sol2%val(k,:),str_equa,1,test)
+
+    accept=.false.
+    if (sol2%val(k,1)<eps) then
+       accept=.true.
+    endif
+    if ((sol2%val(k,2)<eps.or.sol2%val(k,3)<eps).or.(sol2%val(k,2)>1.0_dp-eps.or.sol2%val(k,3)>1.0_dp-eps)) then
+       accept=.true.
+    endif
+
+    return
+  end subroutine PAD_M1
 
   subroutine criteria_flux(flux,accept)
     real(dp), dimension(:), intent(in) :: flux

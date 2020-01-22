@@ -36,6 +36,7 @@ module types
      integer :: deg
      integer :: level
      real(dp), dimension(:,:), allocatable :: polMax
+     integer, dimension(:), allocatable :: stencil
   end type cellStruct
   
   type :: meshStruct
@@ -92,7 +93,7 @@ module types
      end subroutine sub_speed
 
      subroutine sub_time (mesh,sol,str_equa,f_equa,flux,speed,order,cfl,t,n,tf, &
-          L_str_criteria,L_var_criteria,L_eps,gauss_weight,verbosity)
+          L_str_criteria,L_var_criteria,L_eps,gauss_weight,verbosity,order_pc)
        use constant
        import meshStruct
        import solStruct
@@ -112,6 +113,7 @@ module types
        integer, dimension(:), intent(in) :: L_var_criteria
        real(dp), dimension(:), intent(in) :: L_eps
        real(dp), dimension(:), intent(in) :: gauss_weight
+       integer, dimension(:), intent(inout) :: order_pc
      end subroutine sub_time
 
      subroutine sub_criteria(mesh,sol,sol2,k,isol,eps,gauss_weight,str_equa,accept)
