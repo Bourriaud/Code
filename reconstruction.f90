@@ -60,21 +60,27 @@ contains
     return
   end subroutine evaluate
   
-  subroutine reconstruct(mesh,sol,k,order,gauss_weight)
+  subroutine reconstruct(mesh,sol,k,order,gauss_weight,period)
     type(meshStruct), intent(inout) :: mesh
     type(solStruct), intent(in) :: sol
     integer, intent(in) :: k,order
     real(dp), dimension(:), intent(in) :: gauss_weight
-    integer, dimension(:), allocatable :: stencil
+    logical, intent(in) :: period
+    integer, dimension(:), allocatable :: stencil,stencil_type
     real(dp), dimension(:,:), allocatable :: X,U
-    integer :: d,N,Ni,Nj,i,i1,i2,j,isol
-    real(dp) :: Kk,Kj,intk,intj,pond
+    integer :: d,N,Ni,Nj,i,isol
+    real(dp) :: Kk,pond,dist
     real(dp), dimension(2) :: c
-    integer, dimension(2) :: alpha
+    character(len=99) :: id_char
+    integer(16) :: id
     
     d=order-1
     call Nequa(d,N)
-    call buildStencil(mesh,k,N,order,stencil)
+    if (period) then
+       call buildStencil_period(mesh,k,N,order,stencil,stencil_type)
+    else
+       call buildStencil(mesh,k,N,order,stencil,stencil_type)
+    endif
     Ni=size(stencil)
     Nj=d*(d+1)/2+d
     
@@ -84,39 +90,43 @@ contains
     c(1)=mesh%cell(k)%xc
     c(2)=mesh%cell(k)%yc
     pond=1.5_dp
-    i=1
 
-    do i2=1,d
-       do i1=0,d-i2
-          alpha(1)=i1
-          alpha(2)=i2
-          call quad_monome(mesh,c,alpha,k,gauss_weight,intk)
-          do j=1,Ni
-             Kj=mesh%cell(stencil(j))%dx*mesh%cell(stencil(j))%dy
-             call quad_monome(mesh,c,alpha,stencil(j),gauss_weight,intj)
-             X(j,i)=(intj-intk)/(((mesh%cell(stencil(j))%xc-c(1))**2+(mesh%cell(stencil(j))%yc-c(2))**2)**(pond/4.0_dp))
-          enddo
-          i=i+1
-       enddo
-    enddo
-
-    do i1=1,d
-       alpha(1)=i1
-       alpha(2)=0
-       call quad_monome(mesh,c,alpha,k,gauss_weight,intk)
-       do j=1,Ni
-          Kj=mesh%cell(stencil(j))%dx*mesh%cell(stencil(j))%dy
-          call quad_monome(mesh,c,alpha,stencil(j),gauss_weight,intj)
-          X(j,i)=(intj-intk)/(((mesh%cell(stencil(j))%xc-c(1))**2+(mesh%cell(stencil(j))%yc-c(2))**2)**(pond/4.0_dp))
-       enddo
-       i=i+1
-    enddo
+    write(id_char,'(99I1)')order,0,stencil_type
+    read(id_char, '(I99)' )id
+    
+    select case (id)
+    case (205555_dp)
+       X=X_2_5555
+       call adjust_X(mesh%cell(k)%dx,mesh%cell(k)%dy,d,X)
+    case (30555555555555_dp)
+       X=X_3_555555555555
+       call adjust_X(mesh%cell(k)%dx,mesh%cell(k)%dy,d,X)
+    case (40555555555555555555555555_16)
+       X=X_4_555555555555555555555555
+       call adjust_X(mesh%cell(k)%dx,mesh%cell(k)%dy,d,X)
+    case default
+       call calculate_X(mesh,stencil,gauss_weight,k,c,d,Ni,X)
+    end select
+    
+    !if (k==100.and.order==4) then
+       !print*,order
+       !print*,stencil_type
+       !do i=1,size(X(1,:))
+          !print*,X(:,i) !/(mesh%cell(k)%dx)**3
+       !enddo
+       !print*,"---------------"
+       !do i=1,size(X_3_000000000000(:,1))
+          !print*,X_3_000000000000(i,:)
+       !enddo
+       !call exit()
+    !endif
     
     do i=1,Ni
+       dist=((mesh%cell(stencil(i))%xc-c(1))**2+(mesh%cell(stencil(i))%yc-c(2))**2)**(pond/4.0_dp)
        do isol=1,sol%nvar
-          U(i,isol)=(sol%val(stencil(i),isol)-sol%val(k,isol))/ &
-               (((mesh%cell(stencil(i))%xc-c(1))**2+(mesh%cell(stencil(i))%yc-c(2))**2)**(pond/4.0_dp))
+          U(i,isol)=(sol%val(stencil(i),isol)-sol%val(k,isol))/dist
        enddo
+       X(i,:)=X(i,:)/dist
     enddo
     
     if (allocated(mesh%cell(k)%polCoef)) deallocate(mesh%cell(k)%polCoef)
@@ -130,6 +140,65 @@ contains
 
     return
   end subroutine reconstruct
+
+  subroutine adjust_X(dx,dy,d,X)
+    real(dp), intent(in) :: dx,dy
+    integer, intent(in) :: d
+    real(dp), dimension(:,:), intent(inout) :: X
+    integer :: i1,i2,i
+
+    i=1
+    do i2=1,d
+       do i1=0,d-i2
+          X(:,i)=X(:,i)*(dx**i1)*(dy**i2)
+          i=i+1
+       enddo
+    enddo
+    do i1=1,d
+       X(:,i)=X(:,i)*(dx**i1)
+       i=i+1
+    enddo
+
+  end subroutine adjust_X
+
+  subroutine calculate_X(mesh,stencil,gauss_weight,k,c,d,Ni,X)
+    type(meshStruct), intent(in) :: mesh
+    integer, dimension(:), intent(in) :: stencil
+    real(dp), dimension(:), intent(in) :: gauss_weight
+    integer, intent(in) :: k,d,Ni
+    real(dp), dimension(2), intent(in) :: c
+    real(dp), dimension(:,:), intent(inout) :: X
+    integer :: i1,i2,i,j
+    integer, dimension(2) :: alpha
+    real(dp) :: intj,intk,Kj
+
+    i=1
+    do i2=1,d
+       do i1=0,d-i2
+          alpha(1)=i1
+          alpha(2)=i2
+          call quad_monome(mesh,c,alpha,k,gauss_weight,intk)
+          do j=1,Ni
+             Kj=mesh%cell(stencil(j))%dx*mesh%cell(stencil(j))%dy
+             call quad_monome(mesh,c,alpha,stencil(j),gauss_weight,intj)
+             X(j,i)=intj-intk
+          enddo
+          i=i+1
+       enddo
+    enddo
+    do i1=1,d
+       alpha(1)=i1
+       alpha(2)=0
+       call quad_monome(mesh,c,alpha,k,gauss_weight,intk)
+       do j=1,Ni
+          Kj=mesh%cell(stencil(j))%dx*mesh%cell(stencil(j))%dy
+          call quad_monome(mesh,c,alpha,stencil(j),gauss_weight,intj)
+          X(j,i)=intj-intk
+       enddo
+       i=i+1
+    enddo
+
+  end subroutine calculate_X
   
   subroutine Nequa(d,N)
     integer, intent(in) :: d
@@ -140,16 +209,19 @@ contains
     return
   end subroutine Nequa
 
-  subroutine couronne(mesh,stencil,n)
+  subroutine couronne(mesh,stencil,stencil_type,n)
     type(meshStruct), intent(in) :: mesh
-    integer, dimension(:), allocatable, intent(inout) :: stencil
+    integer, dimension(:), allocatable, intent(inout) :: stencil,stencil_type
     integer, intent(in) :: n
-    integer, dimension(:), allocatable :: stencil2
-    integer :: i,j,k,neigh
+    integer, dimension(:), allocatable :: stencil2,stencil2_type
+    integer :: i,j,k,neigh,s
 
-    allocate(stencil2(3*(2*n+1)**2))
+    s=3*(2*n+1)**2
+    allocate(stencil2(s),stencil2_type(s))
     stencil2=-1
     stencil2(1:size(stencil))=stencil
+    stencil2_type=0
+    stencil2_type(1:size(stencil_type))=stencil_type
     k=size(stencil)
 
     do i=1,size(stencil)
@@ -158,30 +230,35 @@ contains
           if ((all(stencil2/=neigh)).and.(neigh>0)) then
              k=k+1
              stencil2(k)=neigh
+             stencil2_type(k)=mesh%cell(stencil(1))%level-mesh%cell(abs(neigh))%level+5
           endif
        enddo
     enddo
     
-    deallocate(stencil)
-    allocate(stencil(k))
+    deallocate(stencil,stencil_type)
+    allocate(stencil(k),stencil_type(k))
 
     stencil=stencil2(1:k)
+    stencil_type=stencil2_type(1:k)
 
-    deallocate(stencil2)
+    deallocate(stencil2,stencil2_type)
     
     return
   end subroutine couronne
 
-  subroutine couronne_period(mesh,stencil,n)
+  subroutine couronne_period(mesh,stencil,stencil_type,n)
     type(meshStruct), intent(in) :: mesh
-    integer, dimension(:), allocatable, intent(inout) :: stencil
+    integer, dimension(:), allocatable, intent(inout) :: stencil,stencil_type
     integer, intent(in) :: n
-    integer, dimension(:), allocatable :: stencil2
-    integer :: i,j,k,neigh
+    integer, dimension(:), allocatable :: stencil2,stencil2_type
+    integer :: i,j,k,neigh,s
 
-    allocate(stencil2(3*(2*n+1)**2))
+    s=3*(2*n+1)**2
+    allocate(stencil2(s),stencil2_type(s))
     stencil2=-1
     stencil2(1:size(stencil))=stencil
+    stencil2_type=0
+    stencil2_type(1:size(stencil_type))=stencil_type
     k=size(stencil)
 
     do i=1,size(stencil)
@@ -190,68 +267,74 @@ contains
           if (all(stencil2/=abs(neigh))) then
              k=k+1
              stencil2(k)=abs(neigh)
+             stencil2_type(k)=mesh%cell(stencil(1))%level-mesh%cell(abs(neigh))%level+5
           endif
        enddo
     enddo
 
-    deallocate(stencil)
-    allocate(stencil(k))
+    deallocate(stencil,stencil_type)
+    allocate(stencil(k),stencil_type(k))
 
     stencil=stencil2(1:k)
+    stencil_type=stencil2_type(1:k)
 
-    deallocate(stencil2)
+    deallocate(stencil2,stencil2_type)
     
     return
   end subroutine couronne_period
   
-  subroutine buildStencil(mesh,k,N,order,stencil)
+  subroutine buildStencil(mesh,k,N,order,stencil,stencil_type)
     type(meshStruct), intent(in) :: mesh
     integer, intent(in) :: k,N,order
-    integer, dimension(:), allocatable, intent(out) :: stencil
-    integer, dimension(:), allocatable :: stencil2
+    integer, dimension(:), allocatable, intent(out) :: stencil,stencil_type
+    integer, dimension(:), allocatable :: stencil2,stencil2_type
     integer :: i,s
 
-    allocate(stencil2(1))
+    allocate(stencil2(1),stencil2_type(1))
     stencil2(1)=k
+    stencil2_type(1)=0
     i=1
     s=ceiling(size_stencil(order)*N)
 
     do while (size(stencil2)<s)
-       call couronne(mesh,stencil2,i)
+       call couronne(mesh,stencil2,stencil2_type,i)
        i=i+1
     enddo
 
     s=size(stencil2)-1
-    allocate(stencil(s))
+    allocate(stencil(s),stencil_type(s))
     stencil(1:s)=stencil2(2:s+1)
+    stencil_type(1:s)=stencil2_type(2:s+1)
     
-    deallocate(stencil2)
+    deallocate(stencil2,stencil2_type)
 
     return
   end subroutine buildStencil
 
-  subroutine buildStencil_period(mesh,k,N,order,stencil)
+  subroutine buildStencil_period(mesh,k,N,order,stencil,stencil_type)
     type(meshStruct), intent(in) :: mesh
     integer, intent(in) :: k,N,order
-    integer, dimension(:), allocatable, intent(out) :: stencil
-    integer, dimension(:), allocatable :: stencil2
+    integer, dimension(:), allocatable, intent(out) :: stencil,stencil_type
+    integer, dimension(:), allocatable :: stencil2,stencil2_type
     integer :: i,s
 
-    allocate(stencil2(1))
+    allocate(stencil2(1),stencil2_type(1))
     stencil2(1)=k
+    stencil2_type(1)=0
     i=1
     s=ceiling(size_stencil(order)*N)
     
     do while (size(stencil2)<s)
-       call couronne_period(mesh,stencil2,i)
+       call couronne_period(mesh,stencil2,stencil2_type,i)
        i=i+1
     enddo
 
     s=size(stencil2)-1
-    allocate(stencil(s))
+    allocate(stencil(s),stencil_type(s))
     stencil(1:s)=stencil2(2:s+1)
+    stencil_type(1:s)=stencil2_type(2:s+1)
     
-    deallocate(stencil2)
+    deallocate(stencil2,stencil2_type)
 
     return
   end subroutine buildStencil_period

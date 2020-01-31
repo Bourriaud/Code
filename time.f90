@@ -38,7 +38,7 @@ contains
   end subroutine compute_timestep
 
   subroutine advance(mesh,sol,sol2,str_equa,f_equa,flux,order,dt,t,n,irk, &
-       L_str_criteria,L_var_criteria,L_eps,gauss_weight,verbosity,order_pc)
+       L_str_criteria,L_var_criteria,L_eps,gauss_weight,period,verbosity,order_pc)
     type(meshStruct), intent(inout) :: mesh
     type(solStruct), intent(in) :: sol
     type(solStruct), intent(inout) :: sol2
@@ -51,6 +51,7 @@ contains
     integer, dimension(:), intent(in) :: L_var_criteria
     real(dp), dimension(:), intent(in) :: L_eps
     real(dp), dimension(:), intent(in) :: gauss_weight
+    logical, intent(in) :: period
     integer, dimension(:), intent(inout) :: order_pc
     integer :: k,i,j,p,cell1,cell2,dir,count,deg,sub1,sub2,ac1,ac2
     real(dp), dimension(:), allocatable :: u1,u2
@@ -99,8 +100,8 @@ contains
           sub2=edge%sub(2)
           deg=min(mesh%cell(ac1)%deg,mesh%cell(ac2)%deg)
           mesh%edge(j)%deg=deg
-          call reconstruct(mesh,sol,ac1,deg+1,gauss_weight)
-          call reconstruct(mesh,sol,ac2,deg+1,gauss_weight)
+          call reconstruct(mesh,sol,ac1,deg+1,gauss_weight,period)
+          call reconstruct(mesh,sol,ac2,deg+1,gauss_weight,period)
           if (deg+1==order) then
              mesh%cell(ac1)%polMax=mesh%cell(ac1)%polCoef
              mesh%cell(ac2)%polMax=mesh%cell(ac2)%polCoef
@@ -154,7 +155,7 @@ contains
        if (size(L_str_criteria)>0) then
           deg=min(L_deg(min(count,size(L_deg))),order-1)
           call decrement(mesh,sol,soltemp,str_equa,deg,dt,L_str_criteria,L_var_criteria,L_eps, &
-               gauss_weight,NOT_ACCEPTED_CELL,NOT_ACCEPTED_EDGE,NAC_reason,verbosity)
+               gauss_weight,period,NOT_ACCEPTED_CELL,NOT_ACCEPTED_EDGE,NAC_reason,verbosity)
        else
           deallocate(NOT_ACCEPTED_CELL,NOT_ACCEPTED_EDGE)
           allocate(NOT_ACCEPTED_CELL(0),NOT_ACCEPTED_EDGE(0))
@@ -179,7 +180,7 @@ contains
   end subroutine advance
 
   subroutine euler_exp(mesh,sol,str_equa,f_equa,flux,speed,order,cfl,t,n,tf, &
-       L_str_criteria,L_var_criteria,L_eps,gauss_weight,verbosity,order_pc)
+       L_str_criteria,L_var_criteria,L_eps,gauss_weight,period,verbosity,order_pc)
     type(meshStruct), intent(inout) :: mesh
     type(solStruct), intent(inout) :: sol
     character(len=20), intent(in) :: str_equa
@@ -193,6 +194,7 @@ contains
     integer, dimension(:), intent(in) :: L_var_criteria
     real(dp), dimension(:), intent(in) :: L_eps
     real(dp), dimension(:), intent(in) :: gauss_weight
+    logical, intent(in) :: period
     integer, dimension(:), intent(inout) :: order_pc
     type(solStruct) :: Fsol
     real(dp) :: dt
@@ -202,7 +204,7 @@ contains
     call compute_timestep(mesh,sol,f_equa,speed,cfl,tf,t,dt)
 
     call advance(mesh,sol,Fsol,str_equa,f_equa,flux,order,dt,t,n,1, &
-         L_str_criteria,L_var_criteria,L_eps,gauss_weight,verbosity,order_pc)
+         L_str_criteria,L_var_criteria,L_eps,gauss_weight,period,verbosity,order_pc)
     sol%user=Fsol%user
     sol%val=sol%val+Fsol%val
 
@@ -214,7 +216,7 @@ contains
   end subroutine euler_exp
 
   subroutine SSPRK2(mesh,sol,str_equa,f_equa,flux,speed,order,cfl,t,n,tf, &
-       L_str_criteria,L_var_criteria,L_eps,gauss_weight,verbosity,order_pc)
+       L_str_criteria,L_var_criteria,L_eps,gauss_weight,period,verbosity,order_pc)
     type(meshStruct), intent(inout) :: mesh
     type(solStruct), intent(inout) :: sol
     character(len=20), intent(in) :: str_equa
@@ -228,6 +230,7 @@ contains
     integer, dimension(:), intent(in) :: L_var_criteria
     real(dp), dimension(:), intent(in) :: L_eps
     real(dp), dimension(:), intent(in) :: gauss_weight
+    logical, intent(in) :: period
     integer, dimension(:), intent(inout) :: order_pc
     type(solStruct) :: sol1,Fsol,Fsol1
     real(dp) :: dt
@@ -238,11 +241,11 @@ contains
     call compute_timestep(mesh,sol,f_equa,speed,cfl,tf,t,dt)
 
     call advance(mesh,sol,Fsol,str_equa,f_equa,flux,order,dt,t,n,1, &
-         L_str_criteria,L_var_criteria,L_eps,gauss_weight,verbosity,order_pc)
+         L_str_criteria,L_var_criteria,L_eps,gauss_weight,period,verbosity,order_pc)
     sol1%user=Fsol%user
     sol1%val=sol%val+Fsol%val
     call advance(mesh,sol1,Fsol1,str_equa,f_equa,flux,order,dt,t,n,2, &
-         L_str_criteria,L_var_criteria,L_eps,gauss_weight,verbosity,order_pc)
+         L_str_criteria,L_var_criteria,L_eps,gauss_weight,period,verbosity,order_pc)
     sol%user=Fsol1%user
     sol%val=0.5_dp*sol%val+0.5_dp*sol1%val+0.5_dp*Fsol1%val
 
@@ -254,7 +257,7 @@ contains
   end subroutine SSPRK2
 
   subroutine SSPRK3(mesh,sol,str_equa,f_equa,flux,speed,order,cfl,t,n,tf, &
-       L_str_criteria,L_var_criteria,L_eps,gauss_weight,verbosity,order_pc)
+       L_str_criteria,L_var_criteria,L_eps,gauss_weight,period,verbosity,order_pc)
     type(meshStruct), intent(inout) :: mesh
     type(solStruct), intent(inout) :: sol
     character(len=20), intent(in) :: str_equa
@@ -268,6 +271,7 @@ contains
     integer, dimension(:), intent(in) :: L_var_criteria
     real(dp), dimension(:), intent(in) :: L_eps
     real(dp), dimension(:), intent(in) :: gauss_weight
+    logical, intent(in) :: period
     integer, dimension(:), intent(inout) :: order_pc
     type(solStruct) :: sol1,sol2,Fsol,Fsol1,Fsol2
     real(dp) :: dt
@@ -280,15 +284,15 @@ contains
     call compute_timestep(mesh,sol,f_equa,speed,cfl,tf,t,dt)
 
     call advance(mesh,sol,Fsol,str_equa,f_equa,flux,order,dt,t,n,1, &
-         L_str_criteria,L_var_criteria,L_eps,gauss_weight,verbosity,order_pc)
+         L_str_criteria,L_var_criteria,L_eps,gauss_weight,period,verbosity,order_pc)
     sol1%user=Fsol%user
     sol1%val=sol%val+Fsol%val
     call advance(mesh,sol1,Fsol1,str_equa,f_equa,flux,order,dt,t,n,2, &
-         L_str_criteria,L_var_criteria,L_eps,gauss_weight,verbosity,order_pc)
+         L_str_criteria,L_var_criteria,L_eps,gauss_weight,period,verbosity,order_pc)
     sol2%user=Fsol1%user
     sol2%val=0.75_dp*sol%val+0.25_dp*sol1%val+0.25*Fsol1%val
     call advance(mesh,sol2,Fsol2,str_equa,f_equa,flux,order,dt,t,n,3, &
-         L_str_criteria,L_var_criteria,L_eps,gauss_weight,verbosity,order_pc)
+         L_str_criteria,L_var_criteria,L_eps,gauss_weight,period,verbosity,order_pc)
     sol%user=Fsol2%user
     sol%val=1.0_dp/3.0_dp*sol%val+2.0_dp/3.0_dp*sol2%val+2.0_dp/3.0_dp*Fsol2%val
     
@@ -300,7 +304,7 @@ contains
   end subroutine SSPRK3
 
   subroutine SSPRK4(mesh,sol,str_equa,f_equa,flux,speed,order,cfl,t,n,tf, &
-       L_str_criteria,L_var_criteria,L_eps,gauss_weight,verbosity,order_pc)
+       L_str_criteria,L_var_criteria,L_eps,gauss_weight,period,verbosity,order_pc)
     type(meshStruct), intent(inout) :: mesh
     type(solStruct), intent(inout) :: sol
     character(len=20), intent(in) :: str_equa
@@ -314,6 +318,7 @@ contains
     integer, dimension(:), intent(in) :: L_var_criteria
     real(dp), dimension(:), intent(in) :: L_eps
     real(dp), dimension(:), intent(in) :: gauss_weight
+    logical, intent(in) :: period
     integer, dimension(:), intent(inout) :: order_pc
     type(solStruct) :: sol1,sol2,sol3,sol4,Fsol,Fsol1,Fsol2,Fsol3,Fsol4
     real(dp) :: dt
@@ -329,23 +334,23 @@ contains
     sol4=sol
 
     call advance(mesh,sol,Fsol,str_equa,f_equa,flux,order,dt,t,n,1, &
-         L_str_criteria,L_var_criteria,L_eps,gauss_weight,verbosity,order_pc)
+         L_str_criteria,L_var_criteria,L_eps,gauss_weight,period,verbosity,order_pc)
     sol1%user=Fsol%user
     sol1%val=sol%val+0.391752226571890_dp*Fsol%val
     call advance(mesh,sol1,Fsol1,str_equa,f_equa,flux,order,dt,t,n,2, &
-         L_str_criteria,L_var_criteria,L_eps,gauss_weight,verbosity,order_pc)
+         L_str_criteria,L_var_criteria,L_eps,gauss_weight,period,verbosity,order_pc)
     sol2%user=Fsol1%user
     sol2%val=0.444370493651235_dp*sol%val+0.555629506348765_dp*sol1%val+0.368410593050371_dp*Fsol1%val   
     call advance(mesh,sol2,Fsol2,str_equa,f_equa,flux,order,dt,t,n,3, &
-         L_str_criteria,L_var_criteria,L_eps,gauss_weight,verbosity,order_pc)
+         L_str_criteria,L_var_criteria,L_eps,gauss_weight,period,verbosity,order_pc)
     sol3%user=Fsol2%user
     sol3%val=0.620101851488403_dp*sol%val+0.379898148511597_dp*sol2%val+0.251891774271694_dp*Fsol2%val
     call advance(mesh,sol3,Fsol3,str_equa,f_equa,flux,order,dt,t,n,4, &
-         L_str_criteria,L_var_criteria,L_eps,gauss_weight,verbosity,order_pc)
+         L_str_criteria,L_var_criteria,L_eps,gauss_weight,period,verbosity,order_pc)
     sol4%user=Fsol3%user
     sol4%val=0.178079954393132_dp*sol%val+0.821920045606868_dp*sol3%val+0.544974750228521_dp*Fsol3%val
     call advance(mesh,sol4,Fsol4,str_equa,f_equa,flux,order,dt,t,n,5, &
-         L_str_criteria,L_var_criteria,L_eps,gauss_weight,verbosity,order_pc)
+         L_str_criteria,L_var_criteria,L_eps,gauss_weight,period,verbosity,order_pc)
     sol%user=Fsol4%user
     sol%val=0.517231671970585_dp*sol2%val+0.096059710526147_dp*sol3%val+0.386708617503269_dp*sol4%val+ &
          0.063692468666290_dp*Fsol3%val+0.226007483236906_dp*Fsol4%val
@@ -359,7 +364,7 @@ contains
   end subroutine SSPRK4
 
   subroutine SSPRK5(mesh,sol,str_equa,f_equa,flux,speed,order,cfl,t,n,tf, &
-       L_str_criteria,L_var_criteria,L_eps,gauss_weight,verbosity,order_pc)
+       L_str_criteria,L_var_criteria,L_eps,gauss_weight,period,verbosity,order_pc)
     type(meshStruct), intent(inout) :: mesh
     type(solStruct), intent(inout) :: sol
     character(len=20), intent(in) :: str_equa
@@ -373,6 +378,7 @@ contains
     integer, dimension(:), intent(in) :: L_var_criteria
     real(dp), dimension(:), intent(in) :: L_eps
     real(dp), dimension(:), intent(in) :: gauss_weight
+    logical, intent(in) :: period
     integer, dimension(:), intent(inout) :: order_pc
     type(solStruct) :: sol1,sol2,sol3,sol4,sol5,sol6,sol7,sol8,sol9
     type(solStruct) :: Fsol,Fsol1,Fsol2,Fsol3,Fsol4,Fsol5,Fsol6,Fsol7,Fsol8,Fsol9
@@ -397,48 +403,48 @@ contains
     sol9=sol
 
     call advance(mesh,sol,Fsol,str_equa,f_equa,flux,order,dt,t,n,1, &
-         L_str_criteria,L_var_criteria,L_eps,gauss_weight,verbosity,order_pc)
+         L_str_criteria,L_var_criteria,L_eps,gauss_weight,period,verbosity,order_pc)
     sol1%user=Fsol%user
     sol1%val=sol%val+0.173586107937995_dp*Fsol%val
     call advance(mesh,sol1,Fsol1,str_equa,f_equa,flux,order,dt,t,n,2, &
-         L_str_criteria,L_var_criteria,L_eps,gauss_weight,verbosity,order_pc)
+         L_str_criteria,L_var_criteria,L_eps,gauss_weight,period,verbosity,order_pc)
     sol2%user=Fsol1%user
     sol2%val=0.258168167463650_dp*sol%val+0.741831832536350_dp*sol1%val+0.218485490268790_dp*Fsol1%val  
     call advance(mesh,sol2,Fsol2,str_equa,f_equa,flux,order,dt,t,n,3, &
-         L_str_criteria,L_var_criteria,L_eps,gauss_weight,verbosity,order_pc)
+         L_str_criteria,L_var_criteria,L_eps,gauss_weight,period,verbosity,order_pc)
     sol3%user=Fsol2%user
     sol3%val=0.037493531856076_dp*sol1%val+0.962506468143924_dp*sol2%val+ &
          0.011042654588541_dp*Fsol1%val+0.283478934653295_dp*Fsol2%val
     call advance(mesh,sol3,Fsol3,str_equa,f_equa,flux,order,dt,t,n,4, &
-         L_str_criteria,L_var_criteria,L_eps,gauss_weight,verbosity,order_pc)
+         L_str_criteria,L_var_criteria,L_eps,gauss_weight,period,verbosity,order_pc)
     sol4%user=Fsol3%user
     sol4%val=0.595955269449077_dp*sol%val+0.404044730550923_dp*sol2%val+0.118999896166647_dp*Fsol2%val
     call advance(mesh,sol4,Fsol4,str_equa,f_equa,flux,order,dt,t,n,5, &
-         L_str_criteria,L_var_criteria,L_eps,gauss_weight,verbosity,order_pc)
+         L_str_criteria,L_var_criteria,L_eps,gauss_weight,period,verbosity,order_pc)
     sol5%user=Fsol4%user
     sol5%val=0.331848124368345_dp*sol%val+0.008466192609453_dp*sol3%val+0.659685683022202_dp*sol4%val+ &
          0.025030881091201_dp*Fsol%val-0.002493476502164_dp*Fsol3%val+0.194291675763785_dp*Fsol4%val
     call advance(mesh,sol5,Fsol5,str_equa,f_equa,flux,order,dt,t,n,6, &
-         L_str_criteria,L_var_criteria,L_eps,gauss_weight,verbosity,order_pc)
+         L_str_criteria,L_var_criteria,L_eps,gauss_weight,period,verbosity,order_pc)
     sol6%user=Fsol5%user
     sol6%val=0.086976414344414_dp*sol%val+0.913023585655586_dp*sol5%val+0.268905157462563_dp*Fsol5%val
     call advance(mesh,sol6,Fsol6,str_equa,f_equa,flux,order,dt,t,n,7, &
-         L_str_criteria,L_var_criteria,L_eps,gauss_weight,verbosity,order_pc)
+         L_str_criteria,L_var_criteria,L_eps,gauss_weight,period,verbosity,order_pc)
     sol7%user=Fsol6%user
     sol7%val=0.075863700003186_dp*sol%val+0.267513039663395_dp*sol2%val+0.656623260333419_dp*sol6%val+ &
          0.066115378914543_dp*Fsol2%val+0.193389726166555_dp*Fsol6%val
     call advance(mesh,sol7,Fsol7,str_equa,f_equa,flux,order,dt,t,n,8, &
-         L_str_criteria,L_var_criteria,L_eps,gauss_weight,verbosity,order_pc)
+         L_str_criteria,L_var_criteria,L_eps,gauss_weight,period,verbosity,order_pc)
     sol8%user=Fsol7%user
     sol8%val=0.005212058095597_dp*sol%val+0.407430107306541_dp*sol3%val+0.587357834597862_dp*sol7%val- &
          0.119996962708895_dp*Fsol3%val+0.172989562899406_dp*Fsol7%val
     call advance(mesh,sol8,Fsol8,str_equa,f_equa,flux,order,dt,t,n,9, &
-         L_str_criteria,L_var_criteria,L_eps,gauss_weight,verbosity,order_pc)
+         L_str_criteria,L_var_criteria,L_eps,gauss_weight,period,verbosity,order_pc)
     sol9%user=Fsol8%user
     sol9%val=0.122832051947995_dp*sol%val+0.877167948052005_dp*sol8%val+ &
          0.000000000000035_dp*Fsol%val+0.258344898092277_dp*Fsol8%val
     call advance(mesh,sol9,Fsol9,str_equa,f_equa,flux,order,dt,t,n,10, &
-         L_str_criteria,L_var_criteria,L_eps,gauss_weight,verbosity,order_pc)
+         L_str_criteria,L_var_criteria,L_eps,gauss_weight,period,verbosity,order_pc)
     sol%user=Fsol9%user
     sol%val=0.075346276482673_dp*sol%val+0.000425904246091_dp*sol1%val+0.064038648145995_dp*sol5%val+ &
          0.354077936287492_dp*sol6%val+0.506111234837749_dp*sol9%val+0.016982542367506_dp*Fsol%val+ &

@@ -7,25 +7,23 @@ none restart.txt	Restart file
 -1.	yL
 1.	yR
 -------------------- Numerical parameters --------------------------------
-5	level
+4	level
 0.95	cfl
 0.25	tf
 euler	equation
-HLL	flux
+rusanov	flux
 SSPRK3	time scheme
 3	space order
 false 	periodic stencil
 -------------------- Limitation parameters -------------------------------
-4	number of detection criterias
+2	number of detection criterias
 PAD 1 1.0e-4	detection criteria + variable + sensibility
-DMPu2 1 1.0e-4
-DMPu2 2 1.0e-4
-DMPu2 4 1.0e-3
+DMPu2 1 1.0e-3 DMPu2 2 1.0e-4 DMPu2 4 1.0e-3
 -------------------- Output parameters -----------------------------------
-5	save frequency
-5	print frequency
+100000	save frequency
+10	print frequency
 sod_2D	namefile
-0 	verbosity
+1 	verbosity
 4	nvar
 rho	var 1
 rhou	var 2
@@ -37,7 +35,7 @@ E	var 4
 104	var_user : p
 file	sod_2D	analytical solution
 -------------------- AMR parameters --------------------------------------
-FALSE	AMR
-sod	adaptation function
+true	AMR
+sod2D	adaptation function
 1	adaptation frequency
-1	recursivity
+2	recursivity

@@ -56,7 +56,8 @@ program main
   
   if (bool_AMR) then
      do i=0,recursivity-1
-        call adapt(fn_adapt,p4est,quadrants,mesh,sol,level+i,order,gauss_weight,gauss_point,minlevel,maxlevel)
+        call adapt(fn_adapt,p4est,quadrants,mesh,sol,level+i,order,gauss_weight,gauss_point, &
+             period,minlevel,maxlevel)
         call buildMesh_P4EST(p4est,xL,xR,yL,yR,gauss_point,order,mesh,sol,quadrants,period)
         call new_sol(mesh,quadrants,sol)
         if (restart_file=="none") then
@@ -80,7 +81,7 @@ program main
   call writeSol(mesh,sol,namefile,0)
   call calculation(mesh,sol,level,order,cfl,tf,fs,fp,namefile,verbosity,str_equa, &
        f_equa,flux,speed,time_scheme,exactSol,order_pc, &
-       L_str_criteria,L_var_criteria,L_eps,gauss_weight,gauss_point, &
+       L_str_criteria,L_var_criteria,L_eps,gauss_weight,gauss_point,period, &
        bool_AMR,fn_adapt,f_adapt,recursivity,total_cell,average_cell,exact_file,dim)
 
   select case (trim(str_exactSol))
@@ -319,6 +320,8 @@ contains
        fn_adapt => adapt_vortex
     case ('sod')
        fn_adapt => adapt_sod
+    case ('sod2D')
+       fn_adapt => adapt_sod2D
     case default
        print*,trim(str_fn_adapt)," adaptation function not implemented"
        call exit()
@@ -355,7 +358,7 @@ contains
 
   subroutine calculation(mesh,sol,level,order,cfl,tf,fs,fp,namefile,verbosity,str_equa, &
        f_equa,flux,speed,time_scheme,exactSol,order_pc, &
-       L_str_criteria,L_var_criteria,L_eps,gauss_weight,gauss_point, &
+       L_str_criteria,L_var_criteria,L_eps,gauss_weight,gauss_point,period, &
        bool_AMR,fn_adapt,f_adapt,recursivity,total_cell,average_cell,exact_file,dim)
     type(meshStruct), intent(inout) :: mesh
     type(solStruct), intent(inout) :: sol
@@ -373,7 +376,7 @@ contains
     integer, dimension(:), intent(in) :: L_var_criteria
     real(dp), dimension(:), intent(in) :: L_eps
     real(dp), dimension(:), intent(in) :: gauss_weight,gauss_point
-    logical, intent(in) :: bool_AMR
+    logical, intent(in) :: period,bool_AMR
     integer, intent(out) :: total_cell,average_cell
     integer :: i,n,nout,minlevel,maxlevel
     real(dp) :: t
@@ -396,10 +399,11 @@ contains
     
     do while (t<tf)
        call time_scheme(mesh,sol,str_equa,f_equa,flux,speed,order,cfl,t,n,tf, &
-            L_str_criteria,L_var_criteria,L_eps,gauss_weight,verbosity,order_pc)
+            L_str_criteria,L_var_criteria,L_eps,gauss_weight,period,verbosity,order_pc)
        if (bool_AMR.and.mod(n,f_adapt)==0) then
           do i=0,recursivity-1
-             call adapt(fn_adapt,p4est,quadrants,mesh,sol,level+i,order,gauss_weight,gauss_point,minlevel,maxlevel)
+             call adapt(fn_adapt,p4est,quadrants,mesh,sol,level+i,order,gauss_weight,gauss_point, &
+                  period,minlevel,maxlevel)
              call buildMesh_P4EST(p4est,xL,xR,yL,yR,gauss_point,order,mesh,sol,quadrants,period)
              call new_sol(mesh,quadrants,sol)
              call BC(nvar,mesh)

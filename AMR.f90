@@ -7,13 +7,14 @@ module AMR
 
 contains
 
-  subroutine adapt(fn_adapt,p4est,quadrants,mesh,sol,level,order,gauss_weight,gauss_point,minlevel,maxlevel)
+  subroutine adapt(fn_adapt,p4est,quadrants,mesh,sol,level,order,gauss_weight,gauss_point,period,minlevel,maxlevel)
     procedure (sub_adapt), pointer, intent(in) :: fn_adapt
     type(c_ptr), intent(in) :: p4est,quadrants
     type(meshStruct), intent(inout) :: mesh
     type(solStruct), intent(in) :: sol
     integer, intent(in) :: level,order
     real(dp), dimension(:), intent(in) :: gauss_weight,gauss_point
+    logical, intent(in) :: period
     integer, intent(out) :: minlevel,maxlevel
     type(c_ptr) :: C_sol,C_sol_coarsen,C_sol_refine,C_sol_interp
     real(dp), dimension(:,:), allocatable, target :: F_sol,F_sol_interp
@@ -22,10 +23,10 @@ contains
     
     allocate(F_sol(mesh%nc,sol%nvar),F_sol_interp(4*mesh%nc,sol%nvar))
     allocate(sol_coarsen(mesh%nc),sol_refine(mesh%nc))
-    
+
     call fn_adapt(mesh,sol,level,minlevel,maxlevel,coarsen_recursive,refine_recursive, &
-         sol_coarsen,sol_refine)
-    call interp(mesh,sol,order,gauss_weight,gauss_point,sol_refine,F_sol_interp)
+         period,sol_coarsen,sol_refine)
+    call interp(mesh,sol,order,gauss_weight,gauss_point,period,sol_refine,F_sol_interp)
     C_sol_interp=c_loc(F_sol_interp)
     
     F_sol=sol%val
@@ -41,11 +42,12 @@ contains
     return
   end subroutine adapt
 
-  subroutine interp(mesh,sol,order,gauss_weight,gauss_point,sol_refine,sol_interp)
+  subroutine interp(mesh,sol,order,gauss_weight,gauss_point,period,sol_refine,sol_interp)
     type(meshStruct), intent(inout) :: mesh
     type(solStruct), intent(in) :: sol
     integer, intent(in) :: order
     real(dp), dimension(:), intent(in) :: gauss_weight,gauss_point
+    logical, intent(in) :: period
     integer, dimension(:), intent(in) :: sol_refine
     real(dp), dimension(:,:), intent(inout):: sol_interp
     integer :: k,p1,p2
@@ -65,7 +67,7 @@ contains
        case(1)
           if (allocated(mesh%cell(k)%polCoef)) deallocate(mesh%cell(k)%polCoef)
           allocate(mesh%cell(k)%polcoef(order*(order-1)/2+order-1,sol%nvar))
-          call reconstruct(mesh,sol,k,order,gauss_weight)
+          call reconstruct(mesh,sol,k,order,gauss_weight,period)
           xc=mesh%cell(k)%xc
           yc=mesh%cell(k)%yc
           dx=mesh%cell(k)%dx/4.0_dp
@@ -122,15 +124,16 @@ contains
     return
   end subroutine new_sol
 
-  subroutine adapt_zone(mesh,sol,level,minlevel,maxlevel,coarsen_recursive,refine_recursive,sol_coarsen,sol_refine)
+  subroutine adapt_zone(mesh,sol,level,minlevel,maxlevel,coarsen_recursive,refine_recursive,period,sol_coarsen,sol_refine)
     type(meshStruct), intent(inout) :: mesh
     type(solStruct), intent(in) :: sol
     integer, intent(in) :: level
     integer, intent(out) :: minlevel,maxlevel,coarsen_recursive,refine_recursive
+    logical, intent(in) :: period
     integer, dimension(:), intent(inout) :: sol_coarsen,sol_refine
     integer :: k,isol
     real(dp) :: xmin,xmax,ymin,ymax
-    if(.false.)print*,sol%nvar
+    if(.false.)print*,sol%nvar,period
 
     minlevel=level
     maxlevel=level+1
@@ -155,13 +158,15 @@ contains
     return
   end subroutine adapt_zone
 
-  subroutine adapt_sinus(mesh,sol,level,minlevel,maxlevel,coarsen_recursive,refine_recursive,sol_coarsen,sol_refine)
+  subroutine adapt_sinus(mesh,sol,level,minlevel,maxlevel,coarsen_recursive,refine_recursive,period,sol_coarsen,sol_refine)
     type(meshStruct), intent(inout) :: mesh
     type(solStruct), intent(in) :: sol
     integer, intent(in) :: level
     integer, intent(out) :: minlevel,maxlevel,coarsen_recursive,refine_recursive
+    logical, intent(in) :: period
     integer, dimension(:), intent(inout) :: sol_coarsen,sol_refine
     integer :: k,isol
+    if(.false.)print*,period
 
     minlevel=level
     maxlevel=level+1
@@ -179,11 +184,12 @@ contains
     return
   end subroutine adapt_sinus
 
-  subroutine adapt_vortex(mesh,sol,level,minlevel,maxlevel,coarsen_recursive,refine_recursive,sol_coarsen,sol_refine)
+  subroutine adapt_vortex(mesh,sol,level,minlevel,maxlevel,coarsen_recursive,refine_recursive,period,sol_coarsen,sol_refine)
     type(meshStruct), intent(inout) :: mesh
     type(solStruct), intent(in) :: sol
     integer, intent(in) :: level
     integer, intent(out) :: minlevel,maxlevel,coarsen_recursive,refine_recursive
+    logical, intent(in) :: period
     integer, dimension(:), intent(inout) :: sol_coarsen,sol_refine
     integer :: k,isol
     real(dp) :: grad
@@ -193,24 +199,25 @@ contains
     coarsen_recursive=0
     refine_recursive=0
     isol=1
-    
+
     do k=1,mesh%nc
        sol_coarsen(k)=0
        sol_refine(k)=0
-       call reconstruct(mesh,sol,k,2,gauss_weight2)
+       call reconstruct(mesh,sol,k,2,gauss_weight2,period)
        grad=sqrt(mesh%cell(k)%polCoef(1,isol)**2+mesh%cell(k)%polCoef(2,isol)**2)
-       if (grad<0.01_dp.and.mesh%cell(k)%level>minlevel) sol_coarsen(k)=1
-       if (grad>0.02_dp) sol_refine(k)=1
+       if (grad<0.002_dp.and.mesh%cell(k)%level>minlevel) sol_coarsen(k)=1
+       if (grad>0.004_dp) sol_refine(k)=1
     enddo
     
     return
   end subroutine adapt_vortex
 
-  subroutine adapt_sod(mesh,sol,level,minlevel,maxlevel,coarsen_recursive,refine_recursive,sol_coarsen,sol_refine)
+  subroutine adapt_sod(mesh,sol,level,minlevel,maxlevel,coarsen_recursive,refine_recursive,period,sol_coarsen,sol_refine)
     type(meshStruct), intent(inout) :: mesh
     type(solStruct), intent(in) :: sol
     integer, intent(in) :: level
     integer, intent(out) :: minlevel,maxlevel,coarsen_recursive,refine_recursive
+    logical, intent(in) :: period
     integer, dimension(:), intent(inout) :: sol_coarsen,sol_refine
     integer :: k,isol
     real(dp) :: grad
@@ -224,14 +231,42 @@ contains
     do k=1,mesh%nc
        sol_coarsen(k)=0
        sol_refine(k)=0
-       call reconstruct(mesh,sol,k,2,gauss_weight2)
+       call reconstruct(mesh,sol,k,2,gauss_weight2,period)
        grad=sqrt(mesh%cell(k)%polCoef(1,isol)**2+mesh%cell(k)%polCoef(2,isol)**2)
-       if (grad<0.05_dp.and.mesh%cell(k)%level>minlevel) sol_coarsen(k)=1
-       if (grad>0.2_dp) sol_refine(k)=1
+       if (grad<0.2_dp.and.mesh%cell(k)%level>minlevel) sol_coarsen(k)=1
+       if (grad>0.4_dp) sol_refine(k)=1
     enddo
     
     return
   end subroutine adapt_sod
+
+  subroutine adapt_sod2D(mesh,sol,level,minlevel,maxlevel,coarsen_recursive,refine_recursive,period,sol_coarsen,sol_refine)
+    type(meshStruct), intent(inout) :: mesh
+    type(solStruct), intent(in) :: sol
+    integer, intent(in) :: level
+    integer, intent(out) :: minlevel,maxlevel,coarsen_recursive,refine_recursive
+    logical, intent(in) :: period
+    integer, dimension(:), intent(inout) :: sol_coarsen,sol_refine
+    integer :: k,isol
+    real(dp) :: lap
+
+    minlevel=level-1
+    maxlevel=level+2
+    coarsen_recursive=0
+    refine_recursive=0
+    isol=1
+    
+    do k=1,mesh%nc
+       sol_coarsen(k)=0
+       sol_refine(k)=0
+       call reconstruct(mesh,sol,k,3,gauss_weight3,period)
+       lap=abs(mesh%cell(k)%polCoef(3,isol)+mesh%cell(k)%polCoef(5,isol))
+       if (lap<3.0_dp.and.mesh%cell(k)%level>minlevel) sol_coarsen(k)=1
+       if (lap>6.0_dp) sol_refine(k)=1
+    enddo
+    
+    return
+  end subroutine adapt_sod2D
     
 
 end module AMR

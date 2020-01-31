@@ -190,7 +190,7 @@ contains
     integer :: i,j,k,p,dir,Neq
     real(dp) :: dx,dy,a,b,c,center,diff,xc,yc
     type(edgeStruct) :: edge
-    integer, dimension(:), allocatable :: stencil
+    integer, dimension(:), allocatable :: stencil,stencil_type
 
     dx=(xR-xL)/nx
     dy=(yR-yL)/ny
@@ -368,13 +368,14 @@ contains
     do k=1,mesh%nc
        call Nequa(order-1,Neq)
        if (period) then
-          call buildStencil_period(mesh,k,Neq,order,stencil)
+          call buildStencil_period(mesh,k,Neq,order,stencil,stencil_type)
        else
-          call buildStencil(mesh,k,Neq,order,stencil)
+          call buildStencil(mesh,k,Neq,order,stencil,stencil_type)
        endif
-       allocate(mesh%cell(k)%stencil(size(stencil)))
+       allocate(mesh%cell(k)%stencil(size(stencil)),mesh%cell(k)%stencil_type(size(stencil_type)))
        mesh%cell(k)%stencil=stencil
-       deallocate(stencil)
+       mesh%cell(k)%stencil_type=stencil_type
+       deallocate(stencil,stencil_type)
     enddo
     
     return
@@ -405,7 +406,7 @@ contains
     integer, dimension(:), pointer :: F_iedge,F_period,F_nodes
     integer :: k,i,lev,p,Nneigh,N_edge,Nnodes,ie,nedge,i1,iloc,Neq
     real(dp) :: a,b,c,center,diff
-    integer, dimension(:), allocatable :: stencil
+    integer, dimension(:), allocatable :: stencil,stencil_type
 
     call p4_build_mesh(p4est,tt,p4_mesh,quadrants,nodes,edges,mesh%np,mesh%nc,mesh%ne)
     
@@ -563,13 +564,14 @@ contains
     do k=1,mesh%nc
        call Nequa(order-1,Neq)
        if (period) then
-          call buildStencil_period(mesh,k,Neq,order,stencil)
+          call buildStencil_period(mesh,k,Neq,order,stencil,stencil_type)
        else
-          call buildStencil(mesh,k,Neq,order,stencil)
+          call buildStencil(mesh,k,Neq,order,stencil,stencil_type)
        endif
-       allocate(mesh%cell(k)%stencil(size(stencil)))
+       allocate(mesh%cell(k)%stencil(size(stencil)),mesh%cell(k)%stencil_type(size(stencil_type)))
        mesh%cell(k)%stencil=stencil
-       deallocate(stencil)
+       mesh%cell(k)%stencil_type=stencil_type
+       deallocate(stencil,stencil_type)
     enddo
     
     print*,"Mesh created with ",mesh%nc," quadrants"

@@ -9,7 +9,7 @@ module limit
 contains
 
   subroutine decrement(mesh,sol,soltemp,str_equa,deg,dt,L_str_criteria,L_var_criteria,L_eps, &
-       gauss_weight,NOT_ACCEPTED_CELL,NOT_ACCEPTED_EDGE,NAC_reason,verbosity)
+       gauss_weight,period,NOT_ACCEPTED_CELL,NOT_ACCEPTED_EDGE,NAC_reason,verbosity)
     type(meshStruct), intent(inout) :: mesh
     type(solStruct), intent(in) :: sol
     type(solStruct), intent(inout) :: soltemp
@@ -20,6 +20,7 @@ contains
     character(len=20), dimension(:), intent(in) :: L_str_criteria
     real(dp), dimension(:), intent(in) :: L_eps
     real(dp), dimension(:), intent(in) :: gauss_weight
+    logical, intent(in) :: period
     type(solStruct) :: sol2
     integer, dimension(:), allocatable, intent(inout) :: NOT_ACCEPTED_CELL,NOT_ACCEPTED_EDGE,NAC_reason
     integer, dimension(:), allocatable :: NAC,NAE
@@ -72,7 +73,7 @@ contains
           if (mesh%cell(k)%deg==0) then
              accept=.true.
           else
-             call criteria(mesh,sol,sol2,k,isol,L_eps(n),gauss_weight,str_equa,accept)
+             call criteria(mesh,sol,sol2,k,isol,L_eps(n),gauss_weight,period,str_equa,accept)
           endif
           if (.not.accept) then
              if (verbosity>1) then
@@ -158,17 +159,18 @@ contains
     return
   end subroutine decrement
 
-  subroutine DMP(mesh,sol,sol2,k,isol,eps,gauss_weight,str_equa,accept)
+  subroutine DMP(mesh,sol,sol2,k,isol,eps,gauss_weight,period,str_equa,accept)
     type(meshStruct), intent(inout) :: mesh
     type(solStruct), intent(in) :: sol,sol2
     integer, intent(in) :: k,isol
     real(dp), intent(in) :: eps
     real(dp), dimension(:), intent(in) :: gauss_weight
+    logical, intent(in) :: period
     character(len=20), intent(in) :: str_equa
     logical, intent(out) :: accept
     integer :: j,neigh
     real(dp) :: mini,maxi,test,eps2
-    if(.false.)print*,gauss_weight,str_equa
+    if(.false.)print*,gauss_weight,str_equa,period
 
     call norme2(sol,k,isol,mini)
     call norme2(sol,k,isol,maxi)
@@ -193,12 +195,13 @@ contains
     return
   end subroutine DMP
 
-  subroutine DMPu2(mesh,sol,sol2,k,isol,eps,gauss_weight,str_equa,accept)
+  subroutine DMPu2(mesh,sol,sol2,k,isol,eps,gauss_weight,period,str_equa,accept)
     type(meshStruct), intent(inout) :: mesh
     type(solStruct), intent(in) :: sol,sol2
     integer, intent(in) :: k,isol
     real(dp), intent(in) :: eps
     real(dp), dimension(:), intent(in) :: gauss_weight
+    logical, intent(in) :: period
     character(len=20), intent(in) :: str_equa
     logical, intent(out) :: accept
     integer :: i,j,neigh
@@ -225,7 +228,7 @@ contains
     else
        accept=.false.
        do i=sol%conserv_var(isol,1),sol%conserv_var(isol,2)
-          call u2(mesh,sol2,k,i,gauss_weight,extrema)
+          call u2(mesh,sol2,k,i,gauss_weight,period,extrema)
           if (extrema) then
              accept=.true.
           endif
@@ -235,20 +238,21 @@ contains
     return
   end subroutine DMPu2
 
-  subroutine u2(mesh,sol,k,isol,gauss_weight,extrema)
+  subroutine u2(mesh,sol,k,isol,gauss_weight,period,extrema)
     type(meshStruct), intent(inout) :: mesh
     type(solStruct), intent(in) :: sol
     integer, intent(in) :: k,isol
     real(dp), dimension(:), intent(in) :: gauss_weight
+    logical, intent(in) :: period
     logical, intent(out) :: extrema
     integer :: j,neigh,test_min,test_max
     real(dp) :: Xmin,Xmax,Ymin,Ymax
 
-    call reconstruct(mesh,sol,k,3,gauss_weight)
+    call reconstruct(mesh,sol,k,3,gauss_weight,period)
     do j=1,size(mesh%cell(k)%edge)
        neigh=mesh%cell(k)%neigh(j)
        if (neigh>0) then
-          call reconstruct(mesh,sol,neigh,3,gauss_weight)
+          call reconstruct(mesh,sol,neigh,3,gauss_weight,period)
        endif
     enddo
 
@@ -297,16 +301,17 @@ contains
     return
   end subroutine u2
 
-  subroutine PAD_euler(mesh,sol,sol2,k,isol,eps,gauss_weight,str_equa,accept)
+  subroutine PAD_euler(mesh,sol,sol2,k,isol,eps,gauss_weight,period,str_equa,accept)
     type(meshStruct), intent(inout) :: mesh
     type(solStruct), intent(in) :: sol,sol2
     integer, intent(in) :: k,isol
     real(dp), intent(in) :: eps
     real(dp), dimension(:), intent(in) :: gauss_weight
+    logical, intent(in) :: period
     character(len=20), intent(in) :: str_equa
     logical, intent(out) :: accept
     real(dp) :: rho,p
-    if(.false.)print*,eps,gauss_weight,isol,mesh%nc,sol%nsolUser
+    if(.false.)print*,eps,gauss_weight,isol,mesh%nc,sol%nsolUser,period
 
     call unconserv(sol2%val(k,:),str_equa,1,rho)
     accept=.false.
@@ -320,16 +325,17 @@ contains
     return
   end subroutine PAD_euler
 
-  subroutine PAD_M1(mesh,sol,sol2,k,isol,eps,gauss_weight,str_equa,accept)
+  subroutine PAD_M1(mesh,sol,sol2,k,isol,eps,gauss_weight,period,str_equa,accept)
     type(meshStruct), intent(inout) :: mesh
     type(solStruct), intent(in) :: sol,sol2
     integer, intent(in) :: k,isol
     real(dp), intent(in) :: eps
     real(dp), dimension(:), intent(in) :: gauss_weight
+    logical, intent(in) :: period
     character(len=20), intent(in) :: str_equa
     logical, intent(out) :: accept
     real(dp) :: test
-    if(.false.)print*,gauss_weight,isol,mesh%nc,sol%nsolUser
+    if(.false.)print*,gauss_weight,isol,mesh%nc,sol%nsolUser,period
     if(.false.)call unconserv(sol2%val(k,:),str_equa,1,test)
 
     accept=.false.

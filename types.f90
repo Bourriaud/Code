@@ -36,7 +36,7 @@ module types
      integer :: deg
      integer :: level
      real(dp), dimension(:,:), allocatable :: polMax
-     integer, dimension(:), allocatable :: stencil
+     integer, dimension(:), allocatable :: stencil,stencil_type
   end type cellStruct
   
   type :: meshStruct
@@ -93,7 +93,7 @@ module types
      end subroutine sub_speed
 
      subroutine sub_time (mesh,sol,str_equa,f_equa,flux,speed,order,cfl,t,n,tf, &
-          L_str_criteria,L_var_criteria,L_eps,gauss_weight,verbosity,order_pc)
+          L_str_criteria,L_var_criteria,L_eps,gauss_weight,period,verbosity,order_pc)
        use constant
        import meshStruct
        import solStruct
@@ -113,10 +113,11 @@ module types
        integer, dimension(:), intent(in) :: L_var_criteria
        real(dp), dimension(:), intent(in) :: L_eps
        real(dp), dimension(:), intent(in) :: gauss_weight
+       logical, intent(in) :: period
        integer, dimension(:), intent(inout) :: order_pc
      end subroutine sub_time
 
-     subroutine sub_criteria(mesh,sol,sol2,k,isol,eps,gauss_weight,str_equa,accept)
+     subroutine sub_criteria(mesh,sol,sol2,k,isol,eps,gauss_weight,period,str_equa,accept)
        use constant
        import meshStruct
        import solStruct
@@ -125,6 +126,7 @@ module types
        integer, intent(in) :: k,isol
        real(dp), intent(in) :: eps
        real(dp), dimension(:), intent(in) :: gauss_weight
+       logical, intent(in) :: period
        character(len=20), intent(in) :: str_equa
        logical, intent(out) :: accept
      end subroutine sub_criteria
@@ -135,7 +137,7 @@ module types
        real(dp), intent(out) :: s
      end subroutine sub_exactsol
 
-     subroutine sub_adapt(mesh,sol,level,minlevel,maxlevel,coarsen_recursive,refine_recursive,sol_coarsen,sol_refine)
+     subroutine sub_adapt(mesh,sol,level,minlevel,maxlevel,coarsen_recursive,refine_recursive,period,sol_coarsen,sol_refine)
        use constant
        import meshStruct
        import solStruct
@@ -143,6 +145,7 @@ module types
        type(solStruct), intent(in) :: sol
        integer, intent(in) :: level
        integer, intent(out) :: minlevel,maxlevel,coarsen_recursive,refine_recursive
+       logical, intent(in) :: period
        integer, dimension(:), intent(inout) :: sol_coarsen,sol_refine
      end subroutine sub_adapt
      
