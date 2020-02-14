@@ -191,6 +191,7 @@ contains
     real(dp) :: dx,dy,a,b,c,center,diff,xc,yc
     type(edgeStruct) :: edge
     integer, dimension(:), allocatable :: stencil,stencil_type
+    real(dp), dimension(:,:), allocatable :: stencil_bound
 
     dx=(xR-xL)/nx
     dy=(yR-yL)/ny
@@ -223,7 +224,7 @@ contains
 
           allocate(mesh%cell(k)%node(4),mesh%cell(k)%neigh(8),mesh%cell(k)%edge(4))
           allocate(mesh%cell(k)%X_gauss(size(gauss_point)),mesh%cell(k)%Y_gauss(size(gauss_point)))
-          allocate(mesh%cell(k)%polMax(order*(order-1)/2+order-1,sol%nvar))
+          !allocate(mesh%cell(k)%polMax(order*(order-1)/2+order-1,sol%nvar))
 
           mesh%cell(k)%corner(1)=(j-1)*(nx+1)+i
           mesh%cell(k)%corner(2)=(j-1)*(nx+1)+i+1
@@ -368,9 +369,9 @@ contains
     do k=1,mesh%nc
        call Nequa(order-1,Neq)
        if (period) then
-          call buildStencil_period(mesh,k,Neq,order,stencil,stencil_type)
+          call buildStencil_period(mesh,k,Neq,order,stencil,stencil_type,stencil_bound)
        else
-          call buildStencil(mesh,k,Neq,order,stencil,stencil_type)
+          call buildStencil(mesh,k,Neq,order,stencil,stencil_type,stencil_bound)
        endif
        allocate(mesh%cell(k)%stencil(size(stencil)),mesh%cell(k)%stencil_type(size(stencil_type)))
        mesh%cell(k)%stencil=stencil
@@ -401,12 +402,13 @@ contains
     logical, intent(in) :: period
     integer(c_int) :: tt
     type(c_ptr) :: p4_mesh,nodes,edges
-    type(c_ptr) :: C_corners,C_neighbors,C_sub,C_cell1,C_cell2,C_iedge,C_period,C_nodes
-    integer, dimension(:), pointer :: F_corners,F_neighbors,F_sub,F_cell1,F_cell2
+    type(c_ptr) :: C_corners,C_corners_cell,C_neighbors,C_sub,C_cell1,C_cell2,C_iedge,C_period,C_nodes
+    integer, dimension(:), pointer :: F_corners,F_corners_cell,F_neighbors,F_sub,F_cell1,F_cell2
     integer, dimension(:), pointer :: F_iedge,F_period,F_nodes
     integer :: k,i,lev,p,Nneigh,N_edge,Nnodes,ie,nedge,i1,iloc,Neq
     real(dp) :: a,b,c,center,diff
     integer, dimension(:), allocatable :: stencil,stencil_type
+    real(dp), dimension(:,:), allocatable :: stencil_bound
 
     call p4_build_mesh(p4est,tt,p4_mesh,quadrants,nodes,edges,mesh%np,mesh%nc,mesh%ne)
     
@@ -414,6 +416,9 @@ contains
     allocate(mesh%node(mesh%np),mesh%cell(mesh%nc),mesh%edge(mesh%ne))
     if (allocated(sol%val)) deallocate(sol%val,sol%user)
     allocate(sol%val(mesh%nc,sol%nvar),sol%user(mesh%nc,sol%nsolUser))
+
+    mesh%Lx=xR-xL
+    mesh%Ly=yR-yL
 
     do k=1,mesh%np
        call p4_get_node(p4est,tt,nodes,k-1,mesh%node(k)%x,mesh%node(k)%y)
@@ -424,13 +429,13 @@ contains
     ie=0
     do k=1,mesh%nc
        call p4_get_cell(p4est,p4_mesh,tt,quadrants,nodes,edges,k-1,mesh%cell(k)%xc,mesh%cell(k)%yc, &
-            mesh%cell(k)%dx,mesh%cell(k)%dy,C_corners,Nneigh,C_neighbors,Nnodes,C_nodes,N_edge,lev)
+            mesh%cell(k)%dx,mesh%cell(k)%dy,C_corners,C_corners_cell,Nneigh,C_neighbors,Nnodes,C_nodes,N_edge,lev)
 
        allocate(mesh%cell(k)%node(Nnodes))
        allocate(mesh%cell(k)%neigh(Nneigh))
        allocate(mesh%cell(k)%X_gauss(max(size(gauss_point),2)))
        allocate(mesh%cell(k)%Y_gauss(max(size(gauss_point),2)))
-       allocate(mesh%cell(k)%polMax(order*(order-1)/2+order-1,sol%nvar))
+       !allocate(mesh%cell(k)%polMax(order*(order-1)/2+order-1,sol%nvar))
        
        mesh%cell(k)%xc=(xR-xL)*mesh%cell(k)%xc+xL
        mesh%cell(k)%yc=(yR-yL)*mesh%cell(k)%yc+yL
@@ -439,10 +444,12 @@ contains
        mesh%cell(k)%level=lev
        
        call c_f_pointer(C_corners,F_corners,(/4/))
+       call c_f_pointer(C_corners_cell,F_corners_cell,(/4/))
        call c_f_pointer(C_nodes,F_nodes,(/Nnodes/))
        call c_f_pointer(C_neighbors,F_neighbors,(/12/))
        
        mesh%cell(k)%corner=F_corners
+       mesh%cell(k)%corner_cell=F_corners_cell
        mesh%cell(k)%node=F_nodes
        mesh%cell(k)%neigh(1:Nneigh)=F_neighbors(1:Nneigh)
 
@@ -555,6 +562,7 @@ contains
           call p4_free(C_period)
        enddo
        call p4_free(C_corners)
+       call p4_free(C_corners_cell)
        call p4_free(C_neighbors)
        call p4_free(C_nodes)
     enddo
@@ -564,9 +572,15 @@ contains
     do k=1,mesh%nc
        call Nequa(order-1,Neq)
        if (period) then
-          call buildStencil_period(mesh,k,Neq,order,stencil,stencil_type)
+          call buildStencil_period(mesh,k,Neq,order,stencil,stencil_type,stencil_bound)
        else
-          call buildStencil(mesh,k,Neq,order,stencil,stencil_type)
+          call buildStencil(mesh,k,Neq,order,stencil,stencil_type,stencil_bound)
+       endif
+       call buildStencil2(mesh,k)
+       if (any(mesh%cell(k)%stencil2<0)) then
+          mesh%cell(k)%bound=1
+       else
+          mesh%cell(k)%bound=0
        endif
        allocate(mesh%cell(k)%stencil(size(stencil)),mesh%cell(k)%stencil_type(size(stencil_type)))
        mesh%cell(k)%stencil=stencil
@@ -741,7 +755,7 @@ contains
 
     order_list=0
     do k=1,mesh%nc
-       order_list(mesh%cell(k)%deg+1)=order_list(mesh%cell(k)%deg+1)+1
+       !order_list(mesh%cell(k)%deg+1)=order_list(mesh%cell(k)%deg+1)+1
     enddo
 
     write(17,'(i5,a)',advance='no')n," "

@@ -8,26 +8,19 @@ module reconstruction
 
 contains
   
-  subroutine evaluate(mesh,sol,k,order,gauss_weight,x,y,u)
+  subroutine evaluate(mesh,sol,pol,k,order,x,y,u)
     type(meshStruct), intent(in) :: mesh
     type(solStruct), intent(in) :: sol
+    real(dp), dimension(:,:), intent(in) :: pol
     integer, intent(in) :: k,order
-    real(dp), dimension(:), intent(in) :: gauss_weight
     real(dp), intent(in) :: x,y
     real(dp), dimension(:), intent(inout) :: u
     integer :: i1,i2,i,d,isol
-    real(dp) :: xc,yc,Kk,intk
-    real(dp), dimension(2) :: c
+    real(dp) :: xc,yc,Kk,intk,temp
     integer, dimension(2) :: alpha    
-    real(dp), dimension(:,:), allocatable :: pol
-
-    allocate(pol(size(mesh%cell(k)%polCoef(:,1)),size(mesh%cell(k)%polCoef(1,:))))
-    pol=mesh%cell(k)%polCoef
 
     xc=mesh%cell(k)%xc
     yc=mesh%cell(k)%yc
-    c(1)=xc
-    c(2)=yc
     Kk=mesh%cell(k)%dx*mesh%cell(k)%dy
     d=order-1
     u(:)=sol%val(k,:)
@@ -37,9 +30,10 @@ contains
        do i1=0,d-i2
           alpha(1)=i1
           alpha(2)=i2
-          call quad_monome(mesh,c,alpha,k,gauss_weight,intk)
+          call quad_monome2(mesh,alpha,k,intk)
+          temp=(x-xc)**alpha(1)*(y-yc)**alpha(2)-intk
           do isol=1,sol%nvar
-             u(isol)=u(isol)+pol(i,isol)*((x-xc)**alpha(1)*(y-yc)**alpha(2)-intk)
+             u(isol)=u(isol)+pol(i,isol)*temp
           enddo
           i=i+1
        enddo
@@ -48,25 +42,45 @@ contains
     do i1=1,d
        alpha(1)=i1
        alpha(2)=0
-       call quad_monome(mesh,c,alpha,k,gauss_weight,intk)
+       call quad_monome2(mesh,alpha,k,intk)
+       temp=(x-xc)**alpha(1)*(y-yc)**alpha(2)-intk
        do isol=1,sol%nvar
-          u(isol)=u(isol)+pol(i,isol)*((x-xc)**alpha(1)*(y-yc)**alpha(2)-intk)
+          u(isol)=u(isol)+pol(i,isol)*temp
        enddo
        i=i+1
     enddo
 
-    deallocate(pol)
-
     return
   end subroutine evaluate
-  
-  subroutine reconstruct(mesh,sol,k,order,gauss_weight,period)
+
+  subroutine reconstruct(mesh,sol,k,order,gauss_weight,period,pol_IN,pol_OUT)
     type(meshStruct), intent(inout) :: mesh
     type(solStruct), intent(in) :: sol
     integer, intent(in) :: k,order
     real(dp), dimension(:), intent(in) :: gauss_weight
     logical, intent(in) :: period
+    real(dp), dimension(:,:), allocatable, intent(in) :: pol_IN
+    real(dp), dimension(:,:), allocatable, intent(inout) :: pol_OUT
+    
+    if (period.or.mesh%cell(k)%bound==0) then
+       call reconstruct2(mesh,sol,k,order,gauss_weight,pol_IN,pol_OUT)
+       !call reconstruct1(mesh,sol,k,order,gauss_weight,period,pol_OUT)
+    else
+       call reconstruct1(mesh,sol,k,order,gauss_weight,period,pol_OUT)
+    endif
+
+    return
+  end subroutine reconstruct
+  
+  subroutine reconstruct1(mesh,sol,k,order,gauss_weight,period,pol)
+    type(meshStruct), intent(inout) :: mesh
+    type(solStruct), intent(in) :: sol
+    integer, intent(in) :: k,order
+    real(dp), dimension(:), intent(in) :: gauss_weight
+    logical, intent(in) :: period
+    real(dp), dimension(:,:), allocatable, intent(inout) :: pol
     integer, dimension(:), allocatable :: stencil,stencil_type
+    real(dp), dimension(:,:), allocatable :: stencil_bound
     real(dp), dimension(:,:), allocatable :: X,U
     integer :: d,N,Ni,Nj,i,isol
     real(dp) :: Kk,pond,dist
@@ -77,10 +91,15 @@ contains
     d=order-1
     call Nequa(d,N)
     if (period) then
-       call buildStencil_period(mesh,k,N,order,stencil,stencil_type)
+       call buildStencil_period(mesh,k,N,order,stencil,stencil_type,stencil_bound)
     else
-       call buildStencil(mesh,k,N,order,stencil,stencil_type)
+       call buildStencil(mesh,k,N,order,stencil,stencil_type,stencil_bound)
     endif
+    !allocate(stencil(12),stencil_type(12),stencil_bound(12,2))
+    !stencil=abs(mesh%cell(k)%stencil2)
+    !stencil_type=0
+    !stencil_bound=mesh%cell(k)%stencil2_bound
+    
     Ni=size(stencil)
     Nj=d*(d+1)/2+d
     
@@ -88,7 +107,7 @@ contains
 
     Kk=mesh%cell(k)%dx*mesh%cell(k)%dy
     c(1)=mesh%cell(k)%xc
-    c(2)=mesh%cell(k)%yc
+    c(2)=mesh%cell(k)%yc 
     pond=1.5_dp
 
     write(id_char,'(99I1)')order,0,stencil_type
@@ -105,14 +124,15 @@ contains
        X=X_4_555555555555555555555555
        call adjust_X(mesh%cell(k)%dx,mesh%cell(k)%dy,d,X)
     case default
-       call calculate_X(mesh,stencil,gauss_weight,k,c,d,Ni,X)
+       call calculate_X(mesh,stencil,stencil_bound,gauss_weight,k,c,d,Ni,X)
     end select
-    
-    !if (k==100.and.order==4) then
+
+    !if (k==109.and.order==4) then
        !print*,order
        !print*,stencil_type
+       !print*,stencil
        !do i=1,size(X(1,:))
-          !print*,X(:,i) !/(mesh%cell(k)%dx)**3
+          !print*,X(:,i)/(mesh%cell(k)%dx)**3
        !enddo
        !print*,"---------------"
        !do i=1,size(X_3_000000000000(:,1))
@@ -120,7 +140,7 @@ contains
        !enddo
        !call exit()
     !endif
-    
+
     do i=1,Ni
        dist=((mesh%cell(stencil(i))%xc-c(1))**2+(mesh%cell(stencil(i))%yc-c(2))**2)**(pond/4.0_dp)
        do isol=1,sol%nvar
@@ -128,18 +148,124 @@ contains
        enddo
        X(i,:)=X(i,:)/dist
     enddo
-    
-    if (allocated(mesh%cell(k)%polCoef)) deallocate(mesh%cell(k)%polCoef)
-    allocate(mesh%cell(k)%polCoef(Nj,sol%nvar))
+
+    if (allocated(pol)) deallocate(pol)
+    allocate(pol(Nj,sol%nvar))
     
     do isol=1,sol%nvar
-       call solve(X,U(:,isol),mesh%cell(k)%polCoef(:,isol))
+       call solve(X,U(:,isol),pol(:,isol))
     enddo
 
     deallocate(stencil,X,U)
 
     return
-  end subroutine reconstruct
+  end subroutine reconstruct1
+
+  subroutine reconstruct2(mesh,sol,k,order,gauss_weight,pol_IN,pol_OUT)
+    type(meshStruct), intent(inout) :: mesh
+    type(solStruct), intent(in) :: sol
+    integer, intent(in) :: k,order
+    real(dp), dimension(:), intent(in) :: gauss_weight
+    real(dp), dimension(:,:), allocatable, intent(in) :: pol_IN
+    real(dp), dimension(:,:), allocatable, intent(inout) :: pol_OUT
+    integer, dimension(:), allocatable :: stencil
+    real(dp), dimension(:,:), allocatable :: X,U
+    integer :: d,Ni,Nj,isol
+    real(dp) :: pond,dist,dx,dy
+    real(dp), dimension(2) :: c
+
+    Ni=size(mesh%cell(k)%stencil2)
+    d=order-1
+    Nj=d*(d+1)/2+d
+    
+    allocate(X(Ni,Nj),U(Ni,sol%nvar),stencil(Ni))
+
+    stencil=abs(mesh%cell(k)%stencil2)
+    c(1)=mesh%cell(k)%xc
+    c(2)=mesh%cell(k)%yc
+    dx=mesh%cell(k)%dx
+    dy=mesh%cell(k)%dy
+    pond=1.5_dp
+
+    select case (order)
+    case (20)
+       X=X_2
+       call adjust_X(dx,dy,d,X)
+    case (3)
+       X=X_3
+       call adjust_X(dx,dy,d,X)
+    case (4)
+       X=X_4
+       call adjust_X(dx,dy,d,X)
+    case default
+       call calculate_X(mesh,stencil,mesh%cell(k)%stencil2_bound,gauss_weight,k,c,d,Ni,X)
+    end select
+
+    dist=((0.75_dp*dx)**2+(0.75*dy)**2)**(pond/4.0_dp)    
+    call evaluate(mesh,sol,pol_IN,stencil(1),order, &
+         c(1)-0.75_dp*dx-mesh%cell(k)%stencil2_bound(1,1),c(2)+0.75_dp*dy-mesh%cell(k)%stencil2_bound(1,2),U(1,:))
+    U(1,:)=(U(1,:)-sol%val(k,:))/dist
+    X(1,:)=X(1,:)/dist
+    call evaluate(mesh,sol,pol_IN,stencil(4),order, &
+         c(1)-0.75_dp*dx-mesh%cell(k)%stencil2_bound(4,1),c(2)-0.75_dp*dy-mesh%cell(k)%stencil2_bound(4,2),U(4,:))
+    U(4,:)=(U(4,:)-sol%val(k,:))/dist
+    X(4,:)=X(4,:)/dist
+    call evaluate(mesh,sol,pol_IN,stencil(7),order, &
+         c(1)+0.75_dp*dx-mesh%cell(k)%stencil2_bound(7,1),c(2)-0.75_dp*dy-mesh%cell(k)%stencil2_bound(7,2),U(7,:))
+    U(7,:)=(U(7,:)-sol%val(k,:))/dist
+    X(7,:)=X(7,:)/dist
+    call evaluate(mesh,sol,pol_IN,stencil(10),order, &
+         c(1)+0.75_dp*dx-mesh%cell(k)%stencil2_bound(10,1),c(2)+0.75_dp*dy-mesh%cell(k)%stencil2_bound(10,2),U(10,:))
+    U(10,:)=(U(10,:)-sol%val(k,:))/dist
+    X(10,:)=X(10,:)/dist
+
+    dist=((0.75_dp*dx)**2+(0.25*dy)**2)**(pond/4.0_dp)
+    call evaluate(mesh,sol,pol_IN,stencil(2),order, &
+         c(1)-0.75_dp*dx-mesh%cell(k)%stencil2_bound(2,1),c(2)+0.25_dp*dy-mesh%cell(k)%stencil2_bound(2,2),U(2,:))
+    U(2,:)=(U(2,:)-sol%val(k,:))/dist
+    X(2,:)=X(2,:)/dist
+    call evaluate(mesh,sol,pol_IN,stencil(3),order, &
+         c(1)-0.75_dp*dx-mesh%cell(k)%stencil2_bound(3,1),c(2)-0.25_dp*dy-mesh%cell(k)%stencil2_bound(3,2),U(3,:))
+    U(3,:)=(U(3,:)-sol%val(k,:))/dist
+    X(3,:)=X(3,:)/dist
+    call evaluate(mesh,sol,pol_IN,stencil(8),order, &
+         c(1)+0.75_dp*dx-mesh%cell(k)%stencil2_bound(8,1),c(2)-0.25_dp*dy-mesh%cell(k)%stencil2_bound(8,2),U(8,:))
+    U(8,:)=(U(8,:)-sol%val(k,:))/dist
+    X(8,:)=X(8,:)/dist
+    call evaluate(mesh,sol,pol_IN,stencil(9),order, &
+         c(1)+0.75_dp*dx-mesh%cell(k)%stencil2_bound(9,1),c(2)+0.25_dp*dy-mesh%cell(k)%stencil2_bound(9,2),U(9,:))
+    U(9,:)=(U(9,:)-sol%val(k,:))/dist
+    X(9,:)=X(9,:)/dist
+
+    dist=((0.25_dp*dx)**2+(0.75*dy)**2)**(pond/4.0_dp)
+    call evaluate(mesh,sol,pol_IN,stencil(5),order, &
+         c(1)-0.25_dp*dx-mesh%cell(k)%stencil2_bound(5,1),c(2)-0.75_dp*dy-mesh%cell(k)%stencil2_bound(5,2),U(5,:))
+    U(5,:)=(U(5,:)-sol%val(k,:))/dist
+    X(5,:)=X(5,:)/dist
+    call evaluate(mesh,sol,pol_IN,stencil(6),order, &
+         c(1)+0.25_dp*dx-mesh%cell(k)%stencil2_bound(6,1),c(2)-0.75_dp*dy-mesh%cell(k)%stencil2_bound(6,2),U(6,:))
+    U(6,:)=(U(6,:)-sol%val(k,:))/dist
+    X(6,:)=X(6,:)/dist
+    call evaluate(mesh,sol,pol_IN,stencil(11),order, &
+         c(1)+0.25_dp*dx-mesh%cell(k)%stencil2_bound(11,1),c(2)+0.75_dp*dy-mesh%cell(k)%stencil2_bound(11,2),U(11,:))
+    U(11,:)=(U(11,:)-sol%val(k,:))/dist
+    X(11,:)=X(11,:)/dist
+    call evaluate(mesh,sol,pol_IN,stencil(12),order, &
+         c(1)-0.25_dp*dx-mesh%cell(k)%stencil2_bound(12,1),c(2)+0.75_dp*dy-mesh%cell(k)%stencil2_bound(12,2),U(12,:))
+    U(12,:)=(U(12,:)-sol%val(k,:))/dist
+    X(12,:)=X(12,:)/dist
+
+    if (allocated(pol_OUT)) deallocate(pol_OUT)
+    allocate(pol_OUT(Nj,sol%nvar))
+    
+    do isol=1,sol%nvar
+       call solve(X,U(:,isol),pol_OUT(:,isol))
+    enddo
+
+    deallocate(stencil,X,U)
+
+    return
+  end subroutine reconstruct2
 
   subroutine adjust_X(dx,dy,d,X)
     real(dp), intent(in) :: dx,dy
@@ -161,9 +287,10 @@ contains
 
   end subroutine adjust_X
 
-  subroutine calculate_X(mesh,stencil,gauss_weight,k,c,d,Ni,X)
+  subroutine calculate_X(mesh,stencil,stencil_bound,gauss_weight,k,c,d,Ni,X)
     type(meshStruct), intent(in) :: mesh
     integer, dimension(:), intent(in) :: stencil
+    real(dp), dimension(:,:), intent(in) :: stencil_bound
     real(dp), dimension(:), intent(in) :: gauss_weight
     integer, intent(in) :: k,d,Ni
     real(dp), dimension(2), intent(in) :: c
@@ -177,10 +304,10 @@ contains
        do i1=0,d-i2
           alpha(1)=i1
           alpha(2)=i2
-          call quad_monome(mesh,c,alpha,k,gauss_weight,intk)
+          call quad_monome2(mesh,alpha,k,intk)
           do j=1,Ni
              Kj=mesh%cell(stencil(j))%dx*mesh%cell(stencil(j))%dy
-             call quad_monome(mesh,c,alpha,stencil(j),gauss_weight,intj)
+             call quad_monome(mesh,c-stencil_bound(j,:),alpha,stencil(j),gauss_weight,intj)
              X(j,i)=intj-intk
           enddo
           i=i+1
@@ -189,10 +316,10 @@ contains
     do i1=1,d
        alpha(1)=i1
        alpha(2)=0
-       call quad_monome(mesh,c,alpha,k,gauss_weight,intk)
+       call quad_monome2(mesh,alpha,k,intk)
        do j=1,Ni
           Kj=mesh%cell(stencil(j))%dx*mesh%cell(stencil(j))%dy
-          call quad_monome(mesh,c,alpha,stencil(j),gauss_weight,intj)
+          call quad_monome(mesh,c-stencil_bound(j,:),alpha,stencil(j),gauss_weight,intj)
           X(j,i)=intj-intk
        enddo
        i=i+1
@@ -283,10 +410,11 @@ contains
     return
   end subroutine couronne_period
   
-  subroutine buildStencil(mesh,k,N,order,stencil,stencil_type)
+  subroutine buildStencil(mesh,k,N,order,stencil,stencil_type,stencil_bound)
     type(meshStruct), intent(in) :: mesh
     integer, intent(in) :: k,N,order
     integer, dimension(:), allocatable, intent(out) :: stencil,stencil_type
+    real(dp), dimension(:,:), allocatable, intent(out) :: stencil_bound
     integer, dimension(:), allocatable :: stencil2,stencil2_type
     integer :: i,s
 
@@ -302,19 +430,21 @@ contains
     enddo
 
     s=size(stencil2)-1
-    allocate(stencil(s),stencil_type(s))
+    allocate(stencil(s),stencil_type(s),stencil_bound(s,2))
     stencil(1:s)=stencil2(2:s+1)
     stencil_type(1:s)=stencil2_type(2:s+1)
+    stencil_bound=0.0_dp
     
     deallocate(stencil2,stencil2_type)
 
     return
   end subroutine buildStencil
 
-  subroutine buildStencil_period(mesh,k,N,order,stencil,stencil_type)
+  subroutine buildStencil_period(mesh,k,N,order,stencil,stencil_type,stencil_bound)
     type(meshStruct), intent(in) :: mesh
     integer, intent(in) :: k,N,order
     integer, dimension(:), allocatable, intent(out) :: stencil,stencil_type
+    real(dp), dimension(:,:), allocatable, intent(out) :: stencil_bound
     integer, dimension(:), allocatable :: stencil2,stencil2_type
     integer :: i,s
 
@@ -330,14 +460,87 @@ contains
     enddo
 
     s=size(stencil2)-1
-    allocate(stencil(s),stencil_type(s))
+    allocate(stencil(s),stencil_type(s),stencil_bound(s,2))
     stencil(1:s)=stencil2(2:s+1)
     stencil_type(1:s)=stencil2_type(2:s+1)
+    stencil_bound=0
+    do i=1,s
+       if (mesh%cell(k)%xc-mesh%cell(abs(stencil(i)))%xc>mesh%Lx/2.0_dp) stencil_bound(i,1)=stencil_bound(i,1)+mesh%Lx
+       if (mesh%cell(k)%xc-mesh%cell(abs(stencil(i)))%xc<-mesh%Lx/2.0_dp) stencil_bound(i,1)=stencil_bound(i,1)-mesh%Lx
+       if (mesh%cell(k)%yc-mesh%cell(abs(stencil(i)))%yc>mesh%Ly/2.0_dp) stencil_bound(i,2)=stencil_bound(i,2)+mesh%Ly
+       if (mesh%cell(k)%yc-mesh%cell(abs(stencil(i)))%yc<-mesh%Ly/2.0_dp) stencil_bound(i,2)=stencil_bound(i,2)-mesh%Ly
+    enddo
     
     deallocate(stencil2,stencil2_type)
 
     return
   end subroutine buildStencil_period
+
+  subroutine buildStencil2(mesh,k)
+    type(meshStruct), intent(inout) :: mesh
+    integer, intent(in) :: k
+    integer :: i
+
+    i=1
+    if (mesh%cell(k)%level<mesh%cell(abs(mesh%cell(k)%neigh(i)))%level) then
+       mesh%cell(k)%stencil2(2)=mesh%cell(k)%neigh(i+1)
+       mesh%cell(k)%stencil2(3)=mesh%cell(k)%neigh(i)
+       i=i+2
+    else
+       mesh%cell(k)%stencil2(2)=mesh%cell(k)%neigh(i)
+       mesh%cell(k)%stencil2(3)=mesh%cell(k)%neigh(i)
+       i=i+1
+    endif
+    if (mesh%cell(k)%level<mesh%cell(abs(mesh%cell(k)%neigh(i)))%level) then
+       mesh%cell(k)%stencil2(8)=mesh%cell(k)%neigh(i)
+       mesh%cell(k)%stencil2(9)=mesh%cell(k)%neigh(i+1)
+       i=i+2
+    else
+       mesh%cell(k)%stencil2(8)=mesh%cell(k)%neigh(i)
+       mesh%cell(k)%stencil2(9)=mesh%cell(k)%neigh(i)
+       i=i+1
+    endif
+    if (mesh%cell(k)%level<mesh%cell(abs(mesh%cell(k)%neigh(i)))%level) then
+       mesh%cell(k)%stencil2(5)=mesh%cell(k)%neigh(i)
+       mesh%cell(k)%stencil2(6)=mesh%cell(k)%neigh(i+1)
+       i=i+2
+    else
+       mesh%cell(k)%stencil2(5)=mesh%cell(k)%neigh(i)
+       mesh%cell(k)%stencil2(6)=mesh%cell(k)%neigh(i)
+       i=i+1
+    endif
+    if (mesh%cell(k)%level<mesh%cell(abs(mesh%cell(k)%neigh(i)))%level) then
+       mesh%cell(k)%stencil2(11)=mesh%cell(k)%neigh(i+1)
+       mesh%cell(k)%stencil2(12)=mesh%cell(k)%neigh(i)
+       i=i+2
+    else
+       mesh%cell(k)%stencil2(11)=mesh%cell(k)%neigh(i)
+       mesh%cell(k)%stencil2(12)=mesh%cell(k)%neigh(i)
+       i=i+1
+    endif
+    mesh%cell(k)%stencil2(1)=mesh%cell(k)%corner_cell(3)
+    mesh%cell(k)%stencil2(4)=mesh%cell(k)%corner_cell(1)
+    mesh%cell(k)%stencil2(7)=mesh%cell(k)%corner_cell(2)
+    mesh%cell(k)%stencil2(10)=mesh%cell(k)%corner_cell(4)
+
+    mesh%cell(k)%stencil2_bound=0
+    do i=1,12
+       if (mesh%cell(k)%xc-mesh%cell(abs(mesh%cell(k)%stencil2(i)))%xc>mesh%Lx/2.0_dp) then
+          mesh%cell(k)%stencil2_bound(i,1)=mesh%cell(k)%stencil2_bound(i,1)+mesh%Lx
+       endif
+       if (mesh%cell(k)%xc-mesh%cell(abs(mesh%cell(k)%stencil2(i)))%xc<-mesh%Lx/2.0_dp)  then
+          mesh%cell(k)%stencil2_bound(i,1)=mesh%cell(k)%stencil2_bound(i,1)-mesh%Lx
+       endif
+       if (mesh%cell(k)%yc-mesh%cell(abs(mesh%cell(k)%stencil2(i)))%yc>mesh%Ly/2.0_dp) then
+          mesh%cell(k)%stencil2_bound(i,2)=mesh%cell(k)%stencil2_bound(i,2)+mesh%Ly
+       endif
+       if (mesh%cell(k)%yc-mesh%cell(abs(mesh%cell(k)%stencil2(i)))%yc<-mesh%Ly/2.0_dp) then
+          mesh%cell(k)%stencil2_bound(i,2)=mesh%cell(k)%stencil2_bound(i,2)-mesh%Ly
+       endif
+    enddo
+
+    return
+  end subroutine buildStencil2
 
   subroutine polynomialProduct(x,y,c,alpha,s)
     real(dp), intent(in) :: x,y
@@ -526,5 +729,20 @@ contains
 
     return
   end subroutine quad_monome
+
+   subroutine quad_monome2(mesh,alpha,k,int)
+    type(meshStruct), intent(in) :: mesh
+    integer, dimension(2), intent(in) :: alpha
+    integer, intent(in) :: k
+    real(dp), intent(out) :: int
+
+    if (mod(alpha(1),2)==0.and.mod(alpha(2),2)==0) then
+       int=mesh%cell(k)%dx**(alpha(1))*mesh%cell(k)%dy**(alpha(2))/((alpha(1)+1)*(alpha(2)+1)*2**(alpha(1)+alpha(2)))
+    else
+       int=0.0_dp
+    endif
+
+    return
+  end subroutine quad_monome2
   
 end module reconstruction

@@ -16,7 +16,7 @@ program main
   type(meshStruct) :: mesh
   type(solStruct) :: sol
   real(dp) :: xL,xR,yL,yR,cfl,tf,eL1,eL2,tstart,tfinish
-  integer :: nvar,fs,fp,verbosity,order,i,f_adapt,recursivity,total_cell,average_cell
+  integer :: nvar,fs,fp,verbosity,order,i,k,f_adapt,recursivity,total_cell,average_cell
   integer :: level,minlevel,maxlevel,dim
   logical :: period
   integer, dimension(:), allocatable :: L_var_criteria,order_pc
@@ -53,13 +53,16 @@ program main
      call IC_restart(restart_file,mesh,sol)
   endif
   call BC(nvar,mesh)
-  
+
   if (bool_AMR) then
      do i=0,recursivity-1
+        do k=1,mesh%nc
+           call reconstruct1(mesh,sol,k,order,gauss_weight,period,mesh%cell(k)%polCoef)
+        enddo
         call adapt(fn_adapt,p4est,quadrants,mesh,sol,level+i,order,gauss_weight,gauss_point, &
              period,minlevel,maxlevel)
         call buildMesh_P4EST(p4est,xL,xR,yL,yR,gauss_point,order,mesh,sol,quadrants,period)
-        call new_sol(mesh,quadrants,sol)
+        call new_sol(mesh,order,quadrants,sol)
         if (restart_file=="none") then
            call IC(IC_func,mesh,sol,order)
         else
@@ -68,6 +71,10 @@ program main
            call exit()
         endif
         call BC(nvar,mesh)
+     enddo
+  else
+     do k=1,mesh%nc
+        call reconstruct1(mesh,sol,k,order,gauss_weight,period,mesh%cell(k)%polCoef)
      enddo
   endif
 
@@ -396,7 +403,7 @@ contains
        open(13,file=AMRfile,form="formatted")
        write(13,'(i8,i8)')0,mesh%nc
     endif
-    
+
     do while (t<tf)
        call time_scheme(mesh,sol,str_equa,f_equa,flux,speed,order,cfl,t,n,tf, &
             L_str_criteria,L_var_criteria,L_eps,gauss_weight,period,verbosity,order_pc)
@@ -405,7 +412,7 @@ contains
              call adapt(fn_adapt,p4est,quadrants,mesh,sol,level+i,order,gauss_weight,gauss_point, &
                   period,minlevel,maxlevel)
              call buildMesh_P4EST(p4est,xL,xR,yL,yR,gauss_point,order,mesh,sol,quadrants,period)
-             call new_sol(mesh,quadrants,sol)
+             call new_sol(mesh,order,quadrants,sol)
              call BC(nvar,mesh)
           enddo
        endif

@@ -13,9 +13,11 @@ static sc_MPI_Comm mpicomm;
 typedef struct var
 {
   double *u,*u1,*u2,*u3,*u4;
+  double *pol;
   int coarsen;
   int refine;
   int nsol;
+  int size_pol;
   int k;
 }
 var_t;
@@ -247,13 +249,14 @@ void p4_get_node(p4est_t* p4est, p4est_topidx_t tt, p4est_nodes_t* nodes, int i,
   *Y_out=vxyz[1];
 }
 
-void p4_get_cell(p4est_t* p4est, p4est_mesh_t* mesh, p4est_locidx_t tt, sc_array_t* quadrants, p4est_nodes_t* nodes, int* edges, int i, double* Xc_out, double* Yc_out, double* dX_out, double* dY_out, int** corners_out, int* Nneigh, int** neighbors_out, int* Nnodes, int** nodes_out, int* N_edge, int* lev)
+void p4_get_cell(p4est_t* p4est, p4est_mesh_t* mesh, p4est_locidx_t tt, sc_array_t* quadrants, p4est_nodes_t* nodes, int* edges, int i, double* Xc_out, double* Yc_out, double* dX_out, double* dY_out, int** corners_out, int** corners_cell_out, int* Nneigh, int** neighbors_out, int* Nnodes, int** nodes_out, int* N_edge, int* lev)
 {
   p4est_quadrant_t *quad;
   size_t num_quads;
   p4est_qcoord_t len;
   double Xc[3],dX[3];
   int* corners;
+  int* corners_cell;
   int* neighbors;
   int* neigh;
   int k;
@@ -279,6 +282,7 @@ void p4_get_cell(p4est_t* p4est, p4est_mesh_t* mesh, p4est_locidx_t tt, sc_array
   *dY_out=dX[1];
 
   corners = (int*) malloc(sizeof(int)*4);
+  corners_cell = (int*) malloc(sizeof(int)*4);
   cell_nodes = (int*) malloc(sizeof(int)*8);
   neighbors = (int*) malloc(sizeof(int)*12);
   *Nneigh = 0;
@@ -392,21 +396,61 @@ void p4_get_cell(p4est_t* p4est, p4est_mesh_t* mesh, p4est_locidx_t tt, sc_array
       {
         case 0:
         {
+          if (quad_neigh->y+dX[1]*2.>quad->y+dX[1])
+          {
+            corners_cell[2] = mesh->quad_to_quad[4*i]+1;
+            if (quad_neigh->x>quad->x){corners_cell[2]=-corners_cell[2];}
+          }
+          if (quad_neigh->y+dX[1]*2.<quad->y+dX[1])
+          {
+            corners_cell[0] = mesh->quad_to_quad[4*i]+1;
+            if (quad_neigh->x>quad->x){corners_cell[0]=-corners_cell[0];}
+          }
           if (quad_neigh->x>quad->x){neighbors[*Nneigh]=-neighbors[*Nneigh];}
         }
         break;
         case 1:
         {
+          if (quad_neigh->y+dX[1]*2.>quad->y+dX[1])
+          {
+            corners_cell[3] = mesh->quad_to_quad[4*i+1]+1;
+            if (quad_neigh->x<quad->x){corners_cell[3]=-corners_cell[3];}
+          }
+          if (quad_neigh->y+dX[1]*2.<quad->y+dX[1])
+          {
+            corners_cell[1] = mesh->quad_to_quad[4*i+1]+1;
+            if (quad_neigh->x<quad->x){corners_cell[1]=-corners_cell[1];}
+          }
           if (quad_neigh->x<quad->x){neighbors[*Nneigh]=-neighbors[*Nneigh];}
         }
         break;
         case 2:
         {
+          if (quad_neigh->x+dX[0]*2.>quad->x+dX[0])
+          {
+            corners_cell[1] = mesh->quad_to_quad[4*i+2]+1;
+            if (quad_neigh->y>quad->y){corners_cell[1]=-corners_cell[1];}
+          }
+          if (quad_neigh->x+dX[0]*2.<quad->x+dX[0])
+          {
+            corners_cell[0] = mesh->quad_to_quad[4*i+2]+1;
+            if (quad_neigh->y>quad->y){corners_cell[0]=-corners_cell[0];}
+          }
           if (quad_neigh->y>quad->y){neighbors[*Nneigh]=-neighbors[*Nneigh];}
         }
         break;
         case 3:
         {
+          if (quad_neigh->x+dX[0]*2.>quad->x+dX[0])
+          {
+            corners_cell[3] = mesh->quad_to_quad[4*i+3]+1;
+            if (quad_neigh->y<quad->y){corners_cell[3]=-corners_cell[3];}
+          }
+          if (quad_neigh->x+dX[0]*2.<quad->x+dX[0])
+          {
+            corners_cell[2] = mesh->quad_to_quad[4*i+3]+1;
+            if (quad_neigh->y<quad->y){corners_cell[2]=-corners_cell[2];}
+          }
           if (quad_neigh->y<quad->y){neighbors[*Nneigh]=-neighbors[*Nneigh];}
         }
         break;
@@ -423,34 +467,52 @@ void p4_get_cell(p4est_t* p4est, p4est_mesh_t* mesh, p4est_locidx_t tt, sc_array
       if (index+1<=mesh->local_num_quadrants)
       {
         neighbors[*Nneigh] = index+1;
+        corners_cell[k-4] = index+1;
       }
       else
       {
         index = index-mesh->local_num_quadrants-mesh->ghost_num_quadrants;
         neigh = sc_array_index(mesh->corner_quad,index);
-        neighbors[*Nneigh]=*neigh+1;
+        neighbors[*Nneigh] = *neigh+1;
+        corners_cell[k-4] = *neigh+1;
       }
       quad_neigh = sc_array_index(quadrants,neighbors[*Nneigh]-1);
       switch(k-4)
       {
         case 0:
         {
-          if (quad_neigh->x>quad->x||quad_neigh->y>quad->y){neighbors[*Nneigh]=-neighbors[*Nneigh];}
+          if (quad_neigh->x>quad->x||quad_neigh->y>quad->y)
+          {
+            neighbors[*Nneigh]=-neighbors[*Nneigh];
+            corners_cell[k-4] = -corners_cell[k-4];
+          }
         }
         break;
         case 1:
         {
-          if (quad_neigh->x<quad->x||quad_neigh->y>quad->y){neighbors[*Nneigh]=-neighbors[*Nneigh];}
+          if (quad_neigh->x<quad->x||quad_neigh->y>quad->y)
+          {
+            neighbors[*Nneigh]=-neighbors[*Nneigh];
+            corners_cell[k-4] = -corners_cell[k-4];
+          }
         }
         break;
         case 2:
         {
-          if (quad_neigh->x>quad->x||quad_neigh->y<quad->y){neighbors[*Nneigh]=-neighbors[*Nneigh];}
+          if (quad_neigh->x>quad->x||quad_neigh->y<quad->y)
+          {
+            neighbors[*Nneigh]=-neighbors[*Nneigh];
+            corners_cell[k-4] = -corners_cell[k-4];
+          }
         }
         break;
         case 3:
         {
-          if (quad_neigh->x<quad->x||quad_neigh->y<quad->y){neighbors[*Nneigh]=-neighbors[*Nneigh];}
+          if (quad_neigh->x<quad->x||quad_neigh->y<quad->y)
+          {
+            neighbors[*Nneigh]=-neighbors[*Nneigh];
+            corners_cell[k-4] = -corners_cell[k-4];
+          }
         }
         break;
       }
@@ -459,6 +521,7 @@ void p4_get_cell(p4est_t* p4est, p4est_mesh_t* mesh, p4est_locidx_t tt, sc_array
   }
   *neighbors_out=neighbors;
   *corners_out=corners;
+  *corners_cell_out=corners_cell;
   *nodes_out=cell_nodes;
 }
 
@@ -729,15 +792,28 @@ static void replace_fn (p4est_t* p4est, p4est_topidx_t which_tree, int num_outgo
     parent_data = (var_t *) incoming[0]->p.user_data;
     child_data = (var_t *) outgoing[0]->p.user_data;
     parent_data->u = (double*) malloc(sizeof(double)*child_data->nsol);
+    parent_data->pol = (double*) malloc(sizeof(double)*child_data->nsol*child_data->size_pol);
     parent_data->nsol=child_data->nsol;
+    parent_data->size_pol=child_data->size_pol;
     parent_data->refine=0;
-    for (isol=0;isol<child_data->nsol;isol++){parent_data->u[isol] = 0.;}
+    for (isol=0;isol<child_data->nsol;isol++)
+    {
+      parent_data->u[isol] = 0.;
+      for (j=0;j<parent_data->size_pol;j++)
+      {
+        parent_data->pol[isol*parent_data->size_pol+j]=0.;
+      }
+    }
     for (i=0;i<P4EST_CHILDREN;i++)
     {
       child_data = (var_t *) outgoing[i]->p.user_data;
       for (isol=0;isol<child_data->nsol;isol++)
       {
         parent_data->u[isol] += child_data->u[isol]/P4EST_CHILDREN;
+        for (j=0;j<parent_data->size_pol;j++)
+        {
+          parent_data->pol[isol*parent_data->size_pol+j] += child_data->pol[isol*parent_data->size_pol+j]/P4EST_CHILDREN;
+        }
       }
       switch (i)
       {
@@ -770,8 +846,17 @@ static void replace_fn (p4est_t* p4est, p4est_topidx_t which_tree, int num_outgo
       child_data->u2 = (double*) malloc(sizeof(double)*parent_data->nsol);
       child_data->u3 = (double*) malloc(sizeof(double)*parent_data->nsol);
       child_data->u4 = (double*) malloc(sizeof(double)*parent_data->nsol);
+      child_data->pol = (double*) malloc(sizeof(double)*parent_data->nsol*parent_data->size_pol);
       child_data->nsol=parent_data->nsol;
+      child_data->size_pol=parent_data->size_pol;
       child_data->coarsen=0;
+      for (isol=0;isol<parent_data->nsol;isol++)
+      {
+        for (j=0;j<child_data->size_pol;j++)
+        {
+          child_data->pol[isol*child_data->size_pol+j]=parent_data->pol[isol*child_data->size_pol+j];
+        }
+      }
       switch (i)
       {
         case 0:
@@ -817,12 +902,14 @@ static void replace_fn (p4est_t* p4est, p4est_topidx_t which_tree, int num_outgo
       }
     }
     free(parent_data->u);free(parent_data->u1);free(parent_data->u2);free(parent_data->u3);free(parent_data->u4);
+    free(parent_data->pol);
   }
 }
 
-void p4_adapt (p4est_t* p4est, sc_array_t* quadrants, double* sol, double* sol_interp, int nsol, int* sol_coarsen, int* sol_refine, int maxlevel, int coarsen_recursive, int refine_recursive)
+void p4_adapt (p4est_t* p4est, sc_array_t* quadrants, double* sol, double* sol_interp, double* pol_interp, int size_pol, int nsol, int* sol_coarsen, int* sol_refine, int maxlevel, int coarsen_recursive, int refine_recursive)
 {
   int k;
+  int i;
   int isol;
   p4est_quadrant_t* q;
   var_t* data;
@@ -838,7 +925,9 @@ void p4_adapt (p4est_t* p4est, sc_array_t* quadrants, double* sol, double* sol_i
     data->u2 = (double*) malloc(sizeof(double)*nsol);
     data->u3 = (double*) malloc(sizeof(double)*nsol);
     data->u4 = (double*) malloc(sizeof(double)*nsol);
+    data->pol = (double*) malloc(sizeof(double)*size_pol*nsol);
     data->nsol=nsol;
+    data->size_pol=size_pol;
     data->coarsen=sol_coarsen[k];
     data->refine=sol_refine[k];
 
@@ -849,6 +938,10 @@ void p4_adapt (p4est_t* p4est, sc_array_t* quadrants, double* sol, double* sol_i
       data->u2[isol]=sol_interp[isol*4*nc+k+nc];
       data->u3[isol]=sol_interp[isol*4*nc+k+2*nc];
       data->u4[isol]=sol_interp[isol*4*nc+k+3*nc];
+      for (i=0;i<size_pol;i++)
+      {
+        data->pol[isol*size_pol+i]=pol_interp[isol*size_pol*nc+i*nc+k];
+      }
     }
   }
   p4est_refine_ext(p4est,refine_recursive,maxlevel,refine_value,NULL,replace_fn);
@@ -856,11 +949,13 @@ void p4_adapt (p4est_t* p4est, sc_array_t* quadrants, double* sol, double* sol_i
   p4est_balance_ext (p4est,P4EST_CONNECT_FULL,NULL,replace_fn);
 }
 
-void p4_new_sol (sc_array_t* quadrants, double** sol_out)
+void p4_new_sol (sc_array_t* quadrants, double** sol_out, double** pol_out)
 {
   int nc;
   double* sol;
+  double* pol;
   int k;
+  int i;
   int isol;
   p4est_quadrant_t* q;
   var_t* data;
@@ -869,6 +964,7 @@ void p4_new_sol (sc_array_t* quadrants, double** sol_out)
   q=sc_array_index(quadrants,0);
   data=q->p.user_data;
   sol = (double*) malloc(sizeof(double)*data->nsol*nc);
+  pol = (double*) malloc(sizeof(double)*data->nsol*nc*data->size_pol);
 
   for (k=0;k<nc;k++)
   {
@@ -877,10 +973,16 @@ void p4_new_sol (sc_array_t* quadrants, double** sol_out)
     for (isol=0;isol<data->nsol;isol++)
     {
       sol[isol*nc+k]=data->u[isol];
+      for (i=0;i<data->size_pol;i++)
+      {
+        pol[isol*data->size_pol*nc+i*nc+k]=data->pol[isol*data->size_pol+i];
+      }
     }
     free(data->u);free(data->u1);free(data->u2);free(data->u3);free(data->u4);
+    free(data->pol);
   }
   *sol_out=sol;
+  *pol_out=pol;
 }
 
 void p4_free(void* ptr)

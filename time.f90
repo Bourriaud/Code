@@ -86,6 +86,14 @@ contains
     count=0
     do while (size(NOT_ACCEPTED_EDGE)>0)
        count=count+1
+       do k=1,mesh%nc
+          if (allocated(mesh%cell(k)%polTest)) deallocate(mesh%cell(k)%polTest)
+          allocate(mesh%cell(k)%polTest(size(mesh%cell(k)%polCoef(:,1)),size(mesh%cell(k)%polCoef(1,:))))
+          mesh%cell(k)%polTest=mesh%cell(k)%polCoef
+       enddo
+       do k=1,size(NOT_ACCEPTED_CELL)
+          call reconstruct(mesh,sol,k,mesh%cell(k)%deg+1,gauss_weight,period,mesh%cell(k)%polTest,mesh%cell(k)%polCoef)
+       enddo
        do i=1,size(NOT_ACCEPTED_EDGE)
           j=NOT_ACCEPTED_EDGE(i)
           edge=mesh%edge(j)
@@ -100,33 +108,29 @@ contains
           sub2=edge%sub(2)
           deg=min(mesh%cell(ac1)%deg,mesh%cell(ac2)%deg)
           mesh%edge(j)%deg=deg
-          call reconstruct(mesh,sol,ac1,deg+1,gauss_weight,period)
-          call reconstruct(mesh,sol,ac2,deg+1,gauss_weight,period)
-          if (deg+1==order) then
-             mesh%cell(ac1)%polMax=mesh%cell(ac1)%polCoef
-             mesh%cell(ac2)%polMax=mesh%cell(ac2)%polCoef
-          endif
+          !call reconstruct(mesh,sol,ac1,deg+1,gauss_weight,period,mesh%cell(ac1)%polCoef)
+          !call reconstruct(mesh,sol,ac2,deg+1,gauss_weight,period,mesh%cell(ac2)%polCoef)
           do p=1,order
              if (.not.edge%flux_acc(p)) then
                 if (cell1<0) then
-                   call evaluate(mesh,sol,cell2,deg+1,gauss_weight,edge%X_gauss(p),edge%Y_gauss(p),u2)
-                   call boundary(flux,f_equa,gauss_weight,cell2,cell1, &
+                   call evaluate(mesh,sol,mesh%cell(cell2)%polCoef,cell2,deg+1,edge%X_gauss(p),edge%Y_gauss(p),u2)
+                   call boundary(flux,f_equa,cell2,cell1, &
                         u2,mesh,sol,j,p,edge%boundType,edge%bound,dir,deg+1,mesh%edge(j)%flux(p,:))
                    if (.not.mesh%cell(cell2)%accept) then
                       soltemp%val(cell2,:)=soltemp%val(cell2,:)+ &
-                           gauss_weight(p)*mesh%edge(j)%flux(p,:)*dt/(lengthN2*2.0_dp**(sub2+1))
+                           gauss_weight(p)*mesh%edge(j)%flux(p,:)*dt/(lengthN2*2.0_dp**(sub2+1))                         
                    endif
                 elseif (cell2<0) then
-                   call evaluate(mesh,sol,cell1,deg+1,gauss_weight,edge%X_gauss(p),edge%Y_gauss(p),u1)
-                   call boundary(flux,f_equa,gauss_weight,cell1,cell2, &
+                   call evaluate(mesh,sol,mesh%cell(cell1)%polCoef,cell1,deg+1,edge%X_gauss(p),edge%Y_gauss(p),u1)
+                   call boundary(flux,f_equa,cell1,cell2, &
                         u1,mesh,sol,j,p,edge%boundType,edge%bound,dir+2,deg+1,mesh%edge(j)%flux(p,:))
                    if (.not.mesh%cell(cell1)%accept) then
                       soltemp%val(cell1,:)=soltemp%val(cell1,:)- &
                            gauss_weight(p)*mesh%edge(j)%flux(p,:)*dt/(lengthN1*2.0_dp**(sub1+1))
                    endif
                 else
-                   call evaluate(mesh,sol,cell1,deg+1,gauss_weight,edge%X_gauss(p),edge%Y_gauss(p),u1)
-                   call evaluate(mesh,sol,cell2,deg+1,gauss_weight,edge%X_gauss(p),edge%Y_gauss(p),u2)
+                   call evaluate(mesh,sol,mesh%cell(cell1)%polCoef,cell1,deg+1,edge%X_gauss(p),edge%Y_gauss(p),u1)
+                   call evaluate(mesh,sol,mesh%cell(cell2)%polCoef,cell2,deg+1,edge%X_gauss(p),edge%Y_gauss(p),u2)
                    call flux(u1,u2,f_equa,dir,mesh%edge(j)%flux(p,:))
                    if (.not.mesh%cell(cell1)%accept) then
                       soltemp%val(cell1,:)=soltemp%val(cell1,:)- &
@@ -141,16 +145,16 @@ contains
           enddo
        enddo
 
-       do k=1,size(NOT_ACCEPTED_EDGE)
-          cell1=mesh%edge(NOT_ACCEPTED_EDGE(k))%cell1
-          cell2=mesh%edge(NOT_ACCEPTED_EDGE(k))%cell2
-          if (cell2>0) then
-             if(allocated(mesh%cell(cell2)%polCoef))deallocate(mesh%cell(cell2)%polCoef)
-          endif
-          if (cell1>0) then
-             if(allocated(mesh%cell(cell1)%polCoef))deallocate(mesh%cell(cell1)%polCoef)
-          endif
-       enddo
+       !do k=1,size(NOT_ACCEPTED_EDGE)
+          !cell1=mesh%edge(NOT_ACCEPTED_EDGE(k))%cell1
+          !cell2=mesh%edge(NOT_ACCEPTED_EDGE(k))%cell2
+          !if (cell2>0) then
+             !if(allocated(mesh%cell(cell2)%polCoef))deallocate(mesh%cell(cell2)%polCoef)
+          !endif
+          !if (cell1>0) then
+             !if(allocated(mesh%cell(cell1)%polCoef))deallocate(mesh%cell(cell1)%polCoef)
+          !endif
+       !enddo
 
        if (size(L_str_criteria)>0) then
           deg=min(L_deg(min(count,size(L_deg))),order-1)

@@ -26,7 +26,7 @@ module types
      real(dp) :: dx,dy
      real(dp) :: xc,yc
      real(dp), dimension(:,:), allocatable :: polCoef
-     integer, dimension(4) :: corner
+     integer, dimension(4) :: corner,corner_cell
      integer, dimension(:), allocatable :: node
      integer, dimension(:), allocatable :: neigh
      integer, dimension(:), allocatable :: edge
@@ -35,11 +35,15 @@ module types
      logical :: accept
      integer :: deg
      integer :: level
-     real(dp), dimension(:,:), allocatable :: polMax
+     integer :: bound
+     real(dp), dimension(:,:), allocatable :: polTest
      integer, dimension(:), allocatable :: stencil,stencil_type
+     integer, dimension(12) :: stencil2
+     real(dp), dimension(12,2) :: stencil2_bound
   end type cellStruct
   
   type :: meshStruct
+     real(dp) :: Lx,Ly
      integer :: np,ne,nc
      type(nodeStruct), dimension(:), allocatable :: node
      type(edgeStruct), dimension(:), allocatable :: edge
@@ -176,13 +180,13 @@ module types
      end subroutine p4_get_node
 
      subroutine p4_get_cell(p4est,mesh,tt,quadrants,nodes,edges,k,xc,yc,dx,dy, &
-          corners,Nneigh,neighbors,Nnodes,cell_nodes,N_edge,level) bind(C)
+          corners,corners_cell,Nneigh,neighbors,Nnodes,cell_nodes,N_edge,level) bind(C)
        use, intrinsic :: ISO_C_BINDING
        type(c_ptr), value, intent(in) :: p4est,mesh,quadrants,nodes,edges
        integer(c_int), value, intent(in) :: tt
        integer(c_int), value, intent(in) :: k
        real(c_double), intent(out) :: xc,yc,dx,dy
-       type(c_ptr), intent(out) :: corners,neighbors,cell_nodes
+       type(c_ptr), intent(out) :: corners,corners_cell,neighbors,cell_nodes
        integer(c_int), intent(out) :: Nneigh,Nnodes,N_edge,level
      end subroutine p4_get_cell
 
@@ -194,18 +198,18 @@ module types
        type(c_ptr), intent(out) :: iedge_out,cell1,cell2,sub,period
      end subroutine p4_get_edge
 
-     subroutine p4_adapt(p4est,quadrants,sol,sol_interp,nsol,sol_coarsen,sol_refine,maxlevel, &
-          coarsen_recursive,refine_recursive) bind(C)
+     subroutine p4_adapt(p4est,quadrants,sol,sol_interp,pol_interp,size_pol,nsol,sol_coarsen,sol_refine, &
+          maxlevel,coarsen_recursive,refine_recursive) bind(C)
        use, intrinsic :: ISO_C_BINDING
-       type(c_ptr), value, intent(in) :: p4est,quadrants,sol,sol_interp
+       type(c_ptr), value, intent(in) :: p4est,quadrants,sol,sol_interp,pol_interp
        type(c_ptr), value, intent(in) :: sol_coarsen,sol_refine
-       integer(c_int), value, intent(in) :: nsol,maxlevel,coarsen_recursive,refine_recursive
+       integer(c_int), value, intent(in) :: size_pol,nsol,maxlevel,coarsen_recursive,refine_recursive
      end subroutine p4_adapt
 
-     subroutine p4_new_sol(quadrants,sol) bind(C)
+     subroutine p4_new_sol(quadrants,sol,pol) bind(C)
        use, intrinsic :: ISO_C_BINDING
        type(c_ptr), value, intent(in) :: quadrants
-       type(c_ptr), intent(out) :: sol
+       type(c_ptr), intent(out) :: sol,pol
      end subroutine p4_new_sol
 
      subroutine p4_free(ptr) bind(C)

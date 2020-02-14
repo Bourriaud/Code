@@ -11,10 +11,9 @@ module FV
   
 contains
 
-  subroutine boundary(flux,f_equa,gauss_weight,cell,neigh,u,mesh,sol,edge,p,boundtype,bound,normal,order,F)
+  subroutine boundary(flux,f_equa,cell,neigh,u,mesh,sol,edge,p,boundtype,bound,normal,order,F)
     procedure (sub_flux), pointer, intent(in) :: flux
     procedure (sub_f), pointer, intent(in) :: f_equa
-    real(dp), dimension(:), intent(in) :: gauss_weight
     integer, intent(in) :: cell,neigh,edge,p
     real(dp), dimension(:), intent(in) :: u
     type(meshStruct), intent(inout) :: mesh
@@ -44,25 +43,25 @@ contains
        allocate(v(sol%nvar))
        select case (normal)
        case (1)
-          call evaluate(mesh,sol,cell,order,gauss_weight,mesh%cell(cell)%xc,mesh%edge(edge)%Y_gauss(p),v)
+          call evaluate(mesh,sol,mesh%cell(cell)%polCoef,cell,order,mesh%cell(cell)%xc,mesh%edge(edge)%Y_gauss(p),v)
           do isol=1,sol%nvar
              v(isol)=sol%val(cell,isol)-bound(isol)*mesh%cell(cell)%dx/2.0_dp
           enddo
           call flux(v,v,f_equa,1,F)
        case (2)
-          call evaluate(mesh,sol,cell,order,gauss_weight,mesh%edge(edge)%X_gauss(p),mesh%cell(cell)%yc,v)
+          call evaluate(mesh,sol,mesh%cell(cell)%polCoef,cell,order,mesh%edge(edge)%X_gauss(p),mesh%cell(cell)%yc,v)
           do isol=1,sol%nvar
              v(isol)=sol%val(cell,isol)-bound(isol)*mesh%cell(cell)%dy/2.0_dp
           enddo
           call flux(v,v,f_equa,2,F)
        case (3)
-          call evaluate(mesh,sol,cell,order,gauss_weight,mesh%cell(cell)%xc,mesh%edge(edge)%Y_gauss(p),v)
+          call evaluate(mesh,sol,mesh%cell(cell)%polCoef,cell,order,mesh%cell(cell)%xc,mesh%edge(edge)%Y_gauss(p),v)
           do isol=1,sol%nvar
              v(isol)=sol%val(cell,isol)+bound(isol)*mesh%cell(cell)%dx/2.0_dp
           enddo
           call flux(v,v,f_equa,1,F)
        case (4)
-          call evaluate(mesh,sol,cell,order,gauss_weight,mesh%edge(edge)%X_gauss(p),mesh%cell(cell)%yc,v)
+          call evaluate(mesh,sol,mesh%cell(cell)%polCoef,cell,order,mesh%edge(edge)%X_gauss(p),mesh%cell(cell)%yc,v)
           do isol=1,sol%nvar
              v(isol)=sol%val(cell,isol)+bound(isol)*mesh%cell(cell)%dy/2.0_dp
           enddo
@@ -106,7 +105,7 @@ contains
        allocate(v(sol%nvar))
        k=abs(neigh)
        period=mesh%edge(edge)%period
-       call evaluate(mesh,sol,k,order,gauss_weight,mesh%edge(period)%X_gauss(p),mesh%edge(period)%Y_gauss(p),v)
+       call evaluate(mesh,sol,mesh%cell(k)%polCoef,k,order,mesh%edge(period)%X_gauss(p),mesh%edge(period)%Y_gauss(p),v)
        select case (normal)
        case (1)
           call flux(v,u,f_equa,1,F)

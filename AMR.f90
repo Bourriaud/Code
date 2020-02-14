@@ -16,33 +16,37 @@ contains
     real(dp), dimension(:), intent(in) :: gauss_weight,gauss_point
     logical, intent(in) :: period
     integer, intent(out) :: minlevel,maxlevel
-    type(c_ptr) :: C_sol,C_sol_coarsen,C_sol_refine,C_sol_interp
+    type(c_ptr) :: C_sol,C_sol_coarsen,C_sol_refine,C_sol_interp,C_pol_interp
     real(dp), dimension(:,:), allocatable, target :: F_sol,F_sol_interp
+    real(dp), dimension(:,:,:), allocatable, target :: F_pol_interp
     integer, dimension(:), allocatable, target :: sol_coarsen,sol_refine
-    integer :: coarsen_recursive,refine_recursive
-    
+    integer :: coarsen_recursive,refine_recursive,size_pol
+
+    size_pol=order*(order-1)/2+order-1
     allocate(F_sol(mesh%nc,sol%nvar),F_sol_interp(4*mesh%nc,sol%nvar))
+    allocate(F_pol_interp(mesh%nc,size_pol,sol%nvar))
     allocate(sol_coarsen(mesh%nc),sol_refine(mesh%nc))
 
     call fn_adapt(mesh,sol,level,minlevel,maxlevel,coarsen_recursive,refine_recursive, &
          period,sol_coarsen,sol_refine)
-    call interp(mesh,sol,order,gauss_weight,gauss_point,period,sol_refine,F_sol_interp)
+    call interp(mesh,sol,order,gauss_weight,gauss_point,period,sol_refine,F_sol_interp,F_pol_interp)
     C_sol_interp=c_loc(F_sol_interp)
+    C_pol_interp=c_loc(F_pol_interp)
     
     F_sol=sol%val
     C_sol=c_loc(F_sol)
     C_sol_coarsen=c_loc(sol_coarsen)
     C_sol_refine=c_loc(sol_refine)
 
-    call p4_adapt(p4est,quadrants,C_sol,C_sol_interp,sol%nvar,C_sol_coarsen,C_sol_refine,maxlevel, &
-         coarsen_recursive,refine_recursive)
+    call p4_adapt(p4est,quadrants,C_sol,C_sol_interp,C_pol_interp,size_pol,sol%nvar,C_sol_coarsen,C_sol_refine, &
+         maxlevel,coarsen_recursive,refine_recursive)
 
-    deallocate(F_sol,F_sol_interp,sol_coarsen,sol_refine)
+    deallocate(F_sol,F_sol_interp,F_pol_interp,sol_coarsen,sol_refine)
     
     return
   end subroutine adapt
 
-  subroutine interp(mesh,sol,order,gauss_weight,gauss_point,period,sol_refine,sol_interp)
+  subroutine interp(mesh,sol,order,gauss_weight,gauss_point,period,sol_refine,sol_interp,pol_interp)
     type(meshStruct), intent(inout) :: mesh
     type(solStruct), intent(in) :: sol
     integer, intent(in) :: order
@@ -50,6 +54,7 @@ contains
     logical, intent(in) :: period
     integer, dimension(:), intent(in) :: sol_refine
     real(dp), dimension(:,:), intent(inout):: sol_interp
+    real(dp), dimension(:,:,:), intent(inout):: pol_interp
     integer :: k,p1,p2
     real(dp), dimension(:), allocatable :: u1,u2,u3,u4
     real(dp) :: xc,yc,dx,dy,Xg,Yg
@@ -58,6 +63,7 @@ contains
 
     sol_interp=0.0_dp
     do k=1,mesh%nc
+       pol_interp(k,1:size(mesh%cell(k)%polCoef(:,1)),1:sol%nvar)=mesh%cell(k)%polCoef
        select case (sol_refine(k))
        case(0)
           sol_interp(k,:)=sol%val(k,:)
@@ -67,7 +73,7 @@ contains
        case(1)
           if (allocated(mesh%cell(k)%polCoef)) deallocate(mesh%cell(k)%polCoef)
           allocate(mesh%cell(k)%polcoef(order*(order-1)/2+order-1,sol%nvar))
-          call reconstruct(mesh,sol,k,order,gauss_weight,period)
+          call reconstruct(mesh,sol,k,order,gauss_weight,period,mesh%cell(k)%polCoef,mesh%cell(k)%polTest)
           xc=mesh%cell(k)%xc
           yc=mesh%cell(k)%yc
           dx=mesh%cell(k)%dx/4.0_dp
@@ -80,19 +86,19 @@ contains
              do p2=1,order
                 Xg=xc-dx+gauss_point(p1)*dx
                 Yg=yc-dy+gauss_point(p2)*dy
-                call evaluate(mesh,sol,k,order,gauss_weight,Xg,Yg,u1)
+                call evaluate(mesh,sol,mesh%cell(k)%polTest,k,order,Xg,Yg,u1)
                 sol_interp(k,:)=sol_interp(k,:)+u1*gauss_weight(p1)*gauss_weight(p2)/4.0_dp
                 Xg=xc+dx+gauss_point(p1)*dx
                 Yg=yc-dy+gauss_point(p2)*dy
-                call evaluate(mesh,sol,k,order,gauss_weight,Xg,Yg,u2)
+                call evaluate(mesh,sol,mesh%cell(k)%polTest,k,order,Xg,Yg,u2)
                 sol_interp(k+mesh%nc,:)=sol_interp(k+mesh%nc,:)+u2*gauss_weight(p1)*gauss_weight(p2)/4.0_dp
                 Xg=xc-dx+gauss_point(p1)*dx
                 Yg=yc+dy+gauss_point(p2)*dy
-                call evaluate(mesh,sol,k,order,gauss_weight,Xg,Yg,u3)
+                call evaluate(mesh,sol,mesh%cell(k)%polTest,k,order,Xg,Yg,u3)
                 sol_interp(k+2*mesh%nc,:)=sol_interp(k+2*mesh%nc,:)+u3*gauss_weight(p1)*gauss_weight(p2)/4.0_dp
                 Xg=xc+dx+gauss_point(p1)*dx
                 Yg=yc+dy+gauss_point(p2)*dy
-                call evaluate(mesh,sol,k,order,gauss_weight,Xg,Yg,u4)
+                call evaluate(mesh,sol,mesh%cell(k)%polTest,k,order,Xg,Yg,u4)
                 sol_interp(k+3*mesh%nc,:)=sol_interp(k+3*mesh%nc,:)+u4*gauss_weight(p1)*gauss_weight(p2)/4.0_dp
              enddo
           enddo
@@ -104,22 +110,30 @@ contains
     return
   end subroutine interp
 
-  subroutine new_sol(mesh,quadrants,sol)
-    type(meshStruct), intent(in) :: mesh
+  subroutine new_sol(mesh,order,quadrants,sol)
+    type(meshStruct), intent(inout) :: mesh
+    integer, intent(in) :: order
     type(c_ptr), intent(in) :: quadrants
     type(solStruct), intent(inout) :: sol
-    type(c_ptr) :: C_sol
-    real(dp), dimension(:), pointer :: F_sol
-    integer :: k,isol
-    
-    call p4_new_sol(quadrants,C_sol)
+    type(c_ptr) :: C_sol,C_pol
+    real(dp), dimension(:), pointer :: F_sol,F_pol
+    integer :: k,isol,i,size_pol
+
+    size_pol=order*(order-1)/2+order-1
+    call p4_new_sol(quadrants,C_sol,C_pol)
     call c_f_pointer(C_sol,F_sol,(/sol%nvar*mesh%nc/))
+    call c_f_pointer(C_pol,F_pol,(/sol%nvar*mesh%nc*size_pol/))
     do k=1,mesh%nc
+       allocate(mesh%cell(k)%polCoef(size_pol,sol%nvar))
        do isol=1,sol%nvar
           sol%val(k,isol)=F_sol((isol-1)*mesh%nc+k)
+          do i=1,size_pol
+             mesh%cell(k)%polCoef(i,isol)=F_pol((isol-1)*size_pol*mesh%nc+(i-1)*mesh%nc+k)
+          enddo
        enddo
     enddo
     call p4_free(C_sol)
+    call p4_free(C_pol)
 
     return
   end subroutine new_sol
@@ -203,11 +217,18 @@ contains
     do k=1,mesh%nc
        sol_coarsen(k)=0
        sol_refine(k)=0
-       call reconstruct(mesh,sol,k,2,gauss_weight2,period)
-       grad=sqrt(mesh%cell(k)%polCoef(1,isol)**2+mesh%cell(k)%polCoef(2,isol)**2)
+       call reconstruct(mesh,sol,k,2,gauss_weight2,period,mesh%cell(k)%polCoef,mesh%cell(k)%polTest)
+       grad=sqrt(mesh%cell(k)%polTest(1,isol)**2+mesh%cell(k)%polTest(2,isol)**2)
        if (grad<0.002_dp.and.mesh%cell(k)%level>minlevel) sol_coarsen(k)=1
        if (grad>0.004_dp) sol_refine(k)=1
+       deallocate(mesh%cell(k)%polTest)
     enddo
+    !minlevel=level
+    !sol_refine(97:99)=1
+    !sol_refine(101)=1
+    !sol_refine(103)=1
+    !sol_refine(105:106)=1
+    !sol_refine(109)=1
     
     return
   end subroutine adapt_vortex
@@ -231,10 +252,11 @@ contains
     do k=1,mesh%nc
        sol_coarsen(k)=0
        sol_refine(k)=0
-       call reconstruct(mesh,sol,k,2,gauss_weight2,period)
-       grad=sqrt(mesh%cell(k)%polCoef(1,isol)**2+mesh%cell(k)%polCoef(2,isol)**2)
+       call reconstruct(mesh,sol,k,2,gauss_weight2,period,mesh%cell(k)%polCoef,mesh%cell(k)%polTest)
+       grad=sqrt(mesh%cell(k)%polTest(1,isol)**2+mesh%cell(k)%polTest(2,isol)**2)
        if (grad<0.2_dp.and.mesh%cell(k)%level>minlevel) sol_coarsen(k)=1
        if (grad>0.4_dp) sol_refine(k)=1
+       deallocate(mesh%cell(k)%polTest)
     enddo
     
     return
@@ -259,10 +281,11 @@ contains
     do k=1,mesh%nc
        sol_coarsen(k)=0
        sol_refine(k)=0
-       call reconstruct(mesh,sol,k,3,gauss_weight3,period)
-       lap=abs(mesh%cell(k)%polCoef(3,isol)+mesh%cell(k)%polCoef(5,isol))
+       call reconstruct(mesh,sol,k,3,gauss_weight3,period,mesh%cell(k)%polCoef,mesh%cell(k)%polTest)
+       lap=abs(mesh%cell(k)%polTest(3,isol)+mesh%cell(k)%polTest(5,isol))
        if (lap<3.0_dp.and.mesh%cell(k)%level>minlevel) sol_coarsen(k)=1
        if (lap>6.0_dp) sol_refine(k)=1
+       deallocate(mesh%cell(k)%polTest)
     enddo
     
     return
