@@ -73,7 +73,7 @@ contains
        case(1)
           if (allocated(mesh%cell(k)%polCoef)) deallocate(mesh%cell(k)%polCoef)
           allocate(mesh%cell(k)%polcoef(order*(order-1)/2+order-1,sol%nvar))
-          call reconstruct(mesh,sol,k,order,gauss_weight,period,mesh%cell(k)%polCoef,mesh%cell(k)%polTest)
+          call reconstruct(mesh,sol,k,order,gauss_weight,period,mesh%cell(k)%polTest)
           xc=mesh%cell(k)%xc
           yc=mesh%cell(k)%yc
           dx=mesh%cell(k)%dx/4.0_dp
@@ -86,19 +86,19 @@ contains
              do p2=1,order
                 Xg=xc-dx+gauss_point(p1)*dx
                 Yg=yc-dy+gauss_point(p2)*dy
-                call evaluate(mesh,sol,mesh%cell(k)%polTest,k,order,Xg,Yg,u1)
+                call evaluate(mesh,sol,mesh%cell(k)%polTest,k,Xg,Yg,u1)
                 sol_interp(k,:)=sol_interp(k,:)+u1*gauss_weight(p1)*gauss_weight(p2)/4.0_dp
                 Xg=xc+dx+gauss_point(p1)*dx
                 Yg=yc-dy+gauss_point(p2)*dy
-                call evaluate(mesh,sol,mesh%cell(k)%polTest,k,order,Xg,Yg,u2)
+                call evaluate(mesh,sol,mesh%cell(k)%polTest,k,Xg,Yg,u2)
                 sol_interp(k+mesh%nc,:)=sol_interp(k+mesh%nc,:)+u2*gauss_weight(p1)*gauss_weight(p2)/4.0_dp
                 Xg=xc-dx+gauss_point(p1)*dx
                 Yg=yc+dy+gauss_point(p2)*dy
-                call evaluate(mesh,sol,mesh%cell(k)%polTest,k,order,Xg,Yg,u3)
+                call evaluate(mesh,sol,mesh%cell(k)%polTest,k,Xg,Yg,u3)
                 sol_interp(k+2*mesh%nc,:)=sol_interp(k+2*mesh%nc,:)+u3*gauss_weight(p1)*gauss_weight(p2)/4.0_dp
                 Xg=xc+dx+gauss_point(p1)*dx
                 Yg=yc+dy+gauss_point(p2)*dy
-                call evaluate(mesh,sol,mesh%cell(k)%polTest,k,order,Xg,Yg,u4)
+                call evaluate(mesh,sol,mesh%cell(k)%polTest,k,Xg,Yg,u4)
                 sol_interp(k+3*mesh%nc,:)=sol_interp(k+3*mesh%nc,:)+u4*gauss_weight(p1)*gauss_weight(p2)/4.0_dp
              enddo
           enddo
@@ -217,18 +217,12 @@ contains
     do k=1,mesh%nc
        sol_coarsen(k)=0
        sol_refine(k)=0
-       call reconstruct(mesh,sol,k,2,gauss_weight2,period,mesh%cell(k)%polCoef,mesh%cell(k)%polTest)
+       call reconstruct(mesh,sol,k,2,gauss_weight2,period,mesh%cell(k)%polTest)
        grad=sqrt(mesh%cell(k)%polTest(1,isol)**2+mesh%cell(k)%polTest(2,isol)**2)
-       if (grad<0.002_dp.and.mesh%cell(k)%level>minlevel) sol_coarsen(k)=1
-       if (grad>0.004_dp) sol_refine(k)=1
+       if (grad<0.03_dp.and.mesh%cell(k)%level>minlevel) sol_coarsen(k)=1   !0.002
+       if (grad>0.05_dp) sol_refine(k)=1   !0.004
        deallocate(mesh%cell(k)%polTest)
     enddo
-    !minlevel=level
-    !sol_refine(97:99)=1
-    !sol_refine(101)=1
-    !sol_refine(103)=1
-    !sol_refine(105:106)=1
-    !sol_refine(109)=1
     
     return
   end subroutine adapt_vortex
@@ -252,10 +246,10 @@ contains
     do k=1,mesh%nc
        sol_coarsen(k)=0
        sol_refine(k)=0
-       call reconstruct(mesh,sol,k,2,gauss_weight2,period,mesh%cell(k)%polCoef,mesh%cell(k)%polTest)
+       call reconstruct(mesh,sol,k,2,gauss_weight2,period,mesh%cell(k)%polTest)
        grad=sqrt(mesh%cell(k)%polTest(1,isol)**2+mesh%cell(k)%polTest(2,isol)**2)
-       if (grad<0.2_dp.and.mesh%cell(k)%level>minlevel) sol_coarsen(k)=1
-       if (grad>0.4_dp) sol_refine(k)=1
+       if (grad<0.8_dp.and.mesh%cell(k)%level>minlevel) sol_coarsen(k)=1
+       if (grad>1.0_dp) sol_refine(k)=1
        deallocate(mesh%cell(k)%polTest)
     enddo
     
@@ -273,7 +267,7 @@ contains
     real(dp) :: lap
 
     minlevel=level-1
-    maxlevel=level+2
+    maxlevel=level+1
     coarsen_recursive=0
     refine_recursive=0
     isol=1
@@ -281,7 +275,7 @@ contains
     do k=1,mesh%nc
        sol_coarsen(k)=0
        sol_refine(k)=0
-       call reconstruct(mesh,sol,k,3,gauss_weight3,period,mesh%cell(k)%polCoef,mesh%cell(k)%polTest)
+       call reconstruct(mesh,sol,k,3,gauss_weight3,period,mesh%cell(k)%polTest)
        lap=abs(mesh%cell(k)%polTest(3,isol)+mesh%cell(k)%polTest(5,isol))
        if (lap<3.0_dp.and.mesh%cell(k)%level>minlevel) sol_coarsen(k)=1
        if (lap>6.0_dp) sol_refine(k)=1

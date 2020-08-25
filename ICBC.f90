@@ -13,8 +13,22 @@ contains
   subroutine IC_func_sinus(x,y,S)
     real(dp), intent(in) :: x,y
     real(dp), dimension(:), intent(inout) :: S
+    real(dp)::xmod
 
     S(1)=cos((x-5.0_dp)*pi/5.0_dp)+cos((y-5.0_dp)*pi/5.0_dp)
+    !if(x<5.0_dp)then
+       !S(1)=0.0_dp
+    !else
+       !S(1)=1.0_dp
+    !endif
+    !S(1)=x**3
+    
+    !xmod=(x-5.0_dp)/5.0_dp
+    !if(xmod>0)then
+       !S(1)=((xmod-0.5_dp)**2-0.25_dp)*4.0_dp
+    !else
+       !S(1)=(-(xmod+0.5_dp)**2+0.25_dp)*4.0_dp
+    !endif
     
     return
   end subroutine IC_func_sinus

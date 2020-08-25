@@ -228,6 +228,11 @@ contains
     a2=1.0_dp
 
     s=cos((x-a1*t-5.0_dp)*pi/5.0_dp)+cos((y-a2*t-5.0_dp)*pi/5.0_dp)
+    !if(x-a1*t<5.0_dp)then
+       !s=0.0_dp
+    !else
+       !s=1.0_dp
+    !endif
 
     return
   end subroutine exactSol_sinus
@@ -308,8 +313,8 @@ contains
     real(dp) :: x0,y0,xmin,ymin,beta,r,Temp
     if (.false.) print*,t
 
-    x0=0.0_dp!-5.0_dp+mod(int(t+5.0_dp),10)+t-int(t)
-    y0=0.0_dp!-5.0_dp+mod(int(t+5.0_dp),10)+t-int(t)
+    x0=-5.0_dp+mod(int(t+5.0_dp),10)+t-int(t)
+    y0=-5.0_dp+mod(int(t+5.0_dp),10)+t-int(t)
     beta=5.0_dp
     xmin=min(abs(x-x0),abs(x-x0-10.0_dp),abs(x-x0+10.0_dp))
     ymin=min(abs(y-y0),abs(y-y0-10.0_dp),abs(y-y0+10.0_dp))

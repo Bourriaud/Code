@@ -86,6 +86,7 @@ program main
   endif
   call userSol(0.0_dp,mesh,sol,str_equa,exactSol,exact_file,dim)
   call writeSol(mesh,sol,namefile,0)
+  call writeSol2(mesh,sol,namefile,0)
   call calculation(mesh,sol,level,order,cfl,tf,fs,fp,namefile,verbosity,str_equa, &
        f_equa,flux,speed,time_scheme,exactSol,order_pc, &
        L_str_criteria,L_var_criteria,L_eps,gauss_weight,gauss_point,period, &
@@ -419,6 +420,7 @@ contains
        if (mod(n,fs)==0.or.t>=tf) then
           call userSol(t,mesh,sol,str_equa,exactSol,exact_file,dim)
           call writeSol(mesh,sol,namefile,nout)
+          call writeSol2(mesh,sol,namefile,nout)
           if (verbosity>0) then
              call write_output_calculation(t,n,mesh%nc,total_quantities)
              call write_orders(mesh,order,n)

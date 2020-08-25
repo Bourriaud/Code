@@ -9,18 +9,18 @@ none restart.txt	Restart file
 -------------------- Numerical parameters --------------------------------
 5	level
 0.95	cfl
-10.	tf
+0.5	tf
 euler	equation
 rusanov	flux
-SSPRK3	time scheme
-3	space order
+SSPRK4	time scheme
+4	space order
 true 	periodic stencil
 -------------------- Limitation parameters -------------------------------
 1	number of detection criterias
 PAD 1 1.0e-4	detection criteria + variable + sensibilityDMPu2 1 1.0e-3 DMPu2 2 1.0e-3
 -------------------- Output parameters -----------------------------------
-100000	save frequency
-10	print frequency
+1	save frequency
+1	print frequency
 vortex	namefile
 1	verbosity
 4	nvar

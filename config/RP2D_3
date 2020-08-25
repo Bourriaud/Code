@@ -39,4 +39,4 @@ none	analytical solution
 TRUE	AMR
 sod	adaptation function
 1	adaptation frequency
-1	recursivity
+2	recursivity

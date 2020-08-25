@@ -248,34 +248,34 @@ contains
     integer :: j,neigh,test_min,test_max
     real(dp) :: Xmin,Xmax,Ymin,Ymax
 
-    call reconstruct(mesh,sol,k,3,gauss_weight,period,mesh%cell(k)%polCoef,mesh%cell(k)%polTest)
+    call reconstruct1(mesh,sol,k,3,gauss_weight,period,mesh%cell(k)%polCoef3)
     do j=1,size(mesh%cell(k)%edge)
        neigh=mesh%cell(k)%neigh(j)
        if (neigh>0) then
-          call reconstruct(mesh,sol,neigh,3,gauss_weight,period,mesh%cell(neigh)%polCoef,mesh%cell(neigh)%polTest)
+          call reconstruct1(mesh,sol,neigh,3,gauss_weight,period,mesh%cell(neigh)%polCoef3)
        endif
     enddo
 
-    Xmin=mesh%cell(k)%polTest(5,isol)
-    Xmax=mesh%cell(k)%polTest(5,isol)
-    Ymin=mesh%cell(k)%polTest(3,isol)
-    Ymax=mesh%cell(k)%polTest(3,isol)
+    Xmin=mesh%cell(k)%polCoef3(5,isol)
+    Xmax=mesh%cell(k)%polCoef3(5,isol)
+    Ymin=mesh%cell(k)%polCoef3(3,isol)
+    Ymax=mesh%cell(k)%polCoef3(3,isol)
     test_min=k
     test_max=k
     do j=1,size(mesh%cell(k)%edge)
        neigh=mesh%cell(k)%neigh(j)
        if (neigh>0) then
-          if (abs(mesh%cell(neigh)%polTest(5,isol))<abs(Xmin)) then
-             Xmin=mesh%cell(neigh)%polTest(5,isol)
+          if (abs(mesh%cell(neigh)%polCoef3(5,isol))<abs(Xmin)) then
+             Xmin=mesh%cell(neigh)%polCoef3(5,isol)
              test_min=neigh
-          else if (abs(mesh%cell(neigh)%polTest(5,isol))>abs(Xmax)) then
-             Xmax=mesh%cell(neigh)%polTest(5,isol)
+          else if (abs(mesh%cell(neigh)%polCoef3(5,isol))>abs(Xmax)) then
+             Xmax=mesh%cell(neigh)%polCoef3(5,isol)
              test_max=neigh
           endif
-          if (abs(mesh%cell(neigh)%polTest(3,isol))<abs(Ymin)) then
-             Ymin=mesh%cell(neigh)%polTest(3,isol)
-          else if (abs(mesh%cell(neigh)%polTest(3,isol))>abs(Ymax)) then
-             Ymax=mesh%cell(neigh)%polTest(3,isol)
+          if (abs(mesh%cell(neigh)%polCoef3(3,isol))<abs(Ymin)) then
+             Ymin=mesh%cell(neigh)%polCoef3(3,isol)
+          else if (abs(mesh%cell(neigh)%polCoef3(3,isol))>abs(Ymax)) then
+             Ymax=mesh%cell(neigh)%polCoef3(3,isol)
           endif
        endif
     enddo
@@ -290,11 +290,11 @@ contains
        endif
     endif
 
-    deallocate(mesh%cell(k)%polTest)
+    deallocate(mesh%cell(k)%polCoef3)
     do j=1,size(mesh%cell(k)%edge)
        neigh=mesh%cell(k)%neigh(j)
        if (neigh/=k.and.neigh>0) then
-          deallocate(mesh%cell(neigh)%polTest)
+          deallocate(mesh%cell(neigh)%polCoef3)
        endif
     enddo
 

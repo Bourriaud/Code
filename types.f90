@@ -36,7 +36,7 @@ module types
      integer :: deg
      integer :: level
      integer :: bound
-     real(dp), dimension(:,:), allocatable :: polTest
+     real(dp), dimension(:,:), allocatable :: polTest,polCoef3
      integer, dimension(:), allocatable :: stencil,stencil_type
      integer, dimension(12) :: stencil2
      real(dp), dimension(12,2) :: stencil2_bound

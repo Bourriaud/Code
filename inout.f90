@@ -660,6 +660,65 @@ contains
     return
   end subroutine writeSol
 
+  subroutine writeSol2(mesh,sol,namefile,nfile)
+    type(meshStruct), intent(in) :: mesh
+    type(solStruct), intent(in) :: sol
+    character(len=20), intent(in) :: namefile
+    integer, intent(in) :: nfile
+    integer :: k,n,nfile_max
+    integer :: i,nnodes
+    character(len=34) :: completenamefile
+    real(dp) :: ycentre,dy
+
+    nfile_max=130
+    if (nfile==0) then
+       write(completenamefile,'(A,A,A)')'./results/',trim(namefile),'.txt'
+       open(113,file=completenamefile,form="formatted")
+    endif
+
+    ycentre=2.0*0.3125_dp
+    dy=mesh%cell(1)%dy    
+    if (nfile<nfile_max) then
+       do k=1,mesh%nc
+          if (mesh%cell(k)%yc>ycentre-2.0_dp*dy.and.mesh%cell(k)%yc<ycentre-dy) then
+             if (mesh%cell(k)%xc<10.0_dp-mesh%cell(k)%dx) then
+                !write(11,'(e15.8)')sol%val(k,n)
+                write(113,'(e23.16)',advance='no')sol%user(k,2)
+             else
+                write(113,'(e23.16)')sol%user(k,2)
+             endif
+          endif
+       enddo
+       write(113,*)""
+       do k=1,mesh%nc
+          if (mesh%cell(k)%yc>ycentre-dy.and.mesh%cell(k)%yc<ycentre) then
+             if (mesh%cell(k)%xc<10.0_dp-mesh%cell(k)%dx) then
+                !write(11,'(e15.8)')sol%val(k,n)
+                write(113,'(e23.16)',advance='no')sol%user(k,2)
+             else
+                write(113,'(e23.16)')sol%user(k,2)
+             endif
+          endif
+       enddo
+       write(113,*)""
+       do k=1,mesh%nc
+          if (mesh%cell(k)%yc>ycentre.and.mesh%cell(k)%yc<ycentre+dy) then
+             if (mesh%cell(k)%xc<10.0_dp-mesh%cell(k)%dx) then
+                !write(11,'(e15.8)')sol%val(k,n)
+                write(113,'(e23.16)',advance='no')sol%user(k,2)
+             else
+                write(113,'(e23.16)')sol%user(k,2)
+             endif
+          endif
+       enddo
+       write(113,*)"--------------------------------------------------------------------------------------------------"
+    endif
+    
+    if (nfile==nfile_max) close(113)
+    
+    return
+  end subroutine writeSol2
+
   subroutine print(mesh,sol,t,n,total)
     type(meshStruct), intent(in) :: mesh
     type(solStruct), intent(in) :: sol
@@ -755,7 +814,7 @@ contains
 
     order_list=0
     do k=1,mesh%nc
-       !order_list(mesh%cell(k)%deg+1)=order_list(mesh%cell(k)%deg+1)+1
+       order_list(mesh%cell(k)%deg+1)=order_list(mesh%cell(k)%deg+1)+1
     enddo
 
     write(17,'(i5,a)',advance='no')n," "
