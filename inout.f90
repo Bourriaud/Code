@@ -665,8 +665,7 @@ contains
     type(solStruct), intent(in) :: sol
     character(len=20), intent(in) :: namefile
     integer, intent(in) :: nfile
-    integer :: k,n,nfile_max
-    integer :: i,nnodes
+    integer :: k,nfile_max
     character(len=34) :: completenamefile
     real(dp) :: ycentre,dy
 

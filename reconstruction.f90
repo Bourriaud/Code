@@ -8,10 +8,9 @@ module reconstruction
 
 contains
 
-  subroutine evaluate_cell(mesh,sol,pol,k,xc,yc,dx,dy,gauss_weight,gauss_point,u)
+  subroutine evaluate_cell(mesh,sol,k,xc,yc,dx,dy,gauss_weight,gauss_point,u)
     type(meshStruct), intent(in) :: mesh
     type(solStruct), intent(in) :: sol
-    real(dp), dimension(:,:), intent(in) :: pol
     integer, intent(in) :: k
     real(dp), intent(in) :: xc,yc,dx,dy
     real(dp), dimension(:), intent(in) :: gauss_weight,gauss_point
@@ -22,9 +21,6 @@ contains
 
     allocate(utemp(size(u)))
 
-    !pol2=0.0_dp
-    !pol2(1,1)=pol(1,1)
-    !pol2(2,1)=pol(7,1)
     call reconstruct1(mesh,sol,k,1,gauss_weight,.true.,pol2)
     order=size(gauss_point)
     
@@ -129,9 +125,9 @@ contains
        select case (order)
        case (4)
           call reconstruct1(mesh,sol,k,order,gauss_weight,period,pol_OUT)
-          !call reconstruct2(mesh,sol,k,order,gauss_weight,gauss_point,pol_OUT)
+          !call reconstruct2(mesh,sol,k,order,pol_OUT)
        case default
-          call reconstruct2(mesh,sol,k,order,gauss_weight,gauss_point,pol_OUT)
+          call reconstruct2(mesh,sol,k,order,pol_OUT)
        end select
     else
        call reconstruct1(mesh,sol,k,order,gauss_weight,period,pol_OUT)
@@ -217,7 +213,7 @@ contains
     allocate(pol(Nj,sol%nvar))
     
     do isol=1,sol%nvar
-       call solve(X,U(:,isol),pol(:,isol),k)
+       call solve(X,U(:,isol),pol(:,isol))
     enddo
 
     deallocate(stencil,X,U)
@@ -225,18 +221,16 @@ contains
     return
   end subroutine reconstruct1
 
-  subroutine reconstruct2(mesh,sol,k,order,gauss_weight,gauss_point,pol_OUT)
+  subroutine reconstruct2(mesh,sol,k,order,pol_OUT)
     type(meshStruct), intent(inout) :: mesh
     type(solStruct), intent(in) :: sol
     integer, intent(in) :: k,order
-    real(dp), dimension(:), intent(in) :: gauss_weight,gauss_point
     real(dp), dimension(:,:), allocatable, intent(inout) :: pol_OUT
     integer, dimension(:), allocatable :: stencil
     real(dp), dimension(:,:), allocatable :: X,U,pol
     integer :: d,Ni,Nj,isol
     real(dp) :: pond,dist,dx,dy,dx2,dy2
     real(dp), dimension(2) :: c
-    real(dp), dimension(1) :: utemp
 
     Ni=16
     d=order-1
@@ -350,7 +344,7 @@ contains
     allocate(pol_OUT(Nj,sol%nvar))
     
     do isol=1,sol%nvar
-       call solve(X,U(:,isol),pol_OUT(:,isol),k)
+       call solve(X,U(:,isol),pol_OUT(:,isol))
     enddo
     
     deallocate(stencil,X,U)
@@ -660,11 +654,10 @@ contains
     return
   end subroutine polynomialProduct
 
-  subroutine solve(X,U,R,cell)
+  subroutine solve(X,U,R)
     real(dp), dimension(:,:), intent(in) :: X
     real(dp), dimension(:), intent(in) :: U
     real(dp), dimension(:), intent(inout) :: R
-    integer, intent(in) :: cell
     real(dp), dimension(:,:), allocatable :: A
     real(dp), dimension(:), allocatable :: b
     !integer :: i,j,k
@@ -688,22 +681,6 @@ contains
     
     call cholesky(A,b,R)
     !call QR(X,b,R)
-
-    !if(cell==444)then
-       !print*,A(1,:)
-       !print*,A(2,:)
-       !print*,A(3,:)
-       !print*,A(4,:)
-       !print*,A(5,:)
-       !print*,A(6,:)
-       !print*,A(7,:)
-       !print*,A(8,:)
-       !print*,A(9,:)
-       !print*,"------------------------------------------------"
-       !print*,b
-       !print*,"------------------------------------------------"
-       !print*,R
-    !endif
 
     deallocate(A,b)
 

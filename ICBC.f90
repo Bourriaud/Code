@@ -13,7 +13,7 @@ contains
   subroutine IC_func_sinus(x,y,S)
     real(dp), intent(in) :: x,y
     real(dp), dimension(:), intent(inout) :: S
-    real(dp)::xmod
+    !real(dp)::xmod
 
     S(1)=cos((x-5.0_dp)*pi/5.0_dp)+cos((y-5.0_dp)*pi/5.0_dp)
     !if(x<5.0_dp)then
