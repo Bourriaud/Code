@@ -17,9 +17,9 @@ program main
   type(solStruct) :: sol
   real(dp) :: xL,xR,yL,yR,cfl,tf,eL1,eL2,tstart,tfinish
   integer :: nvar,fs,fp,verbosity,order,i,k,f_adapt,recursivity,total_cell,average_cell
-  integer :: level,minlevel,maxlevel,dim
+  integer :: level,minlevel,maxlevel,nrk,dim
   logical :: period
-  integer, dimension(:), allocatable :: L_var_criteria,order_pc
+  integer, dimension(:), allocatable :: cascade,L_var_criteria,order_pc
   real(dp), dimension(:), allocatable :: L_eps
   character(len=20) :: config_file,test_case,namefile,str_equa,str_flux,str_time_scheme
   character(len=20) :: str_fn_adapt,str_exactSol,exact_file,restart_file
@@ -40,11 +40,11 @@ program main
   
   call get_config(config_file)
   call init(config_file,test_case,restart_file,xL,xR,yL,yR,level,nvar,cfl,tf,fs,fp,namefile,verbosity,sol, &
-       str_equa,str_flux,str_time_scheme,order,period,L_str_criteria,L_var_criteria,L_eps, &
+       str_equa,str_flux,str_time_scheme,order,nrk,period,cascade,L_str_criteria,L_var_criteria,L_eps, &
        gauss_point,gauss_weight,str_exactSol,exact_file,bool_AMR,str_fn_adapt,f_adapt,recursivity,order_pc)
   call buildP4EST(level,connectivity,p4est)
-  call buildMesh_P4EST(p4est,xL,xR,yL,yR,gauss_point,order,mesh,sol,quadrants,period)
-  !call buildmesh(xL,xR,yL,yR,64,64,gauss_point,order,mesh,sol)
+  call buildMesh_P4EST(p4est,xL,xR,yL,yR,gauss_point,order,nrk,mesh,sol,quadrants,period)
+  !call buildmesh(xL,xR,yL,yR,64,64,gauss_point,order,nrk,mesh,sol)
   call init_FV(test_case,str_equa,str_flux,str_time_scheme,str_fn_adapt,IC_func, &
        BC,exactSol,f_equa,flux,speed,time_scheme,sol,fn_adapt,cfl,str_exactSol,exact_file,dim)
   if (restart_file=="none") then
@@ -61,7 +61,7 @@ program main
         enddo
         call adapt(fn_adapt,p4est,quadrants,mesh,sol,level+i,order,gauss_weight,gauss_point, &
              period,minlevel,maxlevel)
-        call buildMesh_P4EST(p4est,xL,xR,yL,yR,gauss_point,order,mesh,sol,quadrants,period)
+        call buildMesh_P4EST(p4est,xL,xR,yL,yR,gauss_point,order,nrk,mesh,sol,quadrants,period)
         call new_sol(mesh,order,quadrants,sol)
         if (restart_file=="none") then
            call IC(IC_func,mesh,sol,order)
@@ -87,8 +87,8 @@ program main
   call userSol(0.0_dp,mesh,sol,str_equa,exactSol,exact_file,dim)
   call writeSol(mesh,sol,namefile,0)
   call writeSol2(mesh,sol,namefile,0)
-  call calculation(mesh,sol,level,order,cfl,tf,fs,fp,namefile,verbosity,str_equa, &
-       f_equa,flux,speed,time_scheme,exactSol,order_pc, &
+  call calculation(mesh,sol,level,order,nrk,cfl,tf,fs,fp,namefile,verbosity,str_equa, &
+       f_equa,flux,speed,time_scheme,exactSol,order_pc,cascade, &
        L_str_criteria,L_var_criteria,L_eps,gauss_weight,gauss_point,period, &
        bool_AMR,fn_adapt,f_adapt,recursivity,total_cell,average_cell,exact_file,dim)
 
@@ -104,7 +104,7 @@ program main
   
   deallocate(mesh%node,mesh%edge,mesh%cell)
   deallocate(sol%val,sol%user,sol%name,sol%var_user,sol%name_user,sol%conserv_var)
-  deallocate(L_str_criteria,L_var_criteria,L_eps)
+  deallocate(cascade,L_str_criteria,L_var_criteria,L_eps)
   deallocate(gauss_point,gauss_weight)
   call p4_destroy(connectivity,p4est)
   
@@ -364,13 +364,13 @@ contains
     return
   end subroutine init_FV
 
-  subroutine calculation(mesh,sol,level,order,cfl,tf,fs,fp,namefile,verbosity,str_equa, &
-       f_equa,flux,speed,time_scheme,exactSol,order_pc, &
+  subroutine calculation(mesh,sol,level,order,nrk,cfl,tf,fs,fp,namefile,verbosity,str_equa, &
+       f_equa,flux,speed,time_scheme,exactSol,order_pc,cascade, &
        L_str_criteria,L_var_criteria,L_eps,gauss_weight,gauss_point,period, &
        bool_AMR,fn_adapt,f_adapt,recursivity,total_cell,average_cell,exact_file,dim)
     type(meshStruct), intent(inout) :: mesh
     type(solStruct), intent(inout) :: sol
-    integer, intent(in) :: level,order,fs,fp,verbosity,f_adapt,recursivity,dim
+    integer, intent(in) :: level,order,nrk,fs,fp,verbosity,f_adapt,recursivity,dim
     real(dp), intent(in) :: cfl,tf
     character(len=20),intent(in) :: namefile,str_equa,exact_file
     procedure (sub_f), pointer, intent(in) :: f_equa
@@ -381,7 +381,7 @@ contains
     integer, dimension(:), intent(inout) :: order_pc
     procedure (sub_adapt), pointer, intent(in) :: fn_adapt
     character(len=20), dimension(:), intent(in) :: L_str_criteria
-    integer, dimension(:), intent(in) :: L_var_criteria
+    integer, dimension(:), intent(in) :: cascade,L_var_criteria
     real(dp), dimension(:), intent(in) :: L_eps
     real(dp), dimension(:), intent(in) :: gauss_weight,gauss_point
     logical, intent(in) :: period,bool_AMR
@@ -406,13 +406,13 @@ contains
     endif
 
     do while (t<tf)
-       call time_scheme(mesh,sol,str_equa,f_equa,flux,speed,order,cfl,t,n,tf, &
-            L_str_criteria,L_var_criteria,L_eps,gauss_weight,period,verbosity,order_pc)
+       call timestep(mesh,sol,str_equa,f_equa,flux,speed,time_scheme,order,nrk,cfl,t,n,tf, &
+            cascade,L_str_criteria,L_var_criteria,L_eps,gauss_weight,period,verbosity,order_pc)
        if (bool_AMR.and.mod(n,f_adapt)==0) then
           do i=0,recursivity-1
              call adapt(fn_adapt,p4est,quadrants,mesh,sol,level+i,order,gauss_weight,gauss_point, &
                   period,minlevel,maxlevel)
-             call buildMesh_P4EST(p4est,xL,xR,yL,yR,gauss_point,order,mesh,sol,quadrants,period)
+             call buildMesh_P4EST(p4est,xL,xR,yL,yR,gauss_point,order,nrk,mesh,sol,quadrants,period)
              call new_sol(mesh,order,quadrants,sol)
              call BC(nvar,mesh)
           enddo

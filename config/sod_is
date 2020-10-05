@@ -16,6 +16,7 @@ SSPRK2	time scheme
 2	space order
 false 	periodic stencil
 -------------------- Limitation parameters -------------------------------
+1 1 1 1	cascade
 2	number of detection criterias
 PAD 1 1.0e-14	detection criteria + variable + sensibility
 DMP 1 1.0e-4 DMPu2 2 1.0e-4 DMP 4 1.0e-5

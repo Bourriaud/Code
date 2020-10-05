@@ -16,10 +16,11 @@ module types
      character(len=20) :: boundType
      real(dp), dimension(:), allocatable :: bound
      real(dp), dimension(:), allocatable :: X_gauss,Y_gauss
-     real(dp), dimension(:,:), allocatable :: flux   !flux(gauss_point,var)
+     real(dp), dimension(:,:,:), allocatable :: flux   !flux(iRK,side,var)
      logical, dimension(:), allocatable :: flux_acc
      integer :: deg
      integer, dimension(2) :: sub
+     logical :: done
   end type edgeStruct
 
   type :: cellStruct
@@ -32,7 +33,7 @@ module types
      integer, dimension(:), allocatable :: edge
      real(dp), dimension(:), allocatable :: X_gauss,Y_gauss
      real(dp), dimension(2) :: X_gauss2,Y_gauss2
-     logical :: accept
+     logical :: accept,updated
      integer :: deg
      integer :: level
      integer :: bound
@@ -96,8 +97,9 @@ module types
        real(dp), dimension(2), intent(out) :: Smax
      end subroutine sub_speed
 
-     subroutine sub_time (mesh,sol,str_equa,f_equa,flux,speed,order,cfl,t,n,tf, &
-          L_str_criteria,L_var_criteria,L_eps,gauss_weight,period,verbosity,order_pc)
+     subroutine sub_time (mesh,sol0,sol,soltemp,f_equa,flux,order,t,dt,n, &      !sol0=initial,sol=sol0+accepted flux, soltemp=sol+new flux
+          gauss_weight,period,order_pc,NOT_ACCEPTED_EDGE,str_equa, &
+          L_str_criteria,L_var_criteria,L_eps,NOT_ACCEPTED_CELL)
        use constant
        import meshStruct
        import solStruct
@@ -105,20 +107,22 @@ module types
        import sub_flux
        import sub_speed
        type(meshStruct), intent(inout) :: mesh
-       type(solStruct), intent(inout) :: sol
-       character(len=20), intent(in) :: str_equa
+       type(solStruct), intent(in) :: sol0,sol
+       type(solStruct), intent(inout) :: soltemp
        procedure (sub_f), pointer, intent(in) :: f_equa
        procedure (sub_flux), pointer, intent(in) :: flux
-       procedure (sub_speed), pointer, intent(in) :: speed
-       integer, intent(in) :: order,n,verbosity
-       real(dp), intent(in) :: cfl,tf
+       integer, intent(in) :: order,n
+       real(dp), intent(in) :: dt
        real(dp), intent(inout) :: t
-       character(len=20), dimension(:), intent(in) :: L_str_criteria
-       integer, dimension(:), intent(in) :: L_var_criteria
-       real(dp), dimension(:), intent(in) :: L_eps
        real(dp), dimension(:), intent(in) :: gauss_weight
        logical, intent(in) :: period
        integer, dimension(:), intent(inout) :: order_pc
+       integer, dimension(:), intent(in) :: NOT_ACCEPTED_EDGE
+       character(len=20), intent(in) :: str_equa
+       integer, dimension(:), intent(in) :: L_var_criteria
+       character(len=20), dimension(:), intent(in) :: L_str_criteria
+       real(dp), dimension(:), intent(in) :: L_eps
+       integer, dimension(:), intent(inout) :: NOT_ACCEPTED_CELL
      end subroutine sub_time
 
      subroutine sub_criteria(mesh,sol,sol2,k,isol,eps,gauss_weight,period,str_equa,accept)
@@ -132,7 +136,7 @@ module types
        real(dp), dimension(:), intent(in) :: gauss_weight
        logical, intent(in) :: period
        character(len=20), intent(in) :: str_equa
-       logical, intent(out) :: accept
+       logical, intent(inout) :: accept
      end subroutine sub_criteria
 
      subroutine sub_exactsol(x,y,t,s)

@@ -8,13 +8,68 @@ module limit
 
 contains
 
-  subroutine decrement(mesh,sol,soltemp,str_equa,deg,dt,L_str_criteria,L_var_criteria,L_eps, &
+  subroutine detect(mesh,sol,sol2,str_equa,L_str_criteria,L_var_criteria,L_eps,gauss_weight,period,NOT_ACCEPTED_CELL)
+     type(meshStruct), intent(inout) :: mesh
+     type(solStruct), intent(in) :: sol
+     type(solStruct), intent(in) :: sol2
+     character(len=20), intent(in) :: str_equa
+     integer, dimension(:), intent(in) :: L_var_criteria
+     character(len=20), dimension(:), intent(in) :: L_str_criteria
+     real(dp), dimension(:), intent(in) :: L_eps
+     real(dp), dimension(:), intent(in) :: gauss_weight
+     logical, intent(in) :: period
+     integer, dimension(:), intent(inout) :: NOT_ACCEPTED_CELL
+     integer :: n,isol,i,k
+     procedure (sub_criteria), pointer :: criteria
+     logical :: accept
+
+     do n=1,size(L_str_criteria)
+        isol=L_var_criteria(n)
+        select case (trim(L_str_criteria(n)))
+        case ('DMP')
+           criteria => DMP
+        case ('DMPu2')
+           criteria => DMPu2
+        case('PAD')
+           select case (trim(str_equa))
+           case('euler')
+              criteria => PAD_euler
+           case('euler_is')
+              criteria => PAD_euler
+           case('M1')
+              criteria => PAD_M1
+           case default
+              print*,trim(L_str_criteria(n))," is not valid for equation ",trim(str_equa)
+              call exit()
+           end select
+        case default
+           print*,trim(L_str_criteria(n))," criteria not implemented"
+           call exit()
+        end select
+
+        do i=1,size(NOT_ACCEPTED_CELL)
+          k=NOT_ACCEPTED_CELL(i)
+
+          if (mesh%cell(k)%deg==0) then
+             accept=.true.
+          else
+             call criteria(mesh,sol,sol2,k,isol,L_eps(n),gauss_weight,period,str_equa,accept)
+          endif
+
+          if (.not.accept) mesh%cell(k)%accept=.false.
+       enddo
+
+     enddo
+
+  end subroutine detect
+
+  subroutine decrement(mesh,sol,soltemp,str_equa,deg,nrk,dt,L_str_criteria,L_var_criteria,L_eps, &
        gauss_weight,period,NOT_ACCEPTED_CELL,NOT_ACCEPTED_EDGE,NAC_reason,verbosity)
     type(meshStruct), intent(inout) :: mesh
     type(solStruct), intent(in) :: sol
     type(solStruct), intent(inout) :: soltemp
     character(len=20), intent(in) :: str_equa
-    integer, intent(in) :: deg,verbosity
+    integer, intent(in) :: deg,nrk,verbosity
     real(dp), intent(in) :: dt
     integer, dimension(:), intent(in) :: L_var_criteria
     character(len=20), dimension(:), intent(in) :: L_str_criteria
@@ -28,7 +83,7 @@ contains
     procedure (sub_criteria), pointer :: criteria
     logical :: accept
     real(dp) :: lengthN1,lengthN2
-    if(.false.)print*,dt
+    if(.false.)print*,dt,neigh,p
 
     allocate(NAC(mesh%nc),NAE(mesh%ne))
 
@@ -38,9 +93,6 @@ contains
     NAE=0
     sol2=soltemp
     if (verbosity>1.and.size(NOT_ACCEPTED_CELL)==mesh%nc) NAC_reason=0
-    do k=1,mesh%nc
-       mesh%cell(k)%accept=.true.
-    enddo
     
     do n=1,size(L_str_criteria)
        
@@ -70,31 +122,26 @@ contains
 
        do i=1,size(NOT_ACCEPTED_CELL)
           k=NOT_ACCEPTED_CELL(i)
+
           if (mesh%cell(k)%deg==0) then
              accept=.true.
-          else
+          else if (mesh%cell(k)%accept) then
              call criteria(mesh,sol,sol2,k,isol,L_eps(n),gauss_weight,period,str_equa,accept)
+          else
+             accept=.false.
           endif
+
           if (.not.accept) then
              if (verbosity>1) then
                 if (size(NOT_ACCEPTED_CELL)==mesh%nc.and.NAC_reason(k)==0) NAC_reason(k)=n
              endif
              mesh%cell(k)%deg=deg
+             mesh%cell(k)%accept=.false.
              if (all(NAC/=k)) then
                 nc=nc+1
                 NAC(nc)=k
-                mesh%cell(k)%accept=.false.
-                soltemp%val(k,:)=sol%val(k,:) !!!
              endif
-             do j=1,size(mesh%cell(k)%stencil)
-                neigh=mesh%cell(k)%stencil(j)
-                if (all(NAC/=neigh)) then
-                   nc=nc+1
-                   NAC(nc)=neigh
-                   mesh%cell(neigh)%accept=.false.
-                   soltemp%val(neigh,:)=sol%val(neigh,:) !!!
-                endif
-             enddo
+             call crown(mesh,k,nc,1,nrk,deg,NAC)
           endif
        enddo
 
@@ -108,6 +155,7 @@ contains
              lengthN2=mesh%cell(abs(cell2))%dx
              sub1=mesh%edge(edge)%sub(1)
              sub2=mesh%edge(edge)%sub(2)
+             
              if (all(NAE/=edge)) then
 
                 select case (trim(mesh%edge(edge)%boundtype))
@@ -120,28 +168,17 @@ contains
                       NAE(ne)=mesh%edge(edge)%period
                    endif
                    !call criteria_flux(mesh%edge(edge)%flux(1,:),mesh%edge(edge)%flux_acc(1))
-                   !soltemp%val(abs(cell1),:)=soltemp%val(abs(cell1),:)+ &
-                        !gauss_weight1(1)*mesh%edge(edge)%flux(1,:)*dt/(lengthN1*2.0_dp**(sub1+1))
-                   !soltemp%val(abs(cell2),:)=soltemp%val(abs(cell2),:)- &
-                           !gauss_weight1(1)*mesh%edge(edge)%flux(1,:)*dt/(lengthN2*2.0_dp**(sub2+1))
 
                 case default
                    ne=ne+1
                    NAE(ne)=edge
                    !call criteria_flux(mesh%edge(edge)%flux(1,:),mesh%edge(edge)%flux_acc(1))
-                   !if (cell1>0) then
-                      !soltemp%val(cell1,:)=soltemp%val(cell1,:)+ &
-                           !gauss_weight1(1)*mesh%edge(edge)%flux(1,:)*dt/(lengthN1*2.0_dp**(sub1+1))
-                   !endif
-                   !if (cell2>0) then
-                      !soltemp%val(cell2,:)=soltemp%val(cell2,:)- &
-                           !gauss_weight1(1)*mesh%edge(edge)%flux(1,:)*dt/(lengthN2*2.0_dp**(sub2+1))
-                   !endif
+
                 end select
 
-                do p=1,size(gauss_weight)
-                   call criteria_flux(mesh%edge(edge)%flux(p,:),mesh%edge(edge)%flux_acc(p))
-                enddo
+                !do p=1,size(gauss_weight)
+                   !call criteria_flux(mesh%edge(edge)%flux(p,:),mesh%edge(edge)%flux_acc(p))
+                !enddo
                 
              endif
           enddo
@@ -159,6 +196,34 @@ contains
     return
   end subroutine decrement
 
+  recursive subroutine crown(mesh,k,nc,i,nrk,deg,NAC)
+    type(meshStruct), intent(inout) :: mesh
+    integer, intent(in) :: k,i,nrk,deg
+    integer, intent(inout) :: nc
+    integer, dimension(:), intent(inout) :: NAC
+    integer :: j,neigh
+
+    do j=1,size(mesh%cell(k)%stencil)
+       neigh=mesh%cell(k)%stencil(j)
+       if (i<=nrk) then
+          mesh%cell(neigh)%accept=.false.
+          !mesh%cell(neigh)%deg=deg
+       endif
+       if (all(NAC/=neigh)) then
+          nc=nc+1
+          NAC(nc)=neigh
+       endif
+    enddo
+    if (i<nrk) then
+       do j=1,size(mesh%cell(k)%stencil)
+          neigh=mesh%cell(k)%stencil(j)
+          call crown(mesh,neigh,nc,i+1,nrk,deg,NAC)
+       enddo
+    endif
+  
+    return
+  end subroutine crown
+
   subroutine DMP(mesh,sol,sol2,k,isol,eps,gauss_weight,period,str_equa,accept)
     type(meshStruct), intent(inout) :: mesh
     type(solStruct), intent(in) :: sol,sol2
@@ -167,7 +232,7 @@ contains
     real(dp), dimension(:), intent(in) :: gauss_weight
     logical, intent(in) :: period
     character(len=20), intent(in) :: str_equa
-    logical, intent(out) :: accept
+    logical, intent(inout) :: accept
     integer :: j,neigh
     real(dp) :: mini,maxi,test,eps2
     if(.false.)print*,gauss_weight,str_equa,period
@@ -203,7 +268,7 @@ contains
     real(dp), dimension(:), intent(in) :: gauss_weight
     logical, intent(in) :: period
     character(len=20), intent(in) :: str_equa
-    logical, intent(out) :: accept
+    logical, intent(inout) :: accept
     integer :: i,j,neigh
     real(dp) :: mini,maxi,test,eps2
     logical :: extrema
@@ -309,7 +374,7 @@ contains
     real(dp), dimension(:), intent(in) :: gauss_weight
     logical, intent(in) :: period
     character(len=20), intent(in) :: str_equa
-    logical, intent(out) :: accept
+    logical, intent(inout) :: accept
     real(dp) :: rho,p
     if(.false.)print*,eps,gauss_weight,isol,mesh%nc,sol%nsolUser,period
 
@@ -333,7 +398,7 @@ contains
     real(dp), dimension(:), intent(in) :: gauss_weight
     logical, intent(in) :: period
     character(len=20), intent(in) :: str_equa
-    logical, intent(out) :: accept
+    logical, intent(inout) :: accept
     real(dp) :: test
     if(.false.)print*,gauss_weight,isol,mesh%nc,sol%nsolUser,period
     if(.false.)call unconserv(sol2%val(k,:),str_equa,1,test)
@@ -351,7 +416,7 @@ contains
 
   subroutine criteria_flux(flux,accept)
     real(dp), dimension(:), intent(in) :: flux
-    logical, intent(out) :: accept
+    logical, intent(inout) :: accept
     if(.false.)print*,flux
     
     accept=.false.

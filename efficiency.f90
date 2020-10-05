@@ -228,6 +228,7 @@ contains
     a2=1.0_dp
 
     s=cos((x-a1*t-5.0_dp)*pi/5.0_dp)+cos((y-a2*t-5.0_dp)*pi/5.0_dp)
+
     !if(x-a1*t<5.0_dp)then
        !s=0.0_dp
     !else

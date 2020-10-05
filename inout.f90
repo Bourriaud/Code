@@ -26,15 +26,15 @@ contains
   end subroutine get_config
   
   subroutine init(config_file,test_case,restart_file,xL,xR,yL,yR,level,nvar,cfl,tf,fs,fp,namefile,verbosity,sol, &
-       str_equa,str_flux,str_time_scheme,order,period,L_str_criteria,L_var_criteria,L_eps, &
+       str_equa,str_flux,str_time_scheme,order,nrk,period,cascade,L_str_criteria,L_var_criteria,L_eps, &
        gauss_point,gauss_weight,str_exactSol,exact_file,bool_AMR,fn_adapt,f_adapt,recursivity,order_pc)
     character(len=20), intent(out) :: config_file,test_case,namefile,str_equa,str_flux,str_time_scheme
     real(dp), intent(out) :: xL,xR,yL,yR,cfl,tf
-    integer, intent(out) :: level,nvar,fs,fp,verbosity,order,f_adapt,recursivity
+    integer, intent(out) :: level,nvar,fs,fp,verbosity,order,nrk,f_adapt,recursivity
     type(solStruct), intent(out) :: sol
     logical, intent(out) :: period
     character(len=20), dimension(:), allocatable, intent(out) :: L_str_criteria
-    integer, dimension(:), allocatable, intent(out) :: L_var_criteria,order_pc
+    integer, dimension(:), allocatable, intent(out) :: cascade,L_var_criteria,order_pc
     real(dp), dimension(:), allocatable, intent(out) :: L_eps
     real(dp), dimension(:), allocatable, intent(out) :: gauss_point,gauss_weight
     character(len=20), intent(out) :: fn_adapt,str_exactSol,exact_file,restart_file
@@ -63,6 +63,8 @@ contains
     read(11,*)order
     read(11,*)period
     read(11,*)blank
+    allocate(cascade(order-1))
+    read(11,*)cascade
     read(11,*)ncriteria
     allocate(L_str_criteria(ncriteria),L_var_criteria(ncriteria),L_eps(ncriteria))
     do i=1,ncriteria
@@ -122,6 +124,22 @@ contains
     allocate(order_pc(order+1))
     order_pc=0
 
+    select case (trim(str_time_scheme))
+    case ('euler_exp')
+       nrk=1
+    case ('SSPRK2')
+       nrk=2
+    case ('SSPRK3')
+       nrk=3
+    case ('SSPRK4')
+       nrk=5
+    case ('SSPRK5')
+       nrk=10
+    case default
+       print*,trim(str_time_scheme)," time scheme not implemented"
+       call exit()
+    end select
+
     return
   end subroutine init
   
@@ -180,9 +198,9 @@ contains
     return
   end subroutine IC_restart
   
-  subroutine buildMesh(xL,xR,yL,yR,nx,ny,gauss_point,order,mesh,sol,period)
+  subroutine buildMesh(xL,xR,yL,yR,nx,ny,gauss_point,order,nrk,mesh,sol,period)
     real(dp), intent(in) :: xL,xR,yL,yR
-    integer, intent(in) :: nx,ny,order
+    integer, intent(in) :: nx,ny,order,nrk
     real(dp), dimension(:), intent(in) :: gauss_point
     type(meshStruct), intent(inout) :: mesh
     type(solStruct), intent(inout) :: sol
@@ -328,7 +346,7 @@ contains
        dir=edge%dir
        allocate(mesh%edge(i)%X_gauss(size(gauss_point)),mesh%edge(i)%Y_gauss(size(gauss_point)))
        allocate(mesh%edge(i)%flux_acc(size(gauss_point)))
-       allocate(mesh%edge(i)%flux(order,sol%nvar))
+       allocate(mesh%edge(i)%flux(nrk+1,2,sol%nvar))
        mesh%edge(i)%flux_acc=.false.
        select case (dir)
        case(1)
@@ -391,10 +409,10 @@ contains
     return
   end subroutine buildP4EST
   
-  subroutine buildMesh_P4EST(p4est,xL,xR,yL,yR,gauss_point,order,mesh,sol,quadrants,period)
+  subroutine buildMesh_P4EST(p4est,xL,xR,yL,yR,gauss_point,order,nrk,mesh,sol,quadrants,period)
     type(c_ptr), intent(in) :: p4est
     real(dp), intent(in) :: xL,xR,yL,yR
-    integer, intent(in) :: order
+    integer, intent(in) :: order,nrk
     real(dp), dimension(:), intent(in) :: gauss_point
     type(meshStruct), intent(inout) :: mesh
     type(solStruct), intent(inout) :: sol
@@ -480,7 +498,7 @@ contains
              iloc=iloc+1
              if (F_iedge(i1)>0) then
                 allocate(mesh%edge(F_iedge(i1))%flux_acc(size(gauss_point)))
-                allocate(mesh%edge(F_iedge(i1))%flux(order,sol%nvar))
+                allocate(mesh%edge(F_iedge(i1))%flux(nrk+1,2,sol%nvar))
                 allocate(mesh%edge(F_iedge(i1))%X_gauss(size(gauss_point)),mesh%edge(F_iedge(i1))%Y_gauss(size(gauss_point)))
                 
                 call c_f_pointer(C_sub,F_sub,(/2/))

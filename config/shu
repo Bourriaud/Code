@@ -16,6 +16,7 @@ SSPRK3	time scheme
 3	space order
 false 	periodic stencil
 -------------------- Limitation parameters -------------------------------
+1 1 1 1	cascade
 4	number of detection criterias
 PAD 1 1.0e-4	detection criteria + variable + sensibility
 DMPu2 1 1.0e-4

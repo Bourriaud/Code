@@ -16,6 +16,7 @@ SSPRK4	time scheme
 4	space order
 true 	periodic stencil
 -------------------- Limitation parameters -------------------------------
+1 1 1 1	cascade
 1	number of detection criterias
 PAD 1 1.0e-4	detection criteria + variable + sensibilityDMPu2 1 1.0e-3 DMPu2 2 1.0e-3
 -------------------- Output parameters -----------------------------------

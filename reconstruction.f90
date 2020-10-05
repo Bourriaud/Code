@@ -127,6 +127,7 @@ contains
           call reconstruct1(mesh,sol,k,order,gauss_weight,period,pol_OUT)
           !call reconstruct2(mesh,sol,k,order,pol_OUT)
        case default
+          !call reconstruct1(mesh,sol,k,order,gauss_weight,period,pol_OUT)
           call reconstruct2(mesh,sol,k,order,pol_OUT)
        end select
     else
@@ -346,7 +347,7 @@ contains
     do isol=1,sol%nvar
        call solve(X,U(:,isol),pol_OUT(:,isol))
     enddo
-    
+
     deallocate(stencil,X,U)
     
     return

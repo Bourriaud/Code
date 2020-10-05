@@ -9,14 +9,16 @@ none restart.txt	Restart file
 -------------------- Numerical parameters --------------------------------
 5	level
 0.2	cfl
-10.0	tf
+1.0	tf
 advection	equation
 godunov	flux
 SSPRK3	time scheme
 3	space order
 true	periodic stencil
 -------------------- Limitation parameters -------------------------------
-0	number of detection criteriasDMP 1 1.0e-4	detection criteria + variable + sensibility
+1 1 1 1	cascade
+1	number of detection criterias
+DMP 1 1.0e-4	detection criteria + variable + sensibility
 -------------------- Output parameters -----------------------------------
 10	save frequency
 10	print frequency
@@ -29,7 +31,7 @@ var1	var 1
 2	var_user : error
 sinus	analytical solution
 -------------------- AMR parameters --------------------------------------
-TRUE	AMR
+FALSE	AMR
 sinus	adaptation function
 1	adaptation frequency
 1	recursivity
