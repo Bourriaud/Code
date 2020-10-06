@@ -53,7 +53,7 @@ contains
     integer, dimension(:), intent(in) :: cascade,L_var_criteria
     real(dp), dimension(:), intent(in) :: L_eps
     real(dp), dimension(:), intent(in) :: gauss_weight
-    logical, intent(in) :: period
+    logical, dimension(2), intent(in) :: period
     integer, dimension(:), intent(inout) :: order_pc
     integer, dimension(:), allocatable :: NOT_ACCEPTED_CELL,NOT_ACCEPTED_EDGE,NOT_ACCEPTED_CELL_OLD,NOT_ACCEPTED_EDGE_OLD
     integer, dimension(:), allocatable :: NAC_cycle,NAC_reason
@@ -95,6 +95,7 @@ contains
 
        do k=1,mesh%nc
           mesh%cell(k)%accept=.true.
+          mesh%cell(k)%accept_temp=.true.
        enddo
 
        do k=1,size(NOT_ACCEPTED_EDGE)
@@ -142,7 +143,7 @@ contains
              call write_accept(mesh,NAC_cycle,NAC_reason,n)
           endif
        endif
-
+       
     enddo
     t=t+dt
 
@@ -170,7 +171,7 @@ contains
     integer, intent(in) :: order,n,irk
     real(dp), intent(in) :: dt,t
     real(dp), dimension(:), intent(in) :: gauss_weight
-    logical, intent(in) :: period
+    logical, dimension(2), intent(in) :: period
     integer, dimension(:), intent(inout) :: order_pc
     integer, dimension(:), intent(in) :: NOT_ACCEPTED_EDGE
     character(len=20), intent(in) :: str_equa
@@ -264,7 +265,7 @@ contains
     real(dp), intent(in) :: dt
     real(dp), intent(inout) :: t
     real(dp), dimension(:), intent(in) :: gauss_weight
-    logical, intent(in) :: period
+    logical, dimension(2), intent(in) :: period
     integer, dimension(:), intent(inout) :: order_pc
     integer, dimension(:), intent(in) :: NOT_ACCEPTED_EDGE
     character(len=20), intent(in) :: str_equa
@@ -304,7 +305,7 @@ contains
     real(dp), intent(in) :: dt
     real(dp), intent(inout) :: t
     real(dp), dimension(:), intent(in) :: gauss_weight
-    logical, intent(in) :: period
+    logical, dimension(2), intent(in) :: period
     integer, dimension(:), intent(inout) :: order_pc
     integer, dimension(:), intent(in) :: NOT_ACCEPTED_EDGE
     character(len=20), intent(in) :: str_equa
@@ -354,7 +355,7 @@ contains
     real(dp), intent(in) :: dt
     real(dp), intent(inout) :: t
     real(dp), dimension(:), intent(in) :: gauss_weight
-    logical, intent(in) :: period
+    logical, dimension(2), intent(in) :: period
     integer, dimension(:), intent(inout) :: order_pc
     integer, dimension(:), intent(in) :: NOT_ACCEPTED_EDGE
     character(len=20), intent(in) :: str_equa
@@ -412,7 +413,7 @@ contains
     real(dp), intent(in) :: dt
     real(dp), intent(inout) :: t
     real(dp), dimension(:), intent(in) :: gauss_weight
-    logical, intent(in) :: period
+    logical, dimension(2), intent(in) :: period
     integer, dimension(:), intent(inout) :: order_pc
     integer, dimension(:), intent(in) :: NOT_ACCEPTED_EDGE
     character(len=20), intent(in) :: str_equa
@@ -489,7 +490,7 @@ contains
     real(dp), intent(in) :: dt
     real(dp), intent(inout) :: t
     real(dp), dimension(:), intent(in) :: gauss_weight
-    logical, intent(in) :: period
+    logical, dimension(2), intent(in) :: period
     integer, dimension(:), intent(inout) :: order_pc
     integer, dimension(:), intent(in) :: NOT_ACCEPTED_EDGE
     character(len=20), intent(in) :: str_equa

@@ -32,7 +32,7 @@ contains
     real(dp), intent(out) :: xL,xR,yL,yR,cfl,tf
     integer, intent(out) :: level,nvar,fs,fp,verbosity,order,nrk,f_adapt,recursivity
     type(solStruct), intent(out) :: sol
-    logical, intent(out) :: period
+    logical, dimension(2), intent(out) :: period
     character(len=20), dimension(:), allocatable, intent(out) :: L_str_criteria
     integer, dimension(:), allocatable, intent(out) :: cascade,L_var_criteria,order_pc
     real(dp), dimension(:), allocatable, intent(out) :: L_eps
@@ -204,7 +204,7 @@ contains
     real(dp), dimension(:), intent(in) :: gauss_point
     type(meshStruct), intent(inout) :: mesh
     type(solStruct), intent(inout) :: sol
-    logical, intent(in) :: period
+    logical, dimension(2), intent(in) :: period
     integer :: i,j,k,p,dir,Neq
     real(dp) :: dx,dy,a,b,c,center,diff,xc,yc
     type(edgeStruct) :: edge
@@ -386,11 +386,7 @@ contains
 
     do k=1,mesh%nc
        call Nequa(order-1,Neq)
-       if (period) then
-          call buildStencil_period(mesh,k,Neq,order,stencil,stencil_type,stencil_bound)
-       else
-          call buildStencil(mesh,k,Neq,order,stencil,stencil_type,stencil_bound)
-       endif
+       call buildStencil(mesh,k,Neq,order,period,stencil,stencil_type,stencil_bound)
        allocate(mesh%cell(k)%stencil(size(stencil)),mesh%cell(k)%stencil_type(size(stencil_type)))
        mesh%cell(k)%stencil=stencil
        mesh%cell(k)%stencil_type=stencil_type
@@ -417,7 +413,7 @@ contains
     type(meshStruct), intent(inout) :: mesh
     type(solStruct), intent(inout) :: sol
     type(c_ptr), intent(out) :: quadrants
-    logical, intent(in) :: period
+    logical, dimension(2), intent(in) :: period
     integer(c_int) :: tt
     type(c_ptr) :: p4_mesh,nodes,edges
     type(c_ptr) :: C_corners,C_corners_cell,C_neighbors,C_sub,C_cell1,C_cell2,C_iedge,C_period,C_nodes
@@ -589,17 +585,79 @@ contains
 
     do k=1,mesh%nc
        call Nequa(order-1,Neq)
-       if (period) then
-          call buildStencil_period(mesh,k,Neq,order,stencil,stencil_type,stencil_bound)
-       else
-          call buildStencil(mesh,k,Neq,order,stencil,stencil_type,stencil_bound)
-       endif
+       call buildStencil(mesh,k,Neq,order,period,stencil,stencil_type,stencil_bound)
        call buildStencil2(mesh,k)
-       if (any(mesh%cell(k)%stencil2<0)) then
-          mesh%cell(k)%bound=1
-       else
-          mesh%cell(k)%bound=0
+
+       mesh%cell(k)%bound=0
+       if (mesh%cell(k)%xc<mesh%cell(abs(mesh%cell(k)%corner_cell(1)))%xc) then
+          if (mesh%cell(k)%yc<mesh%cell(abs(mesh%cell(k)%corner_cell(1)))%yc) then
+             mesh%cell(k)%bound=3
+          else
+             if (mesh%cell(k)%bound==0) then
+                mesh%cell(k)%bound=1
+             elseif (mesh%cell(k)%bound==2) then
+                mesh%cell(k)%bound=3
+             endif
+          endif
+       elseif (mesh%cell(k)%yc<mesh%cell(abs(mesh%cell(k)%corner_cell(1)))%yc) then
+          if (mesh%cell(k)%bound==0) then
+             mesh%cell(k)%bound=2
+          elseif (mesh%cell(k)%bound==1) then
+             mesh%cell(k)%bound=3
+          endif
        endif
+       if (mesh%cell(k)%xc>mesh%cell(abs(mesh%cell(k)%corner_cell(2)))%xc) then
+          if (mesh%cell(k)%yc<mesh%cell(abs(mesh%cell(k)%corner_cell(2)))%yc) then
+             mesh%cell(k)%bound=3
+          else
+             if (mesh%cell(k)%bound==0) then
+                mesh%cell(k)%bound=1
+             elseif (mesh%cell(k)%bound==2) then
+                mesh%cell(k)%bound=3
+             endif
+          endif
+       elseif (mesh%cell(k)%yc<mesh%cell(abs(mesh%cell(k)%corner_cell(2)))%yc) then
+          if (mesh%cell(k)%bound==0) then
+             mesh%cell(k)%bound=2
+          elseif (mesh%cell(k)%bound==1) then
+             mesh%cell(k)%bound=3
+          endif
+       endif
+       if (mesh%cell(k)%xc<mesh%cell(abs(mesh%cell(k)%corner_cell(3)))%xc) then
+          if (mesh%cell(k)%yc>mesh%cell(abs(mesh%cell(k)%corner_cell(3)))%yc) then
+             mesh%cell(k)%bound=3
+          else
+             if (mesh%cell(k)%bound==0) then
+                mesh%cell(k)%bound=1
+             elseif (mesh%cell(k)%bound==2) then
+                mesh%cell(k)%bound=3
+             endif
+          endif
+       elseif (mesh%cell(k)%yc>mesh%cell(abs(mesh%cell(k)%corner_cell(3)))%yc) then
+          if (mesh%cell(k)%bound==0) then
+             mesh%cell(k)%bound=2
+          elseif (mesh%cell(k)%bound==1) then
+             mesh%cell(k)%bound=3
+          endif
+       endif
+       if (mesh%cell(k)%xc>mesh%cell(abs(mesh%cell(k)%corner_cell(4)))%xc) then
+          if (mesh%cell(k)%yc>mesh%cell(abs(mesh%cell(k)%corner_cell(4)))%yc) then
+             mesh%cell(k)%bound=3
+          else
+             if (mesh%cell(k)%bound==0) then
+                mesh%cell(k)%bound=1
+             elseif (mesh%cell(k)%bound==2) then
+                mesh%cell(k)%bound=3
+             endif
+          endif
+       elseif (mesh%cell(k)%yc>mesh%cell(abs(mesh%cell(k)%corner_cell(4)))%yc) then
+          if (mesh%cell(k)%bound==0) then
+             mesh%cell(k)%bound=2
+          elseif (mesh%cell(k)%bound==1) then
+             mesh%cell(k)%bound=3
+          endif
+       endif
+
        allocate(mesh%cell(k)%stencil(size(stencil)),mesh%cell(k)%stencil_type(size(stencil_type)))
        mesh%cell(k)%stencil=stencil
        mesh%cell(k)%stencil_type=stencil_type

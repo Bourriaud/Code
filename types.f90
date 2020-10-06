@@ -33,10 +33,10 @@ module types
      integer, dimension(:), allocatable :: edge
      real(dp), dimension(:), allocatable :: X_gauss,Y_gauss
      real(dp), dimension(2) :: X_gauss2,Y_gauss2
-     logical :: accept,updated
+     logical :: accept,accept_temp,updated
      integer :: deg
      integer :: level
-     integer :: bound
+     integer :: bound   !vertical=1,horizontal=2,corner=3
      real(dp), dimension(:,:), allocatable :: polTest,polCoef3
      integer, dimension(:), allocatable :: stencil,stencil_type
      integer, dimension(12) :: stencil2
@@ -115,7 +115,7 @@ module types
        real(dp), intent(in) :: dt
        real(dp), intent(inout) :: t
        real(dp), dimension(:), intent(in) :: gauss_weight
-       logical, intent(in) :: period
+       logical, dimension(2), intent(in) :: period
        integer, dimension(:), intent(inout) :: order_pc
        integer, dimension(:), intent(in) :: NOT_ACCEPTED_EDGE
        character(len=20), intent(in) :: str_equa
@@ -134,7 +134,7 @@ module types
        integer, intent(in) :: k,isol
        real(dp), intent(in) :: eps
        real(dp), dimension(:), intent(in) :: gauss_weight
-       logical, intent(in) :: period
+       logical, dimension(2), intent(in) :: period
        character(len=20), intent(in) :: str_equa
        logical, intent(inout) :: accept
      end subroutine sub_criteria
@@ -153,7 +153,7 @@ module types
        type(solStruct), intent(in) :: sol
        integer, intent(in) :: level
        integer, intent(out) :: minlevel,maxlevel,coarsen_recursive,refine_recursive
-       logical, intent(in) :: period
+       logical, dimension(2), intent(in) :: period
        integer, dimension(:), intent(inout) :: sol_coarsen,sol_refine
      end subroutine sub_adapt
      

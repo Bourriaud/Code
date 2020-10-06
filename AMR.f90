@@ -14,7 +14,7 @@ contains
     type(solStruct), intent(in) :: sol
     integer, intent(in) :: level,order
     real(dp), dimension(:), intent(in) :: gauss_weight,gauss_point
-    logical, intent(in) :: period
+    logical, dimension(2), intent(in) :: period
     integer, intent(out) :: minlevel,maxlevel
     type(c_ptr) :: C_sol,C_sol_coarsen,C_sol_refine,C_sol_interp,C_pol_interp
     real(dp), dimension(:,:), allocatable, target :: F_sol,F_sol_interp
@@ -51,7 +51,7 @@ contains
     type(solStruct), intent(in) :: sol
     integer, intent(in) :: order
     real(dp), dimension(:), intent(in) :: gauss_weight,gauss_point
-    logical, intent(in) :: period
+    logical, dimension(2), intent(in) :: period
     integer, dimension(:), intent(in) :: sol_refine
     real(dp), dimension(:,:), intent(inout):: sol_interp
     real(dp), dimension(:,:,:), intent(inout):: pol_interp
@@ -143,7 +143,7 @@ contains
     type(solStruct), intent(in) :: sol
     integer, intent(in) :: level
     integer, intent(out) :: minlevel,maxlevel,coarsen_recursive,refine_recursive
-    logical, intent(in) :: period
+    logical, dimension(2), intent(in) :: period
     integer, dimension(:), intent(inout) :: sol_coarsen,sol_refine
     integer :: k,isol
     real(dp) :: xmin,xmax,ymin,ymax
@@ -177,7 +177,7 @@ contains
     type(solStruct), intent(in) :: sol
     integer, intent(in) :: level
     integer, intent(out) :: minlevel,maxlevel,coarsen_recursive,refine_recursive
-    logical, intent(in) :: period
+    logical, dimension(2), intent(in) :: period
     integer, dimension(:), intent(inout) :: sol_coarsen,sol_refine
     integer :: k,isol
     if(.false.)print*,period
@@ -203,7 +203,7 @@ contains
     type(solStruct), intent(in) :: sol
     integer, intent(in) :: level
     integer, intent(out) :: minlevel,maxlevel,coarsen_recursive,refine_recursive
-    logical, intent(in) :: period
+    logical, dimension(2), intent(in) :: period
     integer, dimension(:), intent(inout) :: sol_coarsen,sol_refine
     integer :: k,isol
     real(dp) :: grad
@@ -232,7 +232,7 @@ contains
     type(solStruct), intent(in) :: sol
     integer, intent(in) :: level
     integer, intent(out) :: minlevel,maxlevel,coarsen_recursive,refine_recursive
-    logical, intent(in) :: period
+    logical, dimension(2), intent(in) :: period
     integer, dimension(:), intent(inout) :: sol_coarsen,sol_refine
     integer :: k,isol
     real(dp) :: grad
@@ -261,7 +261,7 @@ contains
     type(solStruct), intent(in) :: sol
     integer, intent(in) :: level
     integer, intent(out) :: minlevel,maxlevel,coarsen_recursive,refine_recursive
-    logical, intent(in) :: period
+    logical, dimension(2), intent(in) :: period
     integer, dimension(:), intent(inout) :: sol_coarsen,sol_refine
     integer :: k,isol
     real(dp) :: lap

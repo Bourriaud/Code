@@ -14,16 +14,17 @@ euler	equation
 rusanov	flux
 SSPRK2	time scheme
 2	space order
-false 	periodic stencil
+false true	periodic stencil (vertical horizontal)
 -------------------- Limitation parameters -------------------------------
 1 1 1 1	cascade
-1	number of detection criterias
-PAD 1 1.0e-14	detection criteria + variable + sensibility DMP 1 1.0e-4 DMPu2 2 1.0e-4 DMP 4 1.0e-5
+2	number of detection criterias
+PAD 1 1.0e-14	detection criteria + variable + sensibility 
+DMP 1 1.0e-4 DMPu2 2 1.0e-4 DMP 4 1.0e-5
 -------------------- Output parameters -----------------------------------
 10	save frequency
 10	print frequency
 sod	namefile
-0 	verbosity
+0	verbosity
 4	nvar
 rho	var 1
 rhou	var 2

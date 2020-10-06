@@ -17,7 +17,7 @@ contains
      character(len=20), dimension(:), intent(in) :: L_str_criteria
      real(dp), dimension(:), intent(in) :: L_eps
      real(dp), dimension(:), intent(in) :: gauss_weight
-     logical, intent(in) :: period
+     logical, dimension(2), intent(in) :: period
      integer, dimension(:), intent(inout) :: NOT_ACCEPTED_CELL
      integer :: n,isol,i,k
      procedure (sub_criteria), pointer :: criteria
@@ -75,7 +75,7 @@ contains
     character(len=20), dimension(:), intent(in) :: L_str_criteria
     real(dp), dimension(:), intent(in) :: L_eps
     real(dp), dimension(:), intent(in) :: gauss_weight
-    logical, intent(in) :: period
+    logical, dimension(2), intent(in) :: period
     type(solStruct) :: sol2
     integer, dimension(:), allocatable, intent(inout) :: NOT_ACCEPTED_CELL,NOT_ACCEPTED_EDGE,NAC_reason
     integer, dimension(:), allocatable :: NAC,NAE
@@ -130,7 +130,7 @@ contains
           else
              accept=.false.
           endif
-
+          
           if (.not.accept) then
              if (verbosity>1) then
                 if (size(NOT_ACCEPTED_CELL)==mesh%nc.and.NAC_reason(k)==0) NAC_reason(k)=n
@@ -143,6 +143,10 @@ contains
              endif
              call crown(mesh,k,nc,1,nrk,deg,NAC)
           endif
+       enddo
+
+       do i=1,size(NOT_ACCEPTED_CELL)
+          mesh%cell(NOT_ACCEPTED_CELL(i))%accept=mesh%cell(NOT_ACCEPTED_CELL(i))%accept_temp
        enddo
 
        do i=1,nc
@@ -206,7 +210,7 @@ contains
     do j=1,size(mesh%cell(k)%stencil)
        neigh=mesh%cell(k)%stencil(j)
        if (i<=nrk) then
-          mesh%cell(neigh)%accept=.false.
+          mesh%cell(neigh)%accept_temp=.false.
           !mesh%cell(neigh)%deg=deg
        endif
        if (all(NAC/=neigh)) then
@@ -230,7 +234,7 @@ contains
     integer, intent(in) :: k,isol
     real(dp), intent(in) :: eps
     real(dp), dimension(:), intent(in) :: gauss_weight
-    logical, intent(in) :: period
+    logical, dimension(2), intent(in) :: period
     character(len=20), intent(in) :: str_equa
     logical, intent(inout) :: accept
     integer :: j,neigh
@@ -266,7 +270,7 @@ contains
     integer, intent(in) :: k,isol
     real(dp), intent(in) :: eps
     real(dp), dimension(:), intent(in) :: gauss_weight
-    logical, intent(in) :: period
+    logical, dimension(2), intent(in) :: period
     character(len=20), intent(in) :: str_equa
     logical, intent(inout) :: accept
     integer :: i,j,neigh
@@ -308,7 +312,7 @@ contains
     type(solStruct), intent(in) :: sol
     integer, intent(in) :: k,isol
     real(dp), dimension(:), intent(in) :: gauss_weight
-    logical, intent(in) :: period
+    logical, dimension(2), intent(in) :: period
     logical, intent(out) :: extrema
     integer :: j,neigh,test_min,test_max
     real(dp) :: Xmin,Xmax,Ymin,Ymax
@@ -372,7 +376,7 @@ contains
     integer, intent(in) :: k,isol
     real(dp), intent(in) :: eps
     real(dp), dimension(:), intent(in) :: gauss_weight
-    logical, intent(in) :: period
+    logical, dimension(2), intent(in) :: period
     character(len=20), intent(in) :: str_equa
     logical, intent(inout) :: accept
     real(dp) :: rho,p
@@ -396,7 +400,7 @@ contains
     integer, intent(in) :: k,isol
     real(dp), intent(in) :: eps
     real(dp), dimension(:), intent(in) :: gauss_weight
-    logical, intent(in) :: period
+    logical, dimension(2), intent(in) :: period
     character(len=20), intent(in) :: str_equa
     logical, intent(inout) :: accept
     real(dp) :: test

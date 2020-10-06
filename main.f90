@@ -18,7 +18,7 @@ program main
   real(dp) :: xL,xR,yL,yR,cfl,tf,eL1,eL2,tstart,tfinish
   integer :: nvar,fs,fp,verbosity,order,i,k,f_adapt,recursivity,total_cell,average_cell
   integer :: level,minlevel,maxlevel,nrk,dim
-  logical :: period
+  logical, dimension(2) :: period
   integer, dimension(:), allocatable :: cascade,L_var_criteria,order_pc
   real(dp), dimension(:), allocatable :: L_eps
   character(len=20) :: config_file,test_case,namefile,str_equa,str_flux,str_time_scheme
@@ -384,7 +384,8 @@ contains
     integer, dimension(:), intent(in) :: cascade,L_var_criteria
     real(dp), dimension(:), intent(in) :: L_eps
     real(dp), dimension(:), intent(in) :: gauss_weight,gauss_point
-    logical, intent(in) :: period,bool_AMR
+    logical, dimension(2), intent(in) :: period
+    logical, intent(in) :: bool_AMR
     integer, intent(out) :: total_cell,average_cell
     integer :: i,n,nout,minlevel,maxlevel
     real(dp) :: t
