@@ -2,26 +2,27 @@
 Vortex	ICBC
 none restart.txt	Restart file
 -------------------- Geometrical parameters ------------------------------
--5.	xL
-5.	xR
--5.	yL
-5.	yR
+-5.0	xL
+5.0	xR
+-5.0	yL
+5.0	yR
 -------------------- Numerical parameters --------------------------------
-5	level
+8	level
 0.95	cfl
-0.5	tf
+10.0	tf
 euler	equation
 rusanov	flux
-SSPRK4	time scheme
-4	space order
-true 	periodic stencil
+SSPRK2	time scheme
+2	space order
+true false	periodic stencil
+1	scheme (1=classic reconstruction, 2=compact reconstruction)
 -------------------- Limitation parameters -------------------------------
 1 1 1 1	cascade
 1	number of detection criterias
-PAD 1 1.0e-4	detection criteria + variable + sensibilityDMPu2 1 1.0e-3 DMPu2 2 1.0e-3
+PAD 1 1.0e-14	detection criteria + variable + sensibilityDMPu2 1 1.0e-3 DMPu2 2 1.0e-3
 -------------------- Output parameters -----------------------------------
-1	save frequency
-1	print frequency
+100	save frequency
+10	print frequency
 vortex	namefile
 1	verbosity
 4	nvar

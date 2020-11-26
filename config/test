@@ -14,7 +14,8 @@ advection	equation
 godunov	flux
 SSPRK2	time scheme
 2	space order
-true 	periodic stencil
+true true 	periodic stencil
+2	scheme (1=classic reconstruction, 2=compact reconstruction)
 -------------------- Limitation parameters -------------------------------
 1 1 1 1	cascade
 0	number of detection criteriasDMPu2 1 1.0e-4	detection criteria + variable + sensibility

@@ -21,7 +21,7 @@ contains
 
     allocate(utemp(size(u)))
 
-    call reconstruct1(mesh,sol,k,1,gauss_weight,(/.true.,.true./),pol2)
+    call reconstruct1(mesh,sol,k,1,gauss_weight,pol2)
     order=size(gauss_point)
     
     u=0.0_dp
@@ -98,10 +98,10 @@ contains
     return
   end subroutine evaluate
 
-  subroutine reconstruct(mesh,sol,k,order,gauss_weight,period,pol_OUT)
+  subroutine reconstruct(mesh,sol,k,order,scheme,gauss_weight,period,pol_OUT)
     type(meshStruct), intent(inout) :: mesh
     type(solStruct), intent(in) :: sol
-    integer, intent(in) :: k,order
+    integer, intent(in) :: k,order,scheme
     real(dp), dimension(:), intent(in) :: gauss_weight
     real(dp), dimension(:), allocatable :: gauss_point
     logical, dimension(2), intent(in) :: period
@@ -121,60 +121,76 @@ contains
        gauss_point=gauss_point5
     end select
     
-    if (mesh%cell(k)%bound<=2) then
-       if (mesh%cell(k)%bound==0.or.period(max(mesh%cell(k)%bound,1))) then
-          select case (order)
-          case (4)
-             call reconstruct1(mesh,sol,k,order,gauss_weight,period,pol_OUT)
-             !call reconstruct2(mesh,sol,k,order,pol_OUT)
-          case default
-             !call reconstruct1(mesh,sol,k,order,gauss_weight,period,pol_OUT)
-             call reconstruct2(mesh,sol,k,order,pol_OUT)
-          end select
+    select case (scheme)
+    case (1)
+       if (mesh%cell(k)%bound<=2) then
+          if (mesh%cell(k)%bound==0.or.period(max(mesh%cell(k)%bound,1))) then
+             call reconstruct1(mesh,sol,k,order,gauss_weight,pol_OUT)
+          else
+             if((ALL(mesh%cell(k)%stencil_type==5)).and.(size(mesh%cell(k)%stencil_type)==5.or. &
+                                                       size(mesh%cell(k)%stencil_type)==14)) then
+                call reconstruct1_bound(mesh,sol,k,order,period,pol_OUT)
+             else
+                call reconstruct1(mesh,sol,k,order,gauss_weight,pol_OUT)
+             endif
+          endif
        else
-          call reconstruct1(mesh,sol,k,order,gauss_weight,period,pol_OUT)
+          if ((period(1).and.(.NOT.period(2))).or.(period(2).and.(.NOT.period(1)))) then
+             call reconstruct1_bound(mesh,sol,k,order,period,pol_OUT)
+          else
+             call reconstruct1(mesh,sol,k,order,gauss_weight,pol_OUT)
+          endif
        endif
-    else
-       if (period(1).and.period(2)) then
-          select case (order)
-          case (4)
-             call reconstruct1(mesh,sol,k,order,gauss_weight,period,pol_OUT)
-             !call reconstruct2(mesh,sol,k,order,pol_OUT)
-          case default
-             !call reconstruct1(mesh,sol,k,order,gauss_weight,period,pol_OUT)
-             call reconstruct2(mesh,sol,k,order,pol_OUT)
-          end select
+    case (2)
+       if ((mesh%cell(k)%bound<=2).and.(mesh%cell(k)%bound==0.or.period(min(2,max(mesh%cell(k)%bound,1))))) then
+          call reconstruct2(mesh,sol,k,order,pol_OUT)
        else
-          call reconstruct1(mesh,sol,k,order,gauss_weight,period,pol_OUT)
+          select case (mesh%cell(k)%bound)
+          case (1)
+             if (mesh%edge(mesh%cell(k)%edge4(1))%boundType=="NEUMANN".or. &
+              mesh%edge(mesh%cell(k)%edge4(2))%boundType=="NEUMANN") then
+                call reconstruct2(mesh,sol,k,order,pol_OUT)
+             else
+                call reconstruct1(mesh,sol,k,order,gauss_weight,pol_OUT)
+             endif
+          case (2)
+             if (mesh%edge(mesh%cell(k)%edge4(3))%boundType=="NEUMANN".or. &
+              mesh%edge(mesh%cell(k)%edge4(4))%boundType=="NEUMANN") then
+                call reconstruct2(mesh,sol,k,order,pol_OUT)
+             else
+                call reconstruct1(mesh,sol,k,order,gauss_weight,pol_OUT)
+             endif
+          case (3)
+             if (period(1).and.period(2)) then
+                call reconstruct2(mesh,sol,k,order,pol_OUT)
+             else
+                call reconstruct1(mesh,sol,k,order,gauss_weight,pol_OUT)
+             endif
+          end select
        endif
-    endif
+    end select
 
     deallocate (gauss_point)
 
     return
   end subroutine reconstruct
   
-  subroutine reconstruct1(mesh,sol,k,order,gauss_weight,period,pol)
+  subroutine reconstruct1(mesh,sol,k,order,gauss_weight,pol)
     type(meshStruct), intent(in) :: mesh
     type(solStruct), intent(in) :: sol
     integer, intent(in) :: k,order
     real(dp), dimension(:), intent(in) :: gauss_weight
-    logical, dimension(2), intent(in) :: period
     real(dp), dimension(:,:), allocatable, intent(inout) :: pol
-    integer, dimension(:), allocatable :: stencil,stencil_type
-    real(dp), dimension(:,:), allocatable :: stencil_bound
     real(dp), dimension(:,:), allocatable :: X,U
-    integer :: d,N,Ni,Nj,i,isol
+    integer :: d,Ni,Nj,i,isol
     real(dp) :: Kk,pond,dist
     real(dp), dimension(2) :: c
     character(len=99) :: id_char
     integer(16) :: id
     
     d=order-1
-    call Nequa(d,N)
-    call buildStencil(mesh,k,N,order,period,stencil,stencil_type,stencil_bound)
     
-    Ni=size(stencil)
+    Ni=size(mesh%cell(k)%stencil)
     Nj=d*(d+1)/2+d
     
     allocate(X(Ni,Nj),U(Ni,sol%nvar))
@@ -182,45 +198,702 @@ contains
     Kk=mesh%cell(k)%dx*mesh%cell(k)%dy
     c(1)=mesh%cell(k)%xc
     c(2)=mesh%cell(k)%yc 
-    pond=1.5_dp
+    pond=0.0_dp !1.5_dp
 
-    write(id_char,'(99I1)')order,0,stencil_type
+    write(id_char,'(99I1)')order,0,mesh%cell(k)%stencil_type
     read(id_char, '(I99)' )id
-    
+
     select case (id)
-    case (805555_dp)
-       X=X_2_5555
+    case (2055555555_dp)
+       X=X_2_55555555
        call adjust_X(mesh%cell(k)%dx,mesh%cell(k)%dy,d,X)
-    case (80555555555555_dp)
-       X=X_3_555555555555
+    case (3055555555_dp)
+       X=X_3_55555555
        call adjust_X(mesh%cell(k)%dx,mesh%cell(k)%dy,d,X)
-    case (80555555555555555555555555_16)
+    case (40555555555555555555555555_16)
        X=X_4_555555555555555555555555
        call adjust_X(mesh%cell(k)%dx,mesh%cell(k)%dy,d,X)
     case default
-       call calculate_X(mesh,stencil,stencil_bound,gauss_weight,k,c,d,Ni,X)
+       call calculate_X(mesh,mesh%cell(k)%stencil,mesh%cell(k)%stencil_bound,gauss_weight,k,c,d,Ni,X)
     end select
 
     do i=1,Ni
-       dist=((mesh%cell(stencil(i))%xc-c(1)+stencil_bound(i,1))**2+ &
-            (mesh%cell(stencil(i))%yc-c(2)+stencil_bound(i,2))**2)**(pond/4.0_dp)
+       dist=((mesh%cell(mesh%cell(k)%stencil(i))%xc-c(1)+mesh%cell(k)%stencil_bound(i,1))**2+ &
+            (mesh%cell(mesh%cell(k)%stencil(i))%yc-c(2)+mesh%cell(k)%stencil_bound(i,2))**2)**(pond/4.0_dp)
        do isol=1,sol%nvar
-          U(i,isol)=(sol%val(stencil(i),isol)-sol%val(k,isol))/dist
+          U(i,isol)=(sol%val(mesh%cell(k)%stencil(i),isol)-sol%val(k,isol))/dist
        enddo
        X(i,:)=X(i,:)/dist
     enddo
 
     if (allocated(pol)) deallocate(pol)
     allocate(pol(Nj,sol%nvar))
-    
+
     do isol=1,sol%nvar
        call solve(X,U(:,isol),pol(:,isol))
     enddo
 
-    deallocate(stencil,X,U)
+    deallocate(X,U)
 
     return
   end subroutine reconstruct1
+
+  subroutine reconstruct1_bound(mesh,sol,k,order,period,pol)
+    type(meshStruct), intent(in) :: mesh
+    type(solStruct), intent(in) :: sol
+    integer, intent(in) :: k,order
+    logical, dimension(2), intent(in) :: period
+    real(dp), dimension(:,:), allocatable, intent(inout) :: pol
+    integer :: d,Nj,isol
+    real(dp), dimension(:), allocatable :: U0,U1,U2,U3,U4,U5,U6,U7,U8,U9,U10,U11,U12,U13,U14,U15,U16,U17,U18,U19
+    
+    d=order-1
+    Nj=d*(d+1)/2+d
+
+    if (mesh%cell(k)%neigh(3)<0.and.(.NOT.period(2))) then
+
+       allocate (U0(sol%nvar),U1(sol%nvar),U2(sol%nvar),U3(sol%nvar),U4(sol%nvar),U5(sol%nvar))
+       U0=sol%val(k,:)
+       U1=sol%val(mesh%cell(k)%stencil(1),:)
+       U2=sol%val(mesh%cell(k)%stencil(2),:)
+       U3=sol%val(mesh%cell(k)%stencil(3),:)
+       U4=sol%val(mesh%cell(k)%stencil(4),:)
+       U5=sol%val(mesh%cell(k)%stencil(5),:)
+       if (order>=3) then
+          allocate (U6(sol%nvar),U7(sol%nvar),U8(sol%nvar),U9(sol%nvar),U10(sol%nvar))
+          allocate (U11(sol%nvar),U12(sol%nvar),U13(sol%nvar),U14(sol%nvar))
+          U6=sol%val(mesh%cell(k)%stencil(6),:)
+          U7=sol%val(mesh%cell(k)%stencil(7),:)
+          U8=sol%val(mesh%cell(k)%stencil(8),:)
+          U9=sol%val(mesh%cell(k)%stencil(9),:)
+          U10=sol%val(mesh%cell(k)%stencil(10),:)
+          U11=sol%val(mesh%cell(k)%stencil(11),:)
+          U12=sol%val(mesh%cell(k)%stencil(12),:)
+          U13=sol%val(mesh%cell(k)%stencil(13),:)
+          U14=sol%val(mesh%cell(k)%stencil(14),:)
+          if (order>=4) then
+             allocate (U15(sol%nvar),U16(sol%nvar),U17(sol%nvar),U18(sol%nvar),U19(sol%nvar))
+             U15=sol%val(mesh%cell(mesh%cell(k)%stencil(13))%neigh(4),:)
+             U16=sol%val(mesh%cell(mesh%cell(k)%stencil(11))%neigh(4),:)
+             U17=sol%val(mesh%cell(mesh%cell(k)%stencil(10))%neigh(4),:)
+             U18=sol%val(mesh%cell(mesh%cell(k)%stencil(12))%neigh(4),:)
+             U19=sol%val(mesh%cell(mesh%cell(k)%stencil(14))%neigh(4),:)
+          endif
+       endif
+
+       if (allocated(pol)) deallocate(pol)
+       allocate(pol(Nj,sol%nvar))
+    
+       select case (order)
+       case (1)
+          do isol=1,sol%nvar
+             pol=0.0_dp
+          enddo
+       case (2)
+          do isol=1,sol%nvar
+             pol(1,:)=(U4-U1+U5-U2)/(2.0_dp*mesh%cell(k)%dy)
+             pol(2,:)=(U2-U1+U5-U4)/(4.0_dp*mesh%cell(k)%dx)
+          enddo
+       case (3)
+          do isol=1,sol%nvar
+             pol(1,:)=(-U13+4.0_dp*U7-3.0_dp*U6-U11+4.0_dp*U4-3.0_dp*U1-U12+4.0_dp*U5-3.0_dp*U2- &
+                U14+4.0_dp*U9-3.0_dp*U8)/(8.0_dp*mesh%cell(k)%dy)
+             pol(2,:)=(U9-U8+2.0_dp*U5-2.0_dp*U2+U10-U3-2.0_dp*U4+2.0_dp*U1-U7+U6)/(8.0_dp*mesh%cell(k)%dx*mesh%cell(k)%dy)
+             pol(3,:)=(U6+U13-2.0_dp*U7+U1+U11-2.0_dp*U4+U12+U2-2.0_dp*U5+U8+U14-2.0_dp*U9)/(8.0_dp*mesh%cell(k)%dy**2)
+             pol(4,:)=(0.0625_dp*U0-0.03125_dp*U3-0.21875_dp*U4+0.3125_dp*U2+0.09375_dp*U5+0.15625_dp*U9+ &
+                0.0625_dp*U10+0.0625_dp*U11-0.125_dp*U14-0.375*U1)/mesh%cell(k)%dx
+             pol(5,:)=(-0.0875_dp*U0-0.05625_dp*U3+0.00625_dp*U4-0.03125_dp*U5+0.0125_dp*U2+0.08125_dp*U9- &
+                0.0875_dp*U10-0.0375_dp*U11-0.05_dp*U12+0.1_dp*U13+0.075_dp*U14+0.075_dp*U1)/(mesh%cell(k)%dx**2)
+          enddo
+       case (4)
+          do isol=1,sol%nvar
+             pol(1,:)=(-0.314743239651358*U2+0.172008002725080*U19+0.664105128006643e-1*U18-0.583606159380352e-1*U17- &
+                0.664377955363000e-1*U16+0.178046562184026*U15-0.466412028185066*U14-0.267139565663571*U13-0.210996422604319*U12- &
+                0.247227779419067*U11-0.183224202402931*U10+0.205311021980442*U9+0.815701163480125*U5+0.864009639241732*U4+ &
+                0.989978173141377*U3-1.28295137285046*U0-0.193972050261253*U1)/mesh%cell(k)%dy
+             pol(2,:)=(-0.407102582605936*U2-0.194507093464875*U19+0.681247727901954e-1*U18+0.400145507673599e-2*U17- &
+                0.641233177108981e-1*U16+0.186504183308844*U15+0.229319752604949*U14-0.197308112002911*U13+0.260030920167430*U12- &
+                0.276036740470970*U11-0.160058202984986e-1*U10-0.456165878341404e-1*U9+0.122162604437543*U5- &
+                0.797471806615512e-1*U4+0.320116405815234e-2*U3-0.560203704003114e-1*U0+ &
+                0.463122953632654*U1)/(mesh%cell(k)%dx*mesh%cell(k)%dy)
+             pol(3,:)=(-0.600672971795136e-1*U2+0.656602400956103e-1*U19-0.523826846268949e-1*U18-0.647508184784925e-1*U17- & 
+                0.123681338730380e-1*U16+0.638413968828155e-1*U15+0.210076391339866e-1*U14-0.390141870016351e-1*U13- &
+                0.954892679027685e-3*U12+0.995816661614412e-2*U11+0.900327393053071e-2*U10-0.618406693484164e-1*U9+ &
+                0.140960349309219e-1*U5-0.454710798570785e-3*U4+0.481993452160651e-1*U3+0.156511458622459*U0- &
+                0.964441614990498e-1*U1)/(mesh%cell(k)%dx**2*mesh%cell(k)%dy)
+             pol(4,:)=(0.222717351500523*U2-0.224226991453861*U19-0.120007275289077*U18+0.280465623264732e-1*U17+ &
+                0.480538377325019e-1*U16-0.231866132941028*U15+0.538232084021817*U14+0.286140414469142*U13+0.370989450424273*U12+ &
+                0.416824299424557*U11+0.387813750160175*U10-0.259730811039845*U9-0.690796652813276*U5-0.751909784824555*U4- &
+                0.797562749447247*U3+0.707348123242087*U0+0.699345214899333e-1*U1)/(mesh%cell(k)%dy**2)
+             pol(5,:)=(0.993543106036089e-1*U2+0.732266278486593e-1*U19+0.619316111015537e-2*U18+0.363768643584769e-3*U17- &
+                0.582939246633762e-2*U16-0.739541651360616e-1*U15-0.700618406519754e-1*U14+0.729719897995759e-1*U13- &
+                0.672699162807216e-1*U12+0.658148417066927e-1*U11-0.145507457357077e-2*U10-0.414696253316965e-2*U9- &
+                0.343488540859204e-1*U5+0.382048017045157e-1*U4+0.291014914572674e-3*U3-0.509276115345818e-2*U0- &
+                0.942615495977490e-1*U1)/(mesh%cell(k)%dx*mesh%cell(k)%dy**2)
+             pol(6,:)=(-0.349975748252638e-1*U2+0.525888201387028e-1*U19+0.437795561882611e-1*U18+0.131441736525044e-1*U17+ &
+                0.269795077631986e-2*U16+0.544561658358688e-1*U15-0.128234509443592*U14-0.666121013207166e-1*U13- &
+                0.956863101178672e-1*U12-0.106890384319755*U11-0.102576694498062*U10+0.634897538200422e-1*U9+0.135528070708834*U5+ &
+                0.150466836314015*U4+0.150515338782093*U3-0.134018430211774*U0+0.234933918338461e-2*U1)/(mesh%cell(k)%dy**3)
+             pol(7,:)=(0.399622590067706*U2-0.133018066536490e-1*U19+0.847232326311024e-1*U18-0.389535588915452e-2*U17- &
+                0.886185885227499e-1*U16+0.210925184344515e-1*U15-0.124754456221861*U14+0.935916091201611e-1*U13+ &
+                0.484736874096435e-1*U12-0.328922638563393e-1*U11+0.155814235483962e-1*U10+0.444070570967883e-1*U9+ &
+                0.133443979660482*U5-0.174734752049100*U4-0.311628470817188e-2*U3+0.545349820917557e-1*U0- &
+                0.454157572469545*U1)/mesh%cell(k)%dx
+             pol(8,:)=(0.143188432107778*U2-0.838486722604430e-1*U19+0.966715169420829e-1*U18+0.813022917466328e-1*U17- &
+                0.153692251634171e-1*U16-0.787559112648585e-1*U15-0.882138958076972e-2*U14+0.159239723591021*U13- &
+                0.223263004969039e-1*U12-0.528828665219398e-1*U11-0.752091669914036e-1*U10+0.173153874167376*U9- &
+                0.394688978041894e-1*U5+0.127319023646277e-2*U4-0.134958166599649*U3-0.388232084252594*U0+ &
+                0.245043652197661*U1)/(mesh%cell(k)%dx**2)
+             pol(9,:)=(-0.159906633041169e-1*U2+0.341336243293083e-1*U19-0.672820419676518e-1*U18-0.272826482562946e-2*U17+ &
+                0.645537771402763e-1*U16-0.286770946763028e-1*U15+0.254638050398206e-1*U14-0.472899236367768e-1*U13- &
+                0.579756274707273e-1*U12+0.688886867709237e-1*U11+0.109130592967589e-1*U10+0.311022189844584e-1*U9- &
+                0.548835940140250e-1*U5+0.259639868878629e-1*U4-0.218261185829528e-2*U3+0.381957074458601e-1*U0- &
+                0.222050442222504e-1*U1)/(mesh%cell(k)%dx**3)
+          enddo
+       end select
+
+       deallocate(U0,U1,U2,U3,U4,U5)
+       if (order>=3) then 
+          deallocate(U6,U7,U8,U9,U10,U11,U12,U13,U14)
+          if (order>=4) deallocate(U15,U16,U17,U18,U19)
+       endif
+
+    elseif (mesh%cell(k)%neigh(4)<0.and.(.NOT.period(2))) then
+
+       allocate (U0(sol%nvar),U1(sol%nvar),U2(sol%nvar),U3(sol%nvar),U4(sol%nvar),U5(sol%nvar))
+       U0=sol%val(k,:)
+       U1=sol%val(mesh%cell(k)%stencil(1),:)
+       U2=sol%val(mesh%cell(k)%stencil(2),:)
+       U3=sol%val(mesh%cell(k)%stencil(3),:)
+       U4=sol%val(mesh%cell(k)%stencil(4),:)
+       U5=sol%val(mesh%cell(k)%stencil(5),:)
+       if (order>=3) then
+          allocate (U6(sol%nvar),U7(sol%nvar),U8(sol%nvar),U9(sol%nvar),U10(sol%nvar))
+          allocate (U11(sol%nvar),U12(sol%nvar),U13(sol%nvar),U14(sol%nvar))
+          U6=sol%val(mesh%cell(k)%stencil(6),:)
+          U7=sol%val(mesh%cell(k)%stencil(7),:)
+          U8=sol%val(mesh%cell(k)%stencil(8),:)
+          U9=sol%val(mesh%cell(k)%stencil(9),:)
+          U10=sol%val(mesh%cell(k)%stencil(10),:)
+          U11=sol%val(mesh%cell(k)%stencil(11),:)
+          U12=sol%val(mesh%cell(k)%stencil(12),:)
+          U13=sol%val(mesh%cell(k)%stencil(13),:)
+          U14=sol%val(mesh%cell(k)%stencil(14),:)
+          if (order>=4) then
+             allocate (U15(sol%nvar),U16(sol%nvar),U17(sol%nvar),U18(sol%nvar),U19(sol%nvar))
+             U15=sol%val(mesh%cell(mesh%cell(k)%stencil(13))%neigh(3),:)
+             U16=sol%val(mesh%cell(mesh%cell(k)%stencil(11))%neigh(3),:)
+             U17=sol%val(mesh%cell(mesh%cell(k)%stencil(10))%neigh(3),:)
+             U18=sol%val(mesh%cell(mesh%cell(k)%stencil(12))%neigh(3),:)
+             U19=sol%val(mesh%cell(mesh%cell(k)%stencil(14))%neigh(3),:)
+          endif
+       endif
+
+       if (allocated(pol)) deallocate(pol)
+       allocate(pol(Nj,sol%nvar))
+    
+       select case (order)
+       case (1)
+          do isol=1,sol%nvar
+             pol=0.0_dp
+          enddo
+       case (2)
+          do isol=1,sol%nvar
+             pol(1,:)=-(U4-U1+U5-U2)/(2.0_dp*mesh%cell(k)%dy)
+             pol(2,:)=(U2-U1+U5-U4)/(4.0_dp*mesh%cell(k)%dx)
+          enddo
+       case (3)
+          do isol=1,sol%nvar
+             pol(1,:)=-(-U13+4.0_dp*U7-3.0_dp*U6-U11+4.0_dp*U4-3.0_dp*U1-U12+4.0_dp*U5-3.0_dp*U2- &
+                U14+4.0_dp*U9-3.0_dp*U8)/(8.0_dp*mesh%cell(k)%dy)
+             pol(2,:)=-(U9-U8+2.0_dp*U5-2.0_dp*U2+U10-U3-2.0_dp*U4+2.0_dp*U1-U7+U6)/(8.0_dp*mesh%cell(k)%dx*mesh%cell(k)%dy)
+             pol(3,:)=(U6+U13-2.0_dp*U7+U1+U11-2.0_dp*U4+U12+U2-2.0_dp*U5+U8+U14-2.0_dp*U9)/(8.0_dp*mesh%cell(k)%dy**2)
+             pol(4,:)=(0.0625_dp*U0-0.03125_dp*U3-0.21875_dp*U4+0.3125_dp*U2+0.09375_dp*U5+0.15625_dp*U9+ &
+                0.0625_dp*U10+0.0625_dp*U11-0.125_dp*U14-0.375*U1)/mesh%cell(k)%dx
+             pol(5,:)=(-0.0875_dp*U0-0.05625_dp*U3+0.00625_dp*U4-0.03125_dp*U5+0.0125_dp*U2+0.08125_dp*U9- &
+                0.0875_dp*U10-0.0375_dp*U11-0.05_dp*U12+0.1_dp*U13+0.075_dp*U14+0.075_dp*U1)/(mesh%cell(k)%dx**2)
+          enddo
+       case (4)
+          do isol=1,sol%nvar
+             pol(1,:)=-(-0.314743239651358*U2+0.172008002725080*U19+0.664105128006643e-1*U18-0.583606159380352e-1*U17- &
+                0.664377955363000e-1*U16+0.178046562184026*U15-0.466412028185066*U14-0.267139565663571*U13-0.210996422604319*U12- &
+                0.247227779419067*U11-0.183224202402931*U10+0.205311021980442*U9+0.815701163480125*U5+0.864009639241732*U4+ &
+                0.989978173141377*U3-1.28295137285046*U0-0.193972050261253*U1)/mesh%cell(k)%dy
+             pol(2,:)=-(-0.407102582605936*U2-0.194507093464875*U19+0.681247727901954e-1*U18+0.400145507673599e-2*U17- &
+                0.641233177108981e-1*U16+0.186504183308844*U15+0.229319752604949*U14-0.197308112002911*U13+0.260030920167430*U12- &
+                0.276036740470970*U11-0.160058202984986e-1*U10-0.456165878341404e-1*U9+0.122162604437543*U5- &
+                0.797471806615512e-1*U4+0.320116405815234e-2*U3-0.560203704003114e-1*U0+ &
+                0.463122953632654*U1)/(mesh%cell(k)%dx*mesh%cell(k)%dy)
+             pol(3,:)=-(-0.600672971795136e-1*U2+0.656602400956103e-1*U19-0.523826846268949e-1*U18-0.647508184784925e-1*U17- & 
+                0.123681338730380e-1*U16+0.638413968828155e-1*U15+0.210076391339866e-1*U14-0.390141870016351e-1*U13- &
+                0.954892679027685e-3*U12+0.995816661614412e-2*U11+0.900327393053071e-2*U10-0.618406693484164e-1*U9+ &
+                0.140960349309219e-1*U5-0.454710798570785e-3*U4+0.481993452160651e-1*U3+0.156511458622459*U0- &
+                0.964441614990498e-1*U1)/(mesh%cell(k)%dx**2*mesh%cell(k)%dy)
+             pol(4,:)=(0.222717351500523*U2-0.224226991453861*U19-0.120007275289077*U18+0.280465623264732e-1*U17+ &
+                0.480538377325019e-1*U16-0.231866132941028*U15+0.538232084021817*U14+0.286140414469142*U13+0.370989450424273*U12+ &
+                0.416824299424557*U11+0.387813750160175*U10-0.259730811039845*U9-0.690796652813276*U5-0.751909784824555*U4- &
+                0.797562749447247*U3+0.707348123242087*U0+0.699345214899333e-1*U1)/(mesh%cell(k)%dy**2)
+             pol(5,:)=(0.993543106036089e-1*U2+0.732266278486593e-1*U19+0.619316111015537e-2*U18+0.363768643584769e-3*U17- &
+                0.582939246633762e-2*U16-0.739541651360616e-1*U15-0.700618406519754e-1*U14+0.729719897995759e-1*U13- &
+                0.672699162807216e-1*U12+0.658148417066927e-1*U11-0.145507457357077e-2*U10-0.414696253316965e-2*U9- &
+                0.343488540859204e-1*U5+0.382048017045157e-1*U4+0.291014914572674e-3*U3-0.509276115345818e-2*U0- &
+                0.942615495977490e-1*U1)/(mesh%cell(k)%dx*mesh%cell(k)%dy**2)
+             pol(6,:)=-(-0.349975748252638e-1*U2+0.525888201387028e-1*U19+0.437795561882611e-1*U18+0.131441736525044e-1*U17+ &
+                0.269795077631986e-2*U16+0.544561658358688e-1*U15-0.128234509443592*U14-0.666121013207166e-1*U13- &
+                0.956863101178672e-1*U12-0.106890384319755*U11-0.102576694498062*U10+0.634897538200422e-1*U9+0.135528070708834*U5+ &
+                0.150466836314015*U4+0.150515338782093*U3-0.134018430211774*U0+0.234933918338461e-2*U1)/(mesh%cell(k)%dy**3)
+             pol(7,:)=(0.399622590067706*U2-0.133018066536490e-1*U19+0.847232326311024e-1*U18-0.389535588915452e-2*U17- &
+                0.886185885227499e-1*U16+0.210925184344515e-1*U15-0.124754456221861*U14+0.935916091201611e-1*U13+ &
+                0.484736874096435e-1*U12-0.328922638563393e-1*U11+0.155814235483962e-1*U10+0.444070570967883e-1*U9+ &
+                0.133443979660482*U5-0.174734752049100*U4-0.311628470817188e-2*U3+0.545349820917557e-1*U0- &
+                0.454157572469545*U1)/mesh%cell(k)%dx
+             pol(8,:)=(0.143188432107778*U2-0.838486722604430e-1*U19+0.966715169420829e-1*U18+0.813022917466328e-1*U17- &
+                0.153692251634171e-1*U16-0.787559112648585e-1*U15-0.882138958076972e-2*U14+0.159239723591021*U13- &
+                0.223263004969039e-1*U12-0.528828665219398e-1*U11-0.752091669914036e-1*U10+0.173153874167376*U9- &
+                0.394688978041894e-1*U5+0.127319023646277e-2*U4-0.134958166599649*U3-0.388232084252594*U0+ &
+                0.245043652197661*U1)/(mesh%cell(k)%dx**2)
+             pol(9,:)=(-0.159906633041169e-1*U2+0.341336243293083e-1*U19-0.672820419676518e-1*U18-0.272826482562946e-2*U17+ &
+                0.645537771402763e-1*U16-0.286770946763028e-1*U15+0.254638050398206e-1*U14-0.472899236367768e-1*U13- &
+                0.579756274707273e-1*U12+0.688886867709237e-1*U11+0.109130592967589e-1*U10+0.311022189844584e-1*U9- &
+                0.548835940140250e-1*U5+0.259639868878629e-1*U4-0.218261185829528e-2*U3+0.381957074458601e-1*U0- &
+                0.222050442222504e-1*U1)/(mesh%cell(k)%dx**3)
+          enddo
+       end select
+
+       deallocate(U0,U1,U2,U3,U4,U5)
+       if (order>=3) then 
+          deallocate(U6,U7,U8,U9,U10,U11,U12,U13,U14)
+          if (order>=4) deallocate(U15,U16,U17,U18,U19)
+       endif
+
+    elseif (mesh%cell(k)%neigh(1)<0.and.(.NOT.period(1))) then
+
+       allocate (U0(sol%nvar),U1(sol%nvar),U2(sol%nvar),U3(sol%nvar),U4(sol%nvar),U5(sol%nvar))
+       U0=sol%val(k,:)
+       U1=sol%val(mesh%cell(k)%stencil(1),:)
+       U2=sol%val(mesh%cell(k)%stencil(2),:)
+       U3=sol%val(mesh%cell(k)%stencil(3),:)
+       U4=sol%val(mesh%cell(k)%stencil(4),:)
+       U5=sol%val(mesh%cell(k)%stencil(5),:)
+       if (order>=3) then
+          allocate (U6(sol%nvar),U7(sol%nvar),U8(sol%nvar),U9(sol%nvar),U10(sol%nvar))
+          allocate (U11(sol%nvar),U12(sol%nvar),U13(sol%nvar),U14(sol%nvar))
+          U6=sol%val(mesh%cell(k)%stencil(6),:)
+          U7=sol%val(mesh%cell(k)%stencil(7),:)
+          U8=sol%val(mesh%cell(k)%stencil(8),:)
+          U9=sol%val(mesh%cell(k)%stencil(9),:)
+          U10=sol%val(mesh%cell(k)%stencil(10),:)
+          U11=sol%val(mesh%cell(k)%stencil(11),:)
+          U12=sol%val(mesh%cell(k)%stencil(12),:)
+          U13=sol%val(mesh%cell(k)%stencil(13),:)
+          U14=sol%val(mesh%cell(k)%stencil(14),:)
+          if (order>=4) then
+             allocate (U15(sol%nvar),U16(sol%nvar),U17(sol%nvar),U18(sol%nvar),U19(sol%nvar))
+             U15=sol%val(mesh%cell(mesh%cell(k)%stencil(14))%neigh(2),:)
+             U16=sol%val(mesh%cell(mesh%cell(k)%stencil(8))%neigh(2),:)
+             U17=sol%val(mesh%cell(mesh%cell(k)%stencil(6))%neigh(2),:)
+             U18=sol%val(mesh%cell(mesh%cell(k)%stencil(7))%neigh(2),:)
+             U19=sol%val(mesh%cell(mesh%cell(k)%stencil(13))%neigh(2),:)
+          endif
+       endif
+
+       if (allocated(pol)) deallocate(pol)
+       allocate(pol(Nj,sol%nvar))
+    
+       select case (order)
+       case (1)
+          do isol=1,sol%nvar
+             pol=0.0_dp
+          enddo
+       case (2)
+          do isol=1,sol%nvar
+             pol(1,:)=(U3-U2+U5-U4)/(4.0_dp*mesh%cell(k)%dy)
+             pol(2,:)=(U4-U2+U5-U3)/(2.0_dp*mesh%cell(k)%dx)
+          enddo
+       case (3)
+          do isol=1,sol%nvar
+             pol(1,:)=(0.0625_dp*U0-0.03125_dp*U1-0.21875_dp*U5+0.3125_dp*U2+0.09375_dp*U4+0.15625_dp*U10+ &
+                0.0625_dp*U6+0.0625_dp*U8-0.125_dp*U13-0.375*U3)/mesh%cell(k)%dy
+             pol(2,:)=(U10-U9+2.0_dp*U4-2.0_dp*U2+U6-U1-2.0_dp*U5+2.0_dp*U3-U12+U11)/(8.0_dp*mesh%cell(k)%dx*mesh%cell(k)%dy)
+             pol(3,:)=(-0.0875_dp*U0-0.05625_dp*U1+0.00625_dp*U5-0.03125_dp*U4+0.0125_dp*U2+0.08125_dp*U10- &
+                0.0875_dp*U6-0.0375_dp*U8-0.05_dp*U7+0.1_dp*U14+0.075_dp*U13+0.075_dp*U3)/(mesh%cell(k)%dy**2)
+             pol(4,:)=(-U14+4.0_dp*U12-3.0_dp*U11-U8+4.0_dp*U5-3.0_dp*U3-U7+4.0_dp*U4-3.0_dp*U2- &
+                U13+4.0_dp*U10-3.0_dp*U9)/(8.0_dp*mesh%cell(k)%dx)
+             pol(5,:)=(U11+U14-2.0_dp*U12+U3+U8-2.0_dp*U5+U2+U7-2.0_dp*U4+U9+U13-2.0_dp*U10)/(8.0_dp*mesh%cell(k)%dx**2)
+          enddo
+       case (4)
+          do isol=1,sol%nvar
+             pol(1,:)=(0.399622590067706*U2-0.133018066536490e-1*U19+0.847232326311024e-1*U18-0.389535588915452e-2*U17- &
+                0.886185885227499e-1*U16+0.210925184344515e-1*U15-0.124754456221861*U13+0.935916091201611e-1*U14+ &
+                0.484736874096435e-1*U7-0.328922638563393e-1*U8+0.155814235483962e-1*U6+0.444070570967883e-1*U10+ &
+                0.133443979660482*U4-0.174734752049100*U5-0.311628470817188e-2*U1+0.545349820917557e-1*U0- &
+                0.454157572469545*U3)/mesh%cell(k)%dx
+             pol(2,:)=(-0.407102582605936*U2-0.194507093464875*U19+0.681247727901954e-1*U18+0.400145507673599e-2*U17- &
+                0.641233177108981e-1*U16+0.186504183308844*U15+0.229319752604949*U13-0.197308112002911*U14+0.260030920167430*U7- &
+                0.276036740470970*U8-0.160058202984986e-1*U6-0.456165878341404e-1*U10+0.122162604437543*U4- &
+                0.797471806615512e-1*U5+0.320116405815234e-2*U1-0.560203704003114e-1*U0+ &
+                0.463122953632654*U3)/(mesh%cell(k)%dx*mesh%cell(k)%dy)
+             pol(3,:)=(0.993543106036089e-1*U2+0.732266278486593e-1*U19+0.619316111015537e-2*U18+0.363768643584769e-3*U17- &
+                0.582939246633762e-2*U16-0.739541651360616e-1*U15-0.700618406519754e-1*U13+0.729719897995759e-1*U14- &
+                0.672699162807216e-1*U7+0.658148417066927e-1*U8-0.145507457357077e-2*U6-0.414696253316965e-2*U10- &
+                0.343488540859204e-1*U4+0.382048017045157e-1*U5+0.291014914572674e-3*U1-0.509276115345818e-2*U0- &
+                0.942615495977490e-1*U3)/(mesh%cell(k)%dx*mesh%cell(k)%dy**2)
+             pol(4,:)=(0.143188432107778*U2-0.838486722604430e-1*U19+0.966715169420829e-1*U18+0.813022917466328e-1*U17- &
+                0.153692251634171e-1*U16-0.787559112648585e-1*U15-0.882138958076972e-2*U13+0.159239723591021*U14- &
+                0.223263004969039e-1*U7-0.528828665219398e-1*U8-0.752091669914036e-1*U6+0.173153874167376*U10- &
+                0.394688978041894e-1*U4+0.127319023646277e-2*U5-0.134958166599649*U1-0.388232084252594*U0+ &
+                0.245043652197661*U3)/(mesh%cell(k)%dx**2)
+             pol(5,:)=(-0.600672971795136e-1*U2+0.656602400956103e-1*U19-0.523826846268949e-1*U18-0.647508184784925e-1*U17- & 
+                0.123681338730380e-1*U16+0.638413968828155e-1*U15+0.210076391339866e-1*U13-0.390141870016351e-1*U14- &
+                0.954892679027685e-3*U7+0.995816661614412e-2*U8+0.900327393053071e-2*U6-0.618406693484164e-1*U10+ &
+                0.140960349309219e-1*U4-0.454710798570785e-3*U5+0.481993452160651e-1*U1+0.156511458622459*U0- &
+                0.964441614990498e-1*U3)/(mesh%cell(k)%dx**2*mesh%cell(k)%dy)
+             pol(6,:)=(-0.159906633041169e-1*U2+0.341336243293083e-1*U19-0.672820419676518e-1*U18-0.272826482562946e-2*U17+ &
+                0.645537771402763e-1*U16-0.286770946763028e-1*U15+0.254638050398206e-1*U13-0.472899236367768e-1*U14- &
+                0.579756274707273e-1*U7+0.688886867709237e-1*U8+0.109130592967589e-1*U6+0.311022189844584e-1*U10- &
+                0.548835940140250e-1*U4+0.259639868878629e-1*U5-0.218261185829528e-2*U1+0.381957074458601e-1*U0- &
+                0.222050442222504e-1*U3)/(mesh%cell(k)%dx**3)
+             pol(7,:)=(-0.314743239651358*U2+0.172008002725080*U19+0.664105128006643e-1*U18-0.583606159380352e-1*U17- &
+                0.664377955363000e-1*U16+0.178046562184026*U15-0.466412028185066*U13-0.267139565663571*U14-0.210996422604319*U7- &
+                0.247227779419067*U8-0.183224202402931*U6+0.205311021980442*U10+0.815701163480125*U4+0.864009639241732*U5+ &
+                0.989978173141377*U1-1.28295137285046*U0-0.193972050261253*U3)/mesh%cell(k)%dy
+             pol(8,:)=(0.222717351500523*U2-0.224226991453861*U19-0.120007275289077*U18+0.280465623264732e-1*U17+ &
+                0.480538377325019e-1*U16-0.231866132941028*U15+0.538232084021817*U13+0.286140414469142*U14+0.370989450424273*U7+ &
+                0.416824299424557*U8+0.387813750160175*U6-0.259730811039845*U10-0.690796652813276*U4-0.751909784824555*U5- &
+                0.797562749447247*U1+0.707348123242087*U0+0.699345214899333e-1*U3)/(mesh%cell(k)%dy**2)
+             pol(9,:)=(-0.349975748252638e-1*U2+0.525888201387028e-1*U19+0.437795561882611e-1*U18+0.131441736525044e-1*U17+ &
+                0.269795077631986e-2*U16+0.544561658358688e-1*U15-0.128234509443592*U13-0.666121013207166e-1*U14- &
+                0.956863101178672e-1*U7-0.106890384319755*U8-0.102576694498062*U6+0.634897538200422e-1*U10+0.135528070708834*U4+ &
+                0.150466836314015*U5+0.150515338782093*U1-0.134018430211774*U0+0.234933918338461e-2*U3)/(mesh%cell(k)%dy**3)
+          enddo
+       end select
+
+       deallocate(U0,U1,U2,U3,U4,U5)
+       if (order>=3) then 
+          deallocate(U6,U7,U8,U9,U10,U11,U12,U13,U14)
+          if (order>=4) deallocate(U15,U16,U17,U18,U19)
+       endif
+
+    else
+
+       allocate (U0(sol%nvar),U1(sol%nvar),U2(sol%nvar),U3(sol%nvar),U4(sol%nvar),U5(sol%nvar))
+       U0=sol%val(k,:)
+       U1=sol%val(mesh%cell(k)%stencil(1),:)
+       U2=sol%val(mesh%cell(k)%stencil(2),:)
+       U3=sol%val(mesh%cell(k)%stencil(3),:)
+       U4=sol%val(mesh%cell(k)%stencil(4),:)
+       U5=sol%val(mesh%cell(k)%stencil(5),:)
+       if (order>=3) then
+          allocate (U6(sol%nvar),U7(sol%nvar),U8(sol%nvar),U9(sol%nvar),U10(sol%nvar))
+          allocate (U11(sol%nvar),U12(sol%nvar),U13(sol%nvar),U14(sol%nvar))
+          U6=sol%val(mesh%cell(k)%stencil(6),:)
+          U7=sol%val(mesh%cell(k)%stencil(7),:)
+          U8=sol%val(mesh%cell(k)%stencil(8),:)
+          U9=sol%val(mesh%cell(k)%stencil(9),:)
+          U10=sol%val(mesh%cell(k)%stencil(10),:)
+          U11=sol%val(mesh%cell(k)%stencil(11),:)
+          U12=sol%val(mesh%cell(k)%stencil(12),:)
+          U13=sol%val(mesh%cell(k)%stencil(13),:)
+          U14=sol%val(mesh%cell(k)%stencil(14),:)
+          if (order>=4) then
+             allocate (U15(sol%nvar),U16(sol%nvar),U17(sol%nvar),U18(sol%nvar),U19(sol%nvar))
+             U15=sol%val(mesh%cell(mesh%cell(k)%stencil(14))%neigh(1),:)
+             U16=sol%val(mesh%cell(mesh%cell(k)%stencil(8))%neigh(1),:)
+             U17=sol%val(mesh%cell(mesh%cell(k)%stencil(6))%neigh(1),:)
+             U18=sol%val(mesh%cell(mesh%cell(k)%stencil(7))%neigh(1),:)
+             U19=sol%val(mesh%cell(mesh%cell(k)%stencil(13))%neigh(1),:)
+          endif
+       endif
+
+       if (allocated(pol)) deallocate(pol)
+       allocate(pol(Nj,sol%nvar))
+    
+       select case (order)
+       case (1)
+          do isol=1,sol%nvar
+             pol=0.0_dp
+          enddo
+       case (2)
+          do isol=1,sol%nvar
+             pol(1,:)=(U3-U2+U5-U4)/(4.0_dp*mesh%cell(k)%dy)
+             pol(2,:)=-(U4-U2+U5-U3)/(2.0_dp*mesh%cell(k)%dx)
+          enddo
+       case (3)
+          do isol=1,sol%nvar
+             pol(1,:)=(0.0625_dp*U0-0.03125_dp*U1-0.21875_dp*U5+0.3125_dp*U2+0.09375_dp*U4+0.15625_dp*U10+ &
+                0.0625_dp*U6+0.0625_dp*U8-0.125_dp*U13-0.375*U3)/mesh%cell(k)%dy
+             pol(2,:)=-(U10-U9+2.0_dp*U4-2.0_dp*U2+U6-U1-2.0_dp*U5+2.0_dp*U3-U12+U11)/(8.0_dp*mesh%cell(k)%dx*mesh%cell(k)%dy)
+             pol(3,:)=(-0.0875_dp*U0-0.05625_dp*U1+0.00625_dp*U5-0.03125_dp*U4+0.0125_dp*U2+0.08125_dp*U10- &
+                0.0875_dp*U6-0.0375_dp*U8-0.05_dp*U7+0.1_dp*U14+0.075_dp*U13+0.075_dp*U3)/(mesh%cell(k)%dy**2)
+             pol(4,:)=-(-U14+4.0_dp*U12-3.0_dp*U11-U8+4.0_dp*U5-3.0_dp*U3-U7+4.0_dp*U4-3.0_dp*U2- &
+                U13+4.0_dp*U10-3.0_dp*U9)/(8.0_dp*mesh%cell(k)%dx)
+             pol(5,:)=(U11+U14-2.0_dp*U12+U3+U8-2.0_dp*U5+U2+U7-2.0_dp*U4+U9+U13-2.0_dp*U10)/(8.0_dp*mesh%cell(k)%dx**2)
+          enddo
+       case (4)
+          do isol=1,sol%nvar
+             pol(1,:)=-(0.399622590067706*U2-0.133018066536490e-1*U19+0.847232326311024e-1*U18-0.389535588915452e-2*U17- &
+                0.886185885227499e-1*U16+0.210925184344515e-1*U15-0.124754456221861*U13+0.935916091201611e-1*U14+ &
+                0.484736874096435e-1*U7-0.328922638563393e-1*U8+0.155814235483962e-1*U6+0.444070570967883e-1*U10+ &
+                0.133443979660482*U4-0.174734752049100*U5-0.311628470817188e-2*U1+0.545349820917557e-1*U0- &
+                0.454157572469545*U3)/mesh%cell(k)%dx
+             pol(2,:)=-(-0.407102582605936*U2-0.194507093464875*U19+0.681247727901954e-1*U18+0.400145507673599e-2*U17- &
+                0.641233177108981e-1*U16+0.186504183308844*U15+0.229319752604949*U13-0.197308112002911*U14+0.260030920167430*U7- &
+                0.276036740470970*U8-0.160058202984986e-1*U6-0.456165878341404e-1*U10+0.122162604437543*U4- &
+                0.797471806615512e-1*U5+0.320116405815234e-2*U1-0.560203704003114e-1*U0+ &
+                0.463122953632654*U3)/(mesh%cell(k)%dx*mesh%cell(k)%dy)
+             pol(3,:)=-(0.993543106036089e-1*U2+0.732266278486593e-1*U19+0.619316111015537e-2*U18+0.363768643584769e-3*U17- &
+                0.582939246633762e-2*U16-0.739541651360616e-1*U15-0.700618406519754e-1*U13+0.729719897995759e-1*U14- &
+                0.672699162807216e-1*U7+0.658148417066927e-1*U8-0.145507457357077e-2*U6-0.414696253316965e-2*U10- &
+                0.343488540859204e-1*U4+0.382048017045157e-1*U5+0.291014914572674e-3*U1-0.509276115345818e-2*U0- &
+                0.942615495977490e-1*U3)/(mesh%cell(k)%dx*mesh%cell(k)%dy**2)
+             pol(4,:)=(0.143188432107778*U2-0.838486722604430e-1*U19+0.966715169420829e-1*U18+0.813022917466328e-1*U17- &
+                0.153692251634171e-1*U16-0.787559112648585e-1*U15-0.882138958076972e-2*U13+0.159239723591021*U14- &
+                0.223263004969039e-1*U7-0.528828665219398e-1*U8-0.752091669914036e-1*U6+0.173153874167376*U10- &
+                0.394688978041894e-1*U4+0.127319023646277e-2*U5-0.134958166599649*U1-0.388232084252594*U0+ &
+                0.245043652197661*U3)/(mesh%cell(k)%dx**2)
+             pol(5,:)=(-0.600672971795136e-1*U2+0.656602400956103e-1*U19-0.523826846268949e-1*U18-0.647508184784925e-1*U17- & 
+                0.123681338730380e-1*U16+0.638413968828155e-1*U15+0.210076391339866e-1*U13-0.390141870016351e-1*U14- &
+                0.954892679027685e-3*U7+0.995816661614412e-2*U8+0.900327393053071e-2*U6-0.618406693484164e-1*U10+ &
+                0.140960349309219e-1*U4-0.454710798570785e-3*U5+0.481993452160651e-1*U1+0.156511458622459*U0- &
+                0.964441614990498e-1*U3)/(mesh%cell(k)%dx**2*mesh%cell(k)%dy)
+             pol(6,:)=-(-0.159906633041169e-1*U2+0.341336243293083e-1*U19-0.672820419676518e-1*U18-0.272826482562946e-2*U17+ &
+                0.645537771402763e-1*U16-0.286770946763028e-1*U15+0.254638050398206e-1*U13-0.472899236367768e-1*U14- &
+                0.579756274707273e-1*U7+0.688886867709237e-1*U8+0.109130592967589e-1*U6+0.311022189844584e-1*U10- &
+                0.548835940140250e-1*U4+0.259639868878629e-1*U5-0.218261185829528e-2*U1+0.381957074458601e-1*U0- &
+                0.222050442222504e-1*U3)/(mesh%cell(k)%dx**3)
+             pol(7,:)=(-0.314743239651358*U2+0.172008002725080*U19+0.664105128006643e-1*U18-0.583606159380352e-1*U17- &
+                0.664377955363000e-1*U16+0.178046562184026*U15-0.466412028185066*U13-0.267139565663571*U14-0.210996422604319*U7- &
+                0.247227779419067*U8-0.183224202402931*U6+0.205311021980442*U10+0.815701163480125*U4+0.864009639241732*U5+ &
+                0.989978173141377*U1-1.28295137285046*U0-0.193972050261253*U3)/mesh%cell(k)%dy
+             pol(8,:)=(0.222717351500523*U2-0.224226991453861*U19-0.120007275289077*U18+0.280465623264732e-1*U17+ &
+                0.480538377325019e-1*U16-0.231866132941028*U15+0.538232084021817*U13+0.286140414469142*U14+0.370989450424273*U7+ &
+                0.416824299424557*U8+0.387813750160175*U6-0.259730811039845*U10-0.690796652813276*U4-0.751909784824555*U5- &
+                0.797562749447247*U1+0.707348123242087*U0+0.699345214899333e-1*U3)/(mesh%cell(k)%dy**2)
+             pol(9,:)=(-0.349975748252638e-1*U2+0.525888201387028e-1*U19+0.437795561882611e-1*U18+0.131441736525044e-1*U17+ &
+                0.269795077631986e-2*U16+0.544561658358688e-1*U15-0.128234509443592*U13-0.666121013207166e-1*U14- &
+                0.956863101178672e-1*U7-0.106890384319755*U8-0.102576694498062*U6+0.634897538200422e-1*U10+0.135528070708834*U4+ &
+                0.150466836314015*U5+0.150515338782093*U1-0.134018430211774*U0+0.234933918338461e-2*U3)/(mesh%cell(k)%dy**3)
+          enddo
+       end select
+
+       deallocate(U0,U1,U2,U3,U4,U5)
+       if (order>=3) then 
+          deallocate(U6,U7,U8,U9,U10,U11,U12,U13,U14)
+          if (order>=4) deallocate(U15,U16,U17,U18,U19)
+       endif
+
+    endif
+
+    return
+  end subroutine reconstruct1_bound
+
+  subroutine reconstruct1_corner(mesh,sol,k,order,pol)
+    type(meshStruct), intent(in) :: mesh
+    type(solStruct), intent(in) :: sol
+    integer, intent(in) :: k,order
+    real(dp), dimension(:,:), allocatable, intent(inout) :: pol
+    integer :: d,Nj,isol
+    real(dp), dimension(:), allocatable :: U0,U1,U2,U3,U4,U5,U6,U7,U8,U9,U10,U11,U12,U13,U14,U15
+    
+    d=order-1
+    Nj=d*(d+1)/2+d
+
+    if (mesh%cell(k)%neigh(7)>0) then
+
+       allocate (U0(sol%nvar),U1(sol%nvar),U2(sol%nvar),U3(sol%nvar))
+       U0=sol%val(k,:)
+       U1=sol%val(mesh%cell(k)%stencil(1),:)
+       U2=sol%val(mesh%cell(k)%stencil(2),:)
+       U3=sol%val(mesh%cell(k)%stencil(3),:)
+       if (order>2) then
+          allocate (U4(sol%nvar),U5(sol%nvar))
+          U4=sol%val(mesh%cell(k)%stencil(4),:)
+          U5=sol%val(mesh%cell(k)%stencil(5),:)
+       endif
+       if (order>3) then
+          allocate (U6(sol%nvar),U7(sol%nvar),U8(sol%nvar),U9(sol%nvar),U10(sol%nvar))
+          allocate (U11(sol%nvar),U12(sol%nvar),U13(sol%nvar),U14(sol%nvar),U15(sol%nvar))
+          U6=sol%val(mesh%cell(k)%stencil(6),:)
+          U7=sol%val(mesh%cell(k)%stencil(7),:)
+          U8=sol%val(mesh%cell(k)%stencil(8),:)
+          U9=sol%val(mesh%cell(k)%stencil(9),:)
+          U10=sol%val(mesh%cell(k)%stencil(10),:)
+          U11=sol%val(mesh%cell(k)%stencil(11),:)
+          U12=sol%val(mesh%cell(k)%stencil(12),:)
+          U13=sol%val(mesh%cell(k)%stencil(13),:)
+          U14=sol%val(mesh%cell(k)%stencil(14),:)
+          U15=sol%val(mesh%cell(k)%stencil(15),:)
+       endif
+
+       if (allocated(pol)) deallocate(pol)
+       allocate(pol(Nj,sol%nvar))
+    
+       select case (order)
+       case (1)
+          do isol=1,sol%nvar
+             pol=0.0_dp
+          enddo
+       case (2)
+          do isol=1,sol%nvar
+             pol(1,:)=(2.0_dp*(U2-U0)+U3-U1)/(3.0_dp*mesh%cell(k)%dy)
+             pol(2,:)=(2.0_dp*(U0-U1)+U2-U3)/(3.0_dp*mesh%cell(k)%dx)
+          enddo
+       case (3)
+       case (4)
+       end select
+
+       deallocate(U0,U1,U2,U3)
+       if (order>2) deallocate (U4,U5)
+       if (order>3) deallocate(U6,U7,U8,U9,U10,U11,U12,U13,U14,U15)
+
+    elseif (mesh%cell(k)%neigh(8)>0) then
+
+       allocate (U0(sol%nvar),U1(sol%nvar),U2(sol%nvar),U3(sol%nvar))
+       U0=sol%val(k,:)
+       U1=sol%val(mesh%cell(k)%stencil(1),:)
+       U2=sol%val(mesh%cell(k)%stencil(2),:)
+       U3=sol%val(mesh%cell(k)%stencil(3),:)
+       if (order>2) then
+          allocate (U4(sol%nvar),U5(sol%nvar))
+          U4=sol%val(mesh%cell(k)%stencil(4),:)
+          U5=sol%val(mesh%cell(k)%stencil(5),:)
+       endif
+       if (order>3) then
+          allocate (U6(sol%nvar),U7(sol%nvar),U8(sol%nvar),U9(sol%nvar),U10(sol%nvar))
+          allocate (U11(sol%nvar),U12(sol%nvar),U13(sol%nvar),U14(sol%nvar),U15(sol%nvar))
+          U6=sol%val(mesh%cell(k)%stencil(6),:)
+          U7=sol%val(mesh%cell(k)%stencil(7),:)
+          U8=sol%val(mesh%cell(k)%stencil(8),:)
+          U9=sol%val(mesh%cell(k)%stencil(9),:)
+          U10=sol%val(mesh%cell(k)%stencil(10),:)
+          U11=sol%val(mesh%cell(k)%stencil(11),:)
+          U12=sol%val(mesh%cell(k)%stencil(12),:)
+          U13=sol%val(mesh%cell(k)%stencil(13),:)
+          U14=sol%val(mesh%cell(k)%stencil(14),:)
+          U15=sol%val(mesh%cell(k)%stencil(15),:)
+       endif
+
+       if (allocated(pol)) deallocate(pol)
+       allocate(pol(Nj,sol%nvar))
+    
+       select case (order)
+       case (1)
+          do isol=1,sol%nvar
+             pol=0.0_dp
+          enddo
+       case (2)
+          do isol=1,sol%nvar
+             pol(1,:)=(2.0_dp*(U2-U0)+U3-U1)/(3.0_dp*mesh%cell(k)%dy)
+             pol(2,:)=(2.0_dp*(U1-U0)+U3-U2)/(3.0_dp*mesh%cell(k)%dx)
+          enddo
+       case (3)
+       case (4)
+       end select
+
+       deallocate(U0,U1,U2,U3)
+       if (order>2) deallocate (U4,U5)
+       if (order>3) deallocate(U6,U7,U8,U9,U10,U11,U12,U13,U14,U15)
+
+    elseif (mesh%cell(k)%neigh(5)>0) then
+
+       allocate (U0(sol%nvar),U1(sol%nvar),U2(sol%nvar),U3(sol%nvar))
+       U0=sol%val(k,:)
+       U1=sol%val(mesh%cell(k)%stencil(1),:)
+       U2=sol%val(mesh%cell(k)%stencil(2),:)
+       U3=sol%val(mesh%cell(k)%stencil(3),:)
+       if (order>2) then
+          allocate (U4(sol%nvar),U5(sol%nvar))
+          U4=sol%val(mesh%cell(k)%stencil(4),:)
+          U5=sol%val(mesh%cell(k)%stencil(5),:)
+       endif
+       if (order>3) then
+          allocate (U6(sol%nvar),U7(sol%nvar),U8(sol%nvar),U9(sol%nvar),U10(sol%nvar))
+          allocate (U11(sol%nvar),U12(sol%nvar),U13(sol%nvar),U14(sol%nvar),U15(sol%nvar))
+          U6=sol%val(mesh%cell(k)%stencil(6),:)
+          U7=sol%val(mesh%cell(k)%stencil(7),:)
+          U8=sol%val(mesh%cell(k)%stencil(8),:)
+          U9=sol%val(mesh%cell(k)%stencil(9),:)
+          U10=sol%val(mesh%cell(k)%stencil(10),:)
+          U11=sol%val(mesh%cell(k)%stencil(11),:)
+          U12=sol%val(mesh%cell(k)%stencil(12),:)
+          U13=sol%val(mesh%cell(k)%stencil(13),:)
+          U14=sol%val(mesh%cell(k)%stencil(14),:)
+          U15=sol%val(mesh%cell(k)%stencil(15),:)
+       endif
+
+       if (allocated(pol)) deallocate(pol)
+       allocate(pol(Nj,sol%nvar))
+    
+       select case (order)
+       case (1)
+          do isol=1,sol%nvar
+             pol=0.0_dp
+          enddo
+       case (2)
+          do isol=1,sol%nvar
+             pol(1,:)=(2.0_dp*(U0-U2)+U1-U3)/(3.0_dp*mesh%cell(k)%dy)
+             pol(2,:)=(2.0_dp*(U0-U1)+U2-U3)/(3.0_dp*mesh%cell(k)%dx)
+          enddo
+       case (3)
+       case (4)
+       end select
+
+       deallocate(U0,U1,U2,U3)
+       if (order>2) deallocate (U4,U5)
+       if (order>3) deallocate(U6,U7,U8,U9,U10,U11,U12,U13,U14,U15)
+
+    else
+
+       allocate (U0(sol%nvar),U1(sol%nvar),U2(sol%nvar),U3(sol%nvar))
+       U0=sol%val(k,:)
+       U1=sol%val(mesh%cell(k)%stencil(1),:)
+       U2=sol%val(mesh%cell(k)%stencil(2),:)
+       U3=sol%val(mesh%cell(k)%stencil(3),:)
+       if (order>2) then
+          allocate (U4(sol%nvar),U5(sol%nvar))
+          U4=sol%val(mesh%cell(k)%stencil(4),:)
+          U5=sol%val(mesh%cell(k)%stencil(5),:)
+       endif
+       if (order>3) then
+          allocate (U6(sol%nvar),U7(sol%nvar),U8(sol%nvar),U9(sol%nvar),U10(sol%nvar))
+          allocate (U11(sol%nvar),U12(sol%nvar),U13(sol%nvar),U14(sol%nvar),U15(sol%nvar))
+          U6=sol%val(mesh%cell(k)%stencil(6),:)
+          U7=sol%val(mesh%cell(k)%stencil(7),:)
+          U8=sol%val(mesh%cell(k)%stencil(8),:)
+          U9=sol%val(mesh%cell(k)%stencil(9),:)
+          U10=sol%val(mesh%cell(k)%stencil(10),:)
+          U11=sol%val(mesh%cell(k)%stencil(11),:)
+          U12=sol%val(mesh%cell(k)%stencil(12),:)
+          U13=sol%val(mesh%cell(k)%stencil(13),:)
+          U14=sol%val(mesh%cell(k)%stencil(14),:)
+          U15=sol%val(mesh%cell(k)%stencil(15),:)
+       endif
+
+       if (allocated(pol)) deallocate(pol)
+       allocate(pol(Nj,sol%nvar))
+    
+       select case (order)
+       case (1)
+          do isol=1,sol%nvar
+             pol=0.0_dp
+          enddo
+       case (2)
+          do isol=1,sol%nvar
+             pol(1,:)=(2.0_dp*(U0-U2)+U1-U3)/(3.0_dp*mesh%cell(k)%dy)
+             pol(2,:)=(2.0_dp*(U1-U0)+U3-U2)/(3.0_dp*mesh%cell(k)%dx)
+          enddo
+       case (3)
+       case (4)
+       end select
+
+       deallocate(U0,U1,U2,U3)
+       if (order>2) deallocate (U4,U5)
+       if (order>3) deallocate(U6,U7,U8,U9,U10,U11,U12,U13,U14,U15)
+
+    endif
+
+    return
+  end subroutine reconstruct1_corner
 
   subroutine reconstruct2(mesh,sol,k,order,pol_OUT)
     type(meshStruct), intent(inout) :: mesh
@@ -232,6 +905,7 @@ contains
     integer :: d,Ni,Nj,isol
     real(dp) :: pond,dist,dx,dy,dx2,dy2
     real(dp), dimension(2) :: c
+    real(dp), dimension(16) :: Xs,Ys
 
     Ni=16
     d=order-1
@@ -245,6 +919,122 @@ contains
     dx=mesh%cell(k)%dx
     dy=mesh%cell(k)%dy
     pond=2.0_dp
+
+    Xs(1)=c(1)-1.0_dp*dx-mesh%cell(k)%stencil2_bound(1,1)
+    Xs(2)=c(1)-1.0_dp*dx-mesh%cell(k)%stencil2_bound(2,1)
+    Xs(3)=c(1)-1.0_dp*dx-mesh%cell(k)%stencil2_bound(2,1)
+    Xs(4)=c(1)-1.0_dp*dx-mesh%cell(k)%stencil2_bound(3,1)
+    Xs(5)=c(1)-1.0_dp*dx-mesh%cell(k)%stencil2_bound(4,1)
+    Xs(6)=c(1)-0.5_dp*dx-mesh%cell(k)%stencil2_bound(5,1)
+    Xs(7)=c(1)+0.0_dp*dx-mesh%cell(k)%stencil2_bound(5,1)
+    Xs(8)=c(1)+0.5_dp*dx-mesh%cell(k)%stencil2_bound(6,1)
+    Xs(9)=c(1)+1.0_dp*dx-mesh%cell(k)%stencil2_bound(7,1)
+    Xs(10)=c(1)+1.0_dp*dx-mesh%cell(k)%stencil2_bound(8,1)
+    Xs(11)=c(1)+1.0_dp*dx-mesh%cell(k)%stencil2_bound(8,1)
+    Xs(12)=c(1)+1.0_dp*dx-mesh%cell(k)%stencil2_bound(9,1)
+    Xs(13)=c(1)+1.0_dp*dx-mesh%cell(k)%stencil2_bound(10,1)
+    Xs(14)=c(1)+0.5_dp*dx-mesh%cell(k)%stencil2_bound(11,1)
+    Xs(15)=c(1)+0.0_dp*dx-mesh%cell(k)%stencil2_bound(11,1)
+    Xs(16)=c(1)-0.5_dp*dx-mesh%cell(k)%stencil2_bound(12,1)
+
+    Ys(1)=c(2)+1.0_dp*dy-mesh%cell(k)%stencil2_bound(1,2)
+    Ys(2)=c(2)+0.5_dp*dy-mesh%cell(k)%stencil2_bound(2,2)
+    Ys(3)=c(2)+0.0_dp*dy-mesh%cell(k)%stencil2_bound(2,2)
+    Ys(4)=c(2)-0.5_dp*dy-mesh%cell(k)%stencil2_bound(3,2)
+    Ys(5)=c(2)-1.0_dp*dy-mesh%cell(k)%stencil2_bound(4,2)
+    Ys(6)=c(2)-1.0_dp*dy-mesh%cell(k)%stencil2_bound(5,2)
+    Ys(7)=c(2)-1.0_dp*dy-mesh%cell(k)%stencil2_bound(5,2)
+    Ys(8)=c(2)-1.0_dp*dy-mesh%cell(k)%stencil2_bound(6,2)
+    Ys(9)=c(2)-1.0_dp*dy-mesh%cell(k)%stencil2_bound(7,2)
+    Ys(10)=c(2)-0.5_dp*dy-mesh%cell(k)%stencil2_bound(8,2)
+    Ys(11)=c(2)+0.0_dp*dy-mesh%cell(k)%stencil2_bound(8,2)
+    Ys(12)=c(2)+0.5_dp*dy-mesh%cell(k)%stencil2_bound(9,2)
+    Ys(13)=c(2)+1.0_dp*dy-mesh%cell(k)%stencil2_bound(10,2)
+    Ys(14)=c(2)+1.0_dp*dy-mesh%cell(k)%stencil2_bound(11,2)
+    Ys(15)=c(2)+1.0_dp*dy-mesh%cell(k)%stencil2_bound(11,2)
+    Ys(16)=c(2)+1.0_dp*dy-mesh%cell(k)%stencil2_bound(12,2)
+
+    if (mesh%cell(k)%stencil2(2)<0.and.mesh%edge(mesh%cell(k)%edge4(1))%boundType=="NEUMANN") then
+       Xs(1)=c(1)
+       Xs(2)=c(1)
+       Xs(3)=c(1)
+       Xs(4)=c(1)
+       Xs(5)=c(1)
+       stencil(1)=abs(mesh%cell(k)%stencil2(12))
+       stencil(2)=k
+       stencil(3)=k
+       stencil(4)=abs(mesh%cell(k)%stencil2(5))
+    endif
+
+    if (mesh%cell(k)%stencil2(5)<0.and.mesh%edge(mesh%cell(k)%edge4(3))%boundType=="NEUMANN") then
+       Ys(5)=c(2)
+       Ys(6)=c(2)
+       Ys(7)=c(2)
+       Ys(8)=c(2)
+       Ys(9)=c(2)
+       stencil(4)=abs(mesh%cell(k)%stencil2(3))
+       stencil(5)=k
+       stencil(6)=k
+       stencil(7)=abs(mesh%cell(k)%stencil2(8))
+    endif
+
+    if (mesh%cell(k)%stencil2(8)<0.and.mesh%edge(mesh%cell(k)%edge4(2))%boundType=="NEUMANN") then
+       Xs(9)=c(1)
+       Xs(10)=c(1)
+       Xs(11)=c(1)
+       Xs(12)=c(1)
+       Xs(13)=c(1)
+       stencil(7)=abs(mesh%cell(k)%stencil2(6))
+       stencil(8)=k
+       stencil(9)=k
+       stencil(10)=abs(mesh%cell(k)%stencil2(11))
+    endif
+
+    if (mesh%cell(k)%stencil2(12)<0.and.mesh%edge(mesh%cell(k)%edge4(4))%boundType=="NEUMANN") then
+       Ys(13)=c(2)
+       Ys(14)=c(2)
+       Ys(15)=c(2)
+       Ys(16)=c(2)
+       Ys(1)=c(2)
+       stencil(10)=abs(mesh%cell(k)%stencil2(9))
+       stencil(11)=k
+       stencil(12)=k
+       stencil(1)=abs(mesh%cell(k)%stencil2(2))
+    endif
+
+       !Xs(1)=c(1)-1.0_dp*dx-mesh%cell(k)%stencil2_bound(1,1)
+       !Xs(2)=c(1)-0.5_dp*dx-mesh%cell(k)%stencil2_bound(5,1)
+       !Xs(3)=c(1)-1.0_dp*dx-mesh%cell(k)%stencil2_bound(2,1)
+       !Xs(4)=c(1)+0.5_dp*dx-mesh%cell(k)%stencil2_bound(6,1)
+       !Xs(5)=c(1)-1.0_dp*dx-mesh%cell(k)%stencil2_bound(2,1)
+       !Xs(6)=c(1)+1.0_dp*dx-mesh%cell(k)%stencil2_bound(9,1)
+       !Xs(7)=c(1)+0.0_dp*dx-mesh%cell(k)%stencil2_bound(5,1)
+       !Xs(8)=c(1)+1.0_dp*dx-mesh%cell(k)%stencil2_bound(10,1)
+       !Xs(9)=c(1)-1.0_dp*dx-mesh%cell(k)%stencil2_bound(3,1)
+       !Xs(10)=c(1)+1.0_dp*dx-mesh%cell(k)%stencil2_bound(7,1)
+       !Xs(11)=c(1)+1.0_dp*dx-mesh%cell(k)%stencil2_bound(8,1)
+       !Xs(12)=c(1)+1.0_dp*dx-mesh%cell(k)%stencil2_bound(8,1)
+       !Xs(13)=c(1)-1.0_dp*dx-mesh%cell(k)%stencil2_bound(4,1)
+       !Xs(14)=c(1)+0.5_dp*dx-mesh%cell(k)%stencil2_bound(11,1)
+       !Xs(15)=c(1)-0.0_dp*dx-mesh%cell(k)%stencil2_bound(11,1)
+       !Xs(16)=c(1)-0.5_dp*dx-mesh%cell(k)%stencil2_bound(12,1)
+
+       !Ys(1)=c(2)+1.0_dp*dy-mesh%cell(k)%stencil2_bound(1,2)
+       !Ys(2)=c(2)-1.0_dp*dy-mesh%cell(k)%stencil2_bound(5,2)
+       !Ys(3)=c(2)-0.0_dp*dy-mesh%cell(k)%stencil2_bound(2,2)
+       !Ys(4)=c(2)-1.0_dp*dy-mesh%cell(k)%stencil2_bound(6,2)
+       !Ys(5)=c(2)+0.5_dp*dy-mesh%cell(k)%stencil2_bound(2,2)
+       !Ys(6)=c(2)+0.5_dp*dy-mesh%cell(k)%stencil2_bound(9,2)
+       !Ys(7)=c(2)-1.0_dp*dy-mesh%cell(k)%stencil2_bound(5,2)
+       !Ys(8)=c(2)+1.0_dp*dy-mesh%cell(k)%stencil2_bound(10,2)
+       !Ys(9)=c(2)-0.5_dp*dy-mesh%cell(k)%stencil2_bound(3,2)
+       !Ys(10)=c(2)-1.0_dp*dy-mesh%cell(k)%stencil2_bound(7,2)
+       !Ys(11)=c(2)+0.0_dp*dy-mesh%cell(k)%stencil2_bound(8,2)
+       !Ys(12)=c(2)-0.5_dp*dy-mesh%cell(k)%stencil2_bound(8,2)
+       !Ys(13)=c(2)-1.0_dp*dy-mesh%cell(k)%stencil2_bound(4,2)
+       !Ys(14)=c(2)+1.0_dp*dy-mesh%cell(k)%stencil2_bound(11,2)
+       !Ys(15)=c(2)+1.0_dp*dy-mesh%cell(k)%stencil2_bound(11,2)
+       !Ys(16)=c(2)+1.0_dp*dy-mesh%cell(k)%stencil2_bound(12,2)
 
     select case (order)
     !case (4)
@@ -268,76 +1058,60 @@ contains
     dy2=0.5*dy
     !dist=((dx)**2+(dy)**2)**(pond/2.0_dp)
     dist=0.1_dp
-    call evaluate(mesh,sol,pol,stencil(1), &
-         c(1)-1.0_dp*dx-mesh%cell(k)%stencil2_bound(1,1),c(2)+1.0_dp*dy-mesh%cell(k)%stencil2_bound(1,2),U(1,:))
+    call evaluate(mesh,sol,pol,stencil(1),Xs(1),Ys(1),U(1,:))
     U(1,:)=(U(1,:)-sol%val(k,:))/dist
     X(1,:)=X(1,:)/dist
-    call evaluate(mesh,sol,pol,stencil(4), &
-         c(1)-1.0_dp*dx-mesh%cell(k)%stencil2_bound(4,1),c(2)-1.0_dp*dy-mesh%cell(k)%stencil2_bound(4,2),U(5,:))
+    call evaluate(mesh,sol,pol,stencil(4),Xs(5),Ys(5),U(5,:))
     U(5,:)=(U(5,:)-sol%val(k,:))/dist
     X(5,:)=X(5,:)/dist
-    call evaluate(mesh,sol,pol,stencil(7), &
-         c(1)+1.0_dp*dx-mesh%cell(k)%stencil2_bound(7,1),c(2)-1.0_dp*dy-mesh%cell(k)%stencil2_bound(7,2),U(9,:))
+    call evaluate(mesh,sol,pol,stencil(7),Xs(9),Ys(9),U(9,:))
     U(9,:)=(U(9,:)-sol%val(k,:))/dist
     X(9,:)=X(9,:)/dist
-    call evaluate(mesh,sol,pol,stencil(10), &
-         c(1)+1.0_dp*dx-mesh%cell(k)%stencil2_bound(10,1),c(2)+1.0_dp*dy-mesh%cell(k)%stencil2_bound(10,2),U(13,:))
+    call evaluate(mesh,sol,pol,stencil(10),Xs(13),Ys(13),U(13,:))
     U(13,:)=(U(13,:)-sol%val(k,:))/dist
     X(13,:)=X(13,:)/dist
 
     !dist=((1.0_dp*dx)**2+(0.5*dy)**2)**(pond/2.0_dp)
     dist=10.0_dp
-    call evaluate(mesh,sol,pol,stencil(2), &
-         c(1)-1.0_dp*dx-mesh%cell(k)%stencil2_bound(2,1),c(2)+0.5_dp*dy-mesh%cell(k)%stencil2_bound(2,2),U(2,:))
+    call evaluate(mesh,sol,pol,stencil(2),Xs(2),Ys(2),U(2,:))
     U(2,:)=(U(2,:)-sol%val(k,:))/dist
     X(2,:)=X(2,:)/dist
-    call evaluate(mesh,sol,pol,stencil(3), &
-         c(1)-1.0_dp*dx-mesh%cell(k)%stencil2_bound(3,1),c(2)-0.5_dp*dy-mesh%cell(k)%stencil2_bound(3,2),U(4,:))
+    call evaluate(mesh,sol,pol,stencil(3),Xs(4),Ys(4),U(4,:))
     U(4,:)=(U(4,:)-sol%val(k,:))/dist
     X(4,:)=X(4,:)/dist
-    call evaluate(mesh,sol,pol,stencil(8), &
-         c(1)+1.0_dp*dx-mesh%cell(k)%stencil2_bound(8,1),c(2)-0.5_dp*dy-mesh%cell(k)%stencil2_bound(8,2),U(10,:))
+    call evaluate(mesh,sol,pol,stencil(8),Xs(10),Ys(10),U(10,:))
     U(10,:)=(U(10,:)-sol%val(k,:))/dist
     X(10,:)=X(10,:)/dist
-    call evaluate(mesh,sol,pol,stencil(9), &
-         c(1)+1.0_dp*dx-mesh%cell(k)%stencil2_bound(9,1),c(2)+0.5_dp*dy-mesh%cell(k)%stencil2_bound(9,2),U(12,:))
+    call evaluate(mesh,sol,pol,stencil(9),Xs(12),Ys(12),U(12,:))
     U(12,:)=(U(12,:)-sol%val(k,:))/dist
     X(12,:)=X(12,:)/dist
 
     !dist=((0.5_dp*dx)**2+(1.0*dy)**2)**(pond/2.0_dp)
     dist=10.0_dp
-    call evaluate(mesh,sol,pol,stencil(5), &
-         c(1)-0.5_dp*dx-mesh%cell(k)%stencil2_bound(5,1),c(2)-1.0_dp*dy-mesh%cell(k)%stencil2_bound(5,2),U(6,:))
+    call evaluate(mesh,sol,pol,stencil(5),Xs(6),Ys(6),U(6,:))
     U(6,:)=(U(6,:)-sol%val(k,:))/dist
     X(6,:)=X(6,:)/dist
-    call evaluate(mesh,sol,pol,stencil(6), &
-         c(1)+0.5_dp*dx-mesh%cell(k)%stencil2_bound(6,1),c(2)-1.0_dp*dy-mesh%cell(k)%stencil2_bound(6,2),U(8,:))
+    call evaluate(mesh,sol,pol,stencil(6),Xs(8),Ys(8),U(8,:))
     U(8,:)=(U(8,:)-sol%val(k,:))/dist
     X(8,:)=X(8,:)/dist
-    call evaluate(mesh,sol,pol,stencil(11), &
-         c(1)+0.5_dp*dx-mesh%cell(k)%stencil2_bound(11,1),c(2)+1.0_dp*dy-mesh%cell(k)%stencil2_bound(11,2),U(14,:))
+    call evaluate(mesh,sol,pol,stencil(11),Xs(14),Ys(14),U(14,:))
     U(14,:)=(U(14,:)-sol%val(k,:))/dist
     X(14,:)=X(14,:)/dist
-    call evaluate(mesh,sol,pol,stencil(12), &
-         c(1)-0.5_dp*dx-mesh%cell(k)%stencil2_bound(12,1),c(2)+1.0_dp*dy-mesh%cell(k)%stencil2_bound(12,2),U(16,:))
+    call evaluate(mesh,sol,pol,stencil(12),Xs(16),Ys(16),U(16,:))
     U(16,:)=(U(16,:)-sol%val(k,:))/dist
     X(16,:)=X(16,:)/dist
 
     dist=1.0_dp
-    call evaluate(mesh,sol,pol,stencil(2), &
-         c(1)-1.0_dp*dx-mesh%cell(k)%stencil2_bound(2,1),c(2)-0.0_dp*dy-mesh%cell(k)%stencil2_bound(2,2),U(3,:))
+    call evaluate(mesh,sol,pol,stencil(2),Xs(3),Ys(3),U(3,:))
     U(3,:)=(U(3,:)-sol%val(k,:))/dist
     X(3,:)=X(3,:)/dist
-    call evaluate(mesh,sol,pol,stencil(5), &
-         c(1)+0.0_dp*dx-mesh%cell(k)%stencil2_bound(5,1),c(2)-1.0_dp*dy-mesh%cell(k)%stencil2_bound(5,2),U(7,:))
+    call evaluate(mesh,sol,pol,stencil(5),Xs(7),Ys(7),U(7,:))
     U(7,:)=(U(7,:)-sol%val(k,:))/dist
     X(7,:)=X(7,:)/dist
-    call evaluate(mesh,sol,pol,stencil(8), &
-         c(1)+1.0_dp*dx-mesh%cell(k)%stencil2_bound(8,1),c(2)+0.0_dp*dy-mesh%cell(k)%stencil2_bound(8,2),U(11,:))
+    call evaluate(mesh,sol,pol,stencil(8),Xs(11),Ys(11),U(11,:))
     U(11,:)=(U(11,:)-sol%val(k,:))/dist
     X(11,:)=X(11,:)/dist
-    call evaluate(mesh,sol,pol,stencil(11), &
-         c(1)-0.0_dp*dx-mesh%cell(k)%stencil2_bound(11,1),c(2)+1.0_dp*dy-mesh%cell(k)%stencil2_bound(11,2),U(15,:))
+    call evaluate(mesh,sol,pol,stencil(11),Xs(15),Ys(15),U(15,:))
     U(15,:)=(U(15,:)-sol%val(k,:))/dist
     X(15,:)=X(15,:)/dist
 
@@ -470,7 +1244,13 @@ contains
              k=k+1
              stencil2(k)=abs(neigh)
              stencil2_type(k)=mesh%cell(stencil(1))%level-mesh%cell(abs(neigh))%level+5
-          endif 
+          endif
+       else if (period(mesh%edge(cell%edge(1))%dir).and.period(mesh%edge(cell%edge(3))%dir)) then
+          if (all(stencil2/=abs(neigh))) then
+             k=k+1
+             stencil2(k)=abs(neigh)
+             stencil2_type(k)=mesh%cell(stencil(1))%level-mesh%cell(abs(neigh))%level+5
+          endif
        endif
 
        neigh=cell%corner_cell(2)
@@ -491,7 +1271,13 @@ contains
              k=k+1
              stencil2(k)=abs(neigh)
              stencil2_type(k)=mesh%cell(stencil(1))%level-mesh%cell(abs(neigh))%level+5
-          endif 
+          endif
+       else if (period(mesh%edge(cell%edge(2))%dir).and.period(mesh%edge(cell%edge(3))%dir)) then
+          if (all(stencil2/=abs(neigh))) then
+             k=k+1
+             stencil2(k)=abs(neigh)
+             stencil2_type(k)=mesh%cell(stencil(1))%level-mesh%cell(abs(neigh))%level+5
+          endif
        endif
 
        neigh=cell%corner_cell(3)
@@ -512,7 +1298,13 @@ contains
              k=k+1
              stencil2(k)=abs(neigh)
              stencil2_type(k)=mesh%cell(stencil(1))%level-mesh%cell(abs(neigh))%level+5
-          endif 
+          endif
+       else if (period(mesh%edge(cell%edge(1))%dir).and.period(mesh%edge(cell%edge(4))%dir)) then
+          if (all(stencil2/=abs(neigh))) then
+             k=k+1
+             stencil2(k)=abs(neigh)
+             stencil2_type(k)=mesh%cell(stencil(1))%level-mesh%cell(abs(neigh))%level+5
+          endif
        endif
 
        neigh=cell%corner_cell(4)
@@ -533,7 +1325,13 @@ contains
              k=k+1
              stencil2(k)=abs(neigh)
              stencil2_type(k)=mesh%cell(stencil(1))%level-mesh%cell(abs(neigh))%level+5
-          endif 
+          endif
+       else if (period(mesh%edge(cell%edge(2))%dir).and.period(mesh%edge(cell%edge(4))%dir)) then
+          if (all(stencil2/=abs(neigh))) then
+             k=k+1
+             stencil2(k)=abs(neigh)
+             stencil2_type(k)=mesh%cell(stencil(1))%level-mesh%cell(abs(neigh))%level+5
+          endif
        endif
 
     enddo
@@ -549,14 +1347,12 @@ contains
     return
   end subroutine couronne
 
-  subroutine buildStencil(mesh,k,N,order,period,stencil,stencil_type,stencil_bound)
-    type(meshStruct), intent(in) :: mesh
+  subroutine buildStencil(mesh,k,N,order,period)
+    type(meshStruct), intent(inout) :: mesh
     integer, intent(in) :: k,N,order
     logical, dimension(2), intent(in) :: period
-    integer, dimension(:), allocatable, intent(out) :: stencil,stencil_type
-    real(dp), dimension(:,:), allocatable, intent(out) :: stencil_bound
     integer, dimension(:), allocatable :: stencil2,stencil2_type
-    integer :: i,s
+    integer :: i,j,s
 
     allocate(stencil2(1),stencil2_type(1))
     stencil2(1)=k
@@ -570,15 +1366,29 @@ contains
     enddo
 
     s=size(stencil2)-1
-    allocate(stencil(s),stencil_type(s),stencil_bound(s,2))
-    stencil(1:s)=stencil2(2:s+1)
-    stencil_type(1:s)=stencil2_type(2:s+1)
-    stencil_bound=0.0_dp
+    allocate(mesh%cell(k)%stencil(s),mesh%cell(k)%stencil_type(s),mesh%cell(k)%stencil_bound(s,2))
+    j=1
+    do i=1,s+1
+       if (stencil2(i)/=k) then
+          mesh%cell(k)%stencil(j)=stencil2(i)
+          mesh%cell(k)%stencil_type(j)=stencil2_type(i)
+          j=j+1
+       endif
+    enddo
+    mesh%cell(k)%stencil_bound=0.0_dp
     do i=1,s
-       if (mesh%cell(k)%xc-mesh%cell(abs(stencil(i)))%xc>mesh%Lx/2.0_dp) stencil_bound(i,1)=stencil_bound(i,1)+mesh%Lx
-       if (mesh%cell(k)%xc-mesh%cell(abs(stencil(i)))%xc<-mesh%Lx/2.0_dp) stencil_bound(i,1)=stencil_bound(i,1)-mesh%Lx
-       if (mesh%cell(k)%yc-mesh%cell(abs(stencil(i)))%yc>mesh%Ly/2.0_dp) stencil_bound(i,2)=stencil_bound(i,2)+mesh%Ly
-       if (mesh%cell(k)%yc-mesh%cell(abs(stencil(i)))%yc<-mesh%Ly/2.0_dp) stencil_bound(i,2)=stencil_bound(i,2)-mesh%Ly
+       if (mesh%cell(k)%xc-mesh%cell(abs(mesh%cell(k)%stencil(i)))%xc>mesh%Lx/2.0_dp) then
+          mesh%cell(k)%stencil_bound(i,1)=mesh%cell(k)%stencil_bound(i,1)+mesh%Lx
+       endif
+       if (mesh%cell(k)%xc-mesh%cell(abs(mesh%cell(k)%stencil(i)))%xc<-mesh%Lx/2.0_dp) then
+          mesh%cell(k)%stencil_bound(i,1)=mesh%cell(k)%stencil_bound(i,1)-mesh%Lx
+       endif
+       if (mesh%cell(k)%yc-mesh%cell(abs(mesh%cell(k)%stencil(i)))%yc>mesh%Ly/2.0_dp) then
+          mesh%cell(k)%stencil_bound(i,2)=mesh%cell(k)%stencil_bound(i,2)+mesh%Ly
+       endif
+       if (mesh%cell(k)%yc-mesh%cell(abs(mesh%cell(k)%stencil(i)))%yc<-mesh%Ly/2.0_dp) then
+          mesh%cell(k)%stencil_bound(i,2)=mesh%cell(k)%stencil_bound(i,2)-mesh%Ly
+       endif
     enddo
     
     deallocate(stencil2,stencil2_type)
@@ -674,22 +1484,9 @@ contains
     real(dp), dimension(:), intent(inout) :: R
     real(dp), dimension(:,:), allocatable :: A
     real(dp), dimension(:), allocatable :: b
-    !integer :: i,j,k
 
     allocate(A(size(R),size(R)),b(size(R)))
-    !A=0.0_dp
-    !b=0.0_dp
 
-    !do i=1,size(R)
-       !do j=1,size(R)
-          !do k=1,size(U)
-             !A(i,j)=A(i,j)+X(k,i)*X(k,j)
-          !enddo
-       !enddo
-       !do k=1,size(U)
-          !b(i)=b(i)+X(k,i)*U(k)
-       !enddo
-    !enddo
     A=matmul(transpose(X),X)
     b=matmul(transpose(X),U)
     

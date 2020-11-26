@@ -26,11 +26,11 @@ contains
   end subroutine get_config
   
   subroutine init(config_file,test_case,restart_file,xL,xR,yL,yR,level,nvar,cfl,tf,fs,fp,namefile,verbosity,sol, &
-       str_equa,str_flux,str_time_scheme,order,nrk,period,cascade,L_str_criteria,L_var_criteria,L_eps, &
+       str_equa,str_flux,str_time_scheme,order,scheme,nrk,period,cascade,L_str_criteria,L_var_criteria,L_eps, &
        gauss_point,gauss_weight,str_exactSol,exact_file,bool_AMR,fn_adapt,f_adapt,recursivity,order_pc)
     character(len=20), intent(out) :: config_file,test_case,namefile,str_equa,str_flux,str_time_scheme
     real(dp), intent(out) :: xL,xR,yL,yR,cfl,tf
-    integer, intent(out) :: level,nvar,fs,fp,verbosity,order,nrk,f_adapt,recursivity
+    integer, intent(out) :: level,nvar,fs,fp,verbosity,order,scheme,nrk,f_adapt,recursivity
     type(solStruct), intent(out) :: sol
     logical, dimension(2), intent(out) :: period
     character(len=20), dimension(:), allocatable, intent(out) :: L_str_criteria
@@ -62,6 +62,7 @@ contains
     read(11,*)str_time_scheme
     read(11,*)order
     read(11,*)period
+    read(11,*)scheme
     read(11,*)blank
     allocate(cascade(order-1))
     read(11,*)cascade
@@ -208,8 +209,6 @@ contains
     integer :: i,j,k,p,dir,Neq
     real(dp) :: dx,dy,a,b,c,center,diff,xc,yc
     type(edgeStruct) :: edge
-    integer, dimension(:), allocatable :: stencil,stencil_type
-    real(dp), dimension(:,:), allocatable :: stencil_bound
 
     dx=(xR-xL)/nx
     dy=(yR-yL)/ny
@@ -240,7 +239,7 @@ contains
           mesh%cell(k)%xc=xL+i*dx-dx/2.0_dp
           mesh%cell(k)%yc=yL+j*dy-dy/2.0_dp
 
-          allocate(mesh%cell(k)%node(4),mesh%cell(k)%neigh(8),mesh%cell(k)%edge(4))
+          allocate(mesh%cell(k)%node(4),mesh%cell(k)%neigh(8),mesh%cell(k)%edge(4),mesh%cell(k)%edge_side(4))
           allocate(mesh%cell(k)%X_gauss(size(gauss_point)),mesh%cell(k)%Y_gauss(size(gauss_point)))
           !allocate(mesh%cell(k)%polMax(order*(order-1)/2+order-1,sol%nvar))
 
@@ -257,6 +256,16 @@ contains
           mesh%cell(k)%edge(2)=(nx+1)*ny+j+(i-1)*(ny+1)
           mesh%cell(k)%edge(3)=k+j
           mesh%cell(k)%edge(4)=(nx+1)*ny+j+(i-1)*(ny+1)+1
+
+          mesh%cell(k)%edge4(1)=k+j-1
+          mesh%cell(k)%edge4(2)=(nx+1)*ny+j+(i-1)*(ny+1)
+          mesh%cell(k)%edge4(3)=k+j
+          mesh%cell(k)%edge4(4)=(nx+1)*ny+j+(i-1)*(ny+1)+1
+
+          mesh%cell(k)%edge_side(1)=1
+          mesh%cell(k)%edge_side(2)=3
+          mesh%cell(k)%edge_side(3)=2
+          mesh%cell(k)%edge_side(4)=4
           
           mesh%cell(k)%neigh(1)=k-nx-1
           mesh%cell(k)%neigh(2)=k-1
@@ -386,11 +395,7 @@ contains
 
     do k=1,mesh%nc
        call Nequa(order-1,Neq)
-       call buildStencil(mesh,k,Neq,order,period,stencil,stencil_type,stencil_bound)
-       allocate(mesh%cell(k)%stencil(size(stencil)),mesh%cell(k)%stencil_type(size(stencil_type)))
-       mesh%cell(k)%stencil=stencil
-       mesh%cell(k)%stencil_type=stencil_type
-       deallocate(stencil,stencil_type)
+       call buildStencil(mesh,k,Neq,order,period)
     enddo
     
     return
@@ -421,8 +426,6 @@ contains
     integer, dimension(:), pointer :: F_iedge,F_period,F_nodes
     integer :: k,i,lev,p,Nneigh,N_edge,Nnodes,ie,nedge,i1,iloc,Neq
     real(dp) :: a,b,c,center,diff
-    integer, dimension(:), allocatable :: stencil,stencil_type
-    real(dp), dimension(:,:), allocatable :: stencil_bound
 
     call p4_build_mesh(p4est,tt,p4_mesh,quadrants,nodes,edges,mesh%np,mesh%nc,mesh%ne)
     
@@ -476,7 +479,7 @@ contains
           mesh%cell(k)%Y_gauss2(p)=mesh%cell(k)%yc+mesh%cell(k)%dy*gauss_point2(p)/2.0_dp
        enddo
 
-       allocate(mesh%cell(k)%edge(N_edge))
+       allocate(mesh%cell(k)%edge(N_edge),mesh%cell(k)%edge_side(N_edge))
        iloc=1
        do i=1,4
 
@@ -489,8 +492,10 @@ contains
              call c_f_pointer(C_period,F_period,(/1/))
           endif
 
+          mesh%cell(k)%edge4(i)=abs(F_iedge(1))
           do i1=1,abs(nedge)
              mesh%cell(k)%edge(iloc)=abs(F_iedge(i1))
+             mesh%cell(k)%edge_side(iloc)=i
              iloc=iloc+1
              if (F_iedge(i1)>0) then
                 allocate(mesh%edge(F_iedge(i1))%flux_acc(size(gauss_point)))
@@ -585,7 +590,7 @@ contains
 
     do k=1,mesh%nc
        call Nequa(order-1,Neq)
-       call buildStencil(mesh,k,Neq,order,period,stencil,stencil_type,stencil_bound)
+       call buildStencil(mesh,k,Neq,order,period)
        call buildStencil2(mesh,k)
 
        mesh%cell(k)%bound=0
@@ -658,10 +663,6 @@ contains
           endif
        endif
 
-       allocate(mesh%cell(k)%stencil(size(stencil)),mesh%cell(k)%stencil_type(size(stencil_type)))
-       mesh%cell(k)%stencil=stencil
-       mesh%cell(k)%stencil_type=stencil_type
-       deallocate(stencil,stencil_type)
     enddo
     
     print*,"Mesh created with ",mesh%nc," quadrants"

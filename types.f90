@@ -31,6 +31,8 @@ module types
      integer, dimension(:), allocatable :: node
      integer, dimension(:), allocatable :: neigh
      integer, dimension(:), allocatable :: edge
+     integer, dimension(:), allocatable :: edge_side
+     integer, dimension(4) :: edge4
      real(dp), dimension(:), allocatable :: X_gauss,Y_gauss
      real(dp), dimension(2) :: X_gauss2,Y_gauss2
      logical :: accept,accept_temp,updated
@@ -39,6 +41,7 @@ module types
      integer :: bound   !vertical=1,horizontal=2,corner=3
      real(dp), dimension(:,:), allocatable :: polTest,polCoef3
      integer, dimension(:), allocatable :: stencil,stencil_type
+     real(dp), dimension(:,:), allocatable :: stencil_bound
      integer, dimension(12) :: stencil2
      real(dp), dimension(12,2) :: stencil2_bound
   end type cellStruct
@@ -97,7 +100,7 @@ module types
        real(dp), dimension(2), intent(out) :: Smax
      end subroutine sub_speed
 
-     subroutine sub_time (mesh,sol0,sol,soltemp,f_equa,flux,order,t,dt,n, &      !sol0=initial,sol=sol0+accepted flux, soltemp=sol+new flux
+     subroutine sub_time (mesh,sol0,sol,soltemp,f_equa,flux,order,scheme,t,dt,n, &      !sol0=initial,sol=sol0+accepted flux, soltemp=sol+new flux
           gauss_weight,period,order_pc,NOT_ACCEPTED_EDGE,str_equa, &
           L_str_criteria,L_var_criteria,L_eps,NOT_ACCEPTED_CELL)
        use constant
@@ -111,7 +114,7 @@ module types
        type(solStruct), intent(inout) :: soltemp
        procedure (sub_f), pointer, intent(in) :: f_equa
        procedure (sub_flux), pointer, intent(in) :: flux
-       integer, intent(in) :: order,n
+       integer, intent(in) :: order,scheme,n
        real(dp), intent(in) :: dt
        real(dp), intent(inout) :: t
        real(dp), dimension(:), intent(in) :: gauss_weight
@@ -125,7 +128,7 @@ module types
        integer, dimension(:), intent(inout) :: NOT_ACCEPTED_CELL
      end subroutine sub_time
 
-     subroutine sub_criteria(mesh,sol,sol2,k,isol,eps,gauss_weight,period,str_equa,accept)
+     subroutine sub_criteria(mesh,sol,sol2,k,isol,eps,gauss_weight,str_equa,accept)
        use constant
        import meshStruct
        import solStruct
@@ -134,7 +137,6 @@ module types
        integer, intent(in) :: k,isol
        real(dp), intent(in) :: eps
        real(dp), dimension(:), intent(in) :: gauss_weight
-       logical, dimension(2), intent(in) :: period
        character(len=20), intent(in) :: str_equa
        logical, intent(inout) :: accept
      end subroutine sub_criteria

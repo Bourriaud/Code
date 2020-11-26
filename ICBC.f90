@@ -663,7 +663,7 @@ contains
     T=1.0_dp-(gamma-1.0_dp)*beta**2*exp(1-r**2)/(8.0_dp*gamma*(pi**2))
     U(1)=T**(1.0_dp/(gamma-1.0_dp))
     U(2)=1.0_dp-y*beta*exp(0.5_dp*(1-r**2))/(2.0_dp*pi)
-    U(3)=1.0_dp+x*beta*exp(0.5_dp*(1-r**2))/(2.0_dp*pi)
+    U(3)=0.0_dp+x*beta*exp(0.5_dp*(1-r**2))/(2.0_dp*pi)
     U(4)=U(1)**gamma
 
     do i=1,size(S)
@@ -683,7 +683,11 @@ contains
     do i=1,mesh%ne
        allocate(mesh%edge(i)%bound(nvar))
        if (mesh%edge(i)%cell1<0.or.mesh%edge(i)%cell2<0) then
-          mesh%edge(i)%boundType='PERIODIC'
+          if (mesh%edge(i)%dir==1) then
+             mesh%edge(i)%boundType='PERIODIC'
+          else
+             mesh%edge(i)%boundType='NEUMANN'
+          endif
           mesh%edge(i)%bound=0.0_dp
        else
           mesh%edge(i)%boundType='NOT A BOUNDARY'

@@ -7,19 +7,19 @@ none restart.txt	Restart file
 0.	yL
 1.	yR
 -------------------- Numerical parameters --------------------------------
-6	level
+7	level
 0.95	cfl
 0.25	tf
 euler	equation
 rusanov	flux
-SSPRK2	time scheme
-2	space order
+SSPRK4	time scheme
+4	space order
 false true	periodic stencil (vertical horizontal)
+2	scheme (1=classic reconstruction, 2=compact reconstruction)
 -------------------- Limitation parameters -------------------------------
 1 1 1 1	cascade
-2	number of detection criterias
-PAD 1 1.0e-14	detection criteria + variable + sensibility 
-DMP 1 1.0e-4 DMPu2 2 1.0e-4 DMP 4 1.0e-5
+1	number of detection criterias
+PAD 1 1.0e-14	detection criteria + variable + sensibility DMP 1 1.0e-4 DMPu2 2 1.0e-4 DMP 4 1.0e-5
 -------------------- Output parameters -----------------------------------
 10	save frequency
 10	print frequency

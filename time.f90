@@ -37,7 +37,7 @@ contains
     return
   end subroutine compute_timestep
 
-  subroutine timestep(mesh,sol,str_equa,f_equa,flux,speed,time_scheme,order,nrk,cfl,t,n,tf, &
+  subroutine timestep(mesh,sol,str_equa,f_equa,flux,speed,time_scheme,order,scheme,nrk,cfl,t,n,tf, &
             cascade,L_str_criteria,L_var_criteria,L_eps,gauss_weight,period,verbosity,order_pc)
     type(meshStruct), intent(inout) :: mesh
     type(solStruct), intent(inout) :: sol
@@ -46,7 +46,7 @@ contains
     procedure (sub_flux), pointer, intent(in) :: flux
     procedure (sub_speed), pointer, intent(in) :: speed
     procedure (sub_time), pointer, intent(in) :: time_scheme
-    integer, intent(in) :: order,nrk,n,verbosity
+    integer, intent(in) :: order,scheme,nrk,n,verbosity
     real(dp), intent(in) :: cfl,tf
     real(dp), intent(inout) :: t
     character(len=20), dimension(:), intent(in) :: L_str_criteria
@@ -108,13 +108,13 @@ contains
           endif
        enddo
        
-       call time_scheme(mesh,sol,soltemp2,soltemp,f_equa,flux,order,t,dt,n,gauss_weight,period, &
+       call time_scheme(mesh,sol,soltemp2,soltemp,f_equa,flux,order,scheme,t,dt,n,gauss_weight,period, &
             order_pc,NOT_ACCEPTED_EDGE,str_equa,L_str_criteria,L_var_criteria,L_eps,NOT_ACCEPTED_CELL)
 
        if (size(L_str_criteria)>0.and.order>1) then
           deg=min(cascade(min(count,order-1)),order)-1
           call decrement(mesh,sol,soltemp,str_equa,deg,nrk,dt,L_str_criteria,L_var_criteria,L_eps, &
-               gauss_weight,period,NOT_ACCEPTED_CELL,NOT_ACCEPTED_EDGE,NAC_reason,verbosity)
+               gauss_weight,NOT_ACCEPTED_CELL,NOT_ACCEPTED_EDGE,NAC_reason,verbosity)
        else
           deg=order-1
           deallocate(NOT_ACCEPTED_CELL,NOT_ACCEPTED_EDGE)
@@ -161,14 +161,14 @@ contains
     return
   end subroutine timestep   
 
-  subroutine advance(mesh,sol,sol2,f_equa,flux,order,dt,t,n,irk,gauss_weight,period, &
+  subroutine advance(mesh,sol,sol2,f_equa,flux,order,scheme,dt,t,n,irk,gauss_weight,period, &
             order_pc,NOT_ACCEPTED_EDGE,str_equa,L_str_criteria,L_var_criteria,L_eps,NOT_ACCEPTED_CELL)
     type(meshStruct), intent(inout) :: mesh
     type(solStruct), intent(in) :: sol
     type(solStruct), intent(inout) :: sol2
     procedure (sub_f), pointer, intent(in) :: f_equa
     procedure (sub_flux), pointer, intent(in) :: flux
-    integer, intent(in) :: order,n,irk
+    integer, intent(in) :: order,scheme,n,irk
     real(dp), intent(in) :: dt,t
     real(dp), dimension(:), intent(in) :: gauss_weight
     logical, dimension(2), intent(in) :: period
@@ -209,8 +209,8 @@ contains
 
        mesh%edge(j)%flux(irk,:,:)=0.0_dp
        mesh%edge(j)%deg=deg
-       call reconstruct(mesh,sol,ac1,deg+1,gauss_weight,period,mesh%cell(ac1)%polTest)
-       call reconstruct(mesh,sol,ac2,deg+1,gauss_weight,period,mesh%cell(ac2)%polTest)
+       call reconstruct(mesh,sol,ac1,deg+1,scheme,gauss_weight,period,mesh%cell(ac1)%polTest)
+       call reconstruct(mesh,sol,ac2,deg+1,scheme,gauss_weight,period,mesh%cell(ac2)%polTest)
           
        do p=1,order
           if (.not.edge%flux_acc(p)) then
@@ -241,10 +241,12 @@ contains
              endif
           endif
        enddo
-
+       !if(cell1==85.and.cell2==86)print*,irk,cell1,cell2,flux_temp(1,:),mesh%edge(j)%flux(irk,1,:)
+       !if(cell1==87.and.cell2==88)print*,irk,cell1,cell2,flux_temp(1,:),mesh%edge(j)%flux(irk,2,:)
     enddo
+    !print*,mesh%edge(193)%flux(irk,1,:)
 
-    call detect(mesh,sol,sol2,str_equa,L_str_criteria,L_var_criteria,L_eps,gauss_weight,period,NOT_ACCEPTED_CELL)
+    call detect(mesh,sol,sol2,str_equa,L_str_criteria,L_var_criteria,L_eps,gauss_weight,NOT_ACCEPTED_CELL)
 
     sol2%val=soltemp%val-sol%val
 
@@ -253,7 +255,7 @@ contains
     return
   end subroutine advance
 
-  subroutine euler_exp(mesh,sol0,sol,soltemp,f_equa,flux,order,t,dt,n, &
+  subroutine euler_exp(mesh,sol0,sol,soltemp,f_equa,flux,order,scheme,t,dt,n, &
        gauss_weight,period,order_pc,NOT_ACCEPTED_EDGE,str_equa, &
        L_str_criteria,L_var_criteria,L_eps,NOT_ACCEPTED_CELL)
     type(meshStruct), intent(inout) :: mesh
@@ -261,7 +263,7 @@ contains
     type(solStruct), intent(inout) :: soltemp
     procedure (sub_f), pointer, intent(in) :: f_equa
     procedure (sub_flux), pointer, intent(in) :: flux
-    integer, intent(in) :: order,n
+    integer, intent(in) :: order,scheme,n
     real(dp), intent(in) :: dt
     real(dp), intent(inout) :: t
     real(dp), dimension(:), intent(in) :: gauss_weight
@@ -278,7 +280,7 @@ contains
 
     allocate(Fsol%val(mesh%nc,sol%nvar))   
 
-    call advance(mesh,sol0,Fsol,f_equa,flux,order,dt,t,n,1, &
+    call advance(mesh,sol0,Fsol,f_equa,flux,order,scheme,dt,t,n,1, &
          gauss_weight,period,order_pc,NOT_ACCEPTED_EDGE,str_equa, &
          L_str_criteria,L_var_criteria,L_eps,NOT_ACCEPTED_CELL)
     soltemp%user=Fsol%user
@@ -293,7 +295,7 @@ contains
     return
   end subroutine euler_exp
 
-  subroutine SSPRK2(mesh,sol0,sol,soltemp,f_equa,flux,order,t,dt,n, &
+  subroutine SSPRK2(mesh,sol0,sol,soltemp,f_equa,flux,order,scheme,t,dt,n, &
        gauss_weight,period,order_pc,NOT_ACCEPTED_EDGE,str_equa, &
        L_str_criteria,L_var_criteria,L_eps,NOT_ACCEPTED_CELL)
     type(meshStruct), intent(inout) :: mesh
@@ -301,7 +303,7 @@ contains
     type(solStruct), intent(inout) :: soltemp
     procedure (sub_f), pointer, intent(in) :: f_equa
     procedure (sub_flux), pointer, intent(in) :: flux
-    integer, intent(in) :: order,n
+    integer, intent(in) :: order,scheme,n
     real(dp), intent(in) :: dt
     real(dp), intent(inout) :: t
     real(dp), dimension(:), intent(in) :: gauss_weight
@@ -322,12 +324,12 @@ contains
     
     sol1=sol
 
-    call advance(mesh,sol0,Fsol,f_equa,flux,order,dt,t,n,1, &
+    call advance(mesh,sol0,Fsol,f_equa,flux,order,scheme,dt,t,n,1, &
          gauss_weight,period,order_pc,NOT_ACCEPTED_EDGE,str_equa, &
          L_str_criteria,L_var_criteria,L_eps,NOT_ACCEPTED_CELL)
     sol1%user=Fsol%user
     sol1%val=sol%val+Fsol%val
-    call advance(mesh,sol1,Fsol1,f_equa,flux,order,dt,t,n,2, &
+    call advance(mesh,sol1,Fsol1,f_equa,flux,order,scheme,dt,t,n,2, &
          gauss_weight,period,order_pc,NOT_ACCEPTED_EDGE,str_equa, &
          L_str_criteria,L_var_criteria,L_eps,NOT_ACCEPTED_CELL)
     soltemp%user=Fsol1%user
@@ -343,7 +345,7 @@ contains
     return
   end subroutine SSPRK2
 
-  subroutine SSPRK3(mesh,sol0,sol,soltemp,f_equa,flux,order,t,dt,n, &
+  subroutine SSPRK3(mesh,sol0,sol,soltemp,f_equa,flux,order,scheme,t,dt,n, &
        gauss_weight,period,order_pc,NOT_ACCEPTED_EDGE,str_equa, &
        L_str_criteria,L_var_criteria,L_eps,NOT_ACCEPTED_CELL)
     type(meshStruct), intent(inout) :: mesh
@@ -351,7 +353,7 @@ contains
     type(solStruct), intent(inout) :: soltemp
     procedure (sub_f), pointer, intent(in) :: f_equa
     procedure (sub_flux), pointer, intent(in) :: flux
-    integer, intent(in) :: order,n
+    integer, intent(in) :: order,scheme,n
     real(dp), intent(in) :: dt
     real(dp), intent(inout) :: t
     real(dp), dimension(:), intent(in) :: gauss_weight
@@ -374,17 +376,17 @@ contains
     sol1=sol
     sol2=sol
 
-    call advance(mesh,sol0,Fsol,f_equa,flux,order,dt,t,n,1, &
+    call advance(mesh,sol0,Fsol,f_equa,flux,order,scheme,dt,t,n,1, &
          gauss_weight,period,order_pc,NOT_ACCEPTED_EDGE,str_equa, &
          L_str_criteria,L_var_criteria,L_eps,NOT_ACCEPTED_CELL)
     sol1%user=Fsol%user
     sol1%val=sol%val+Fsol%val
-    call advance(mesh,sol1,Fsol1,f_equa,flux,order,dt,t,n,2, &
+    call advance(mesh,sol1,Fsol1,f_equa,flux,order,scheme,dt,t,n,2, &
          gauss_weight,period,order_pc,NOT_ACCEPTED_EDGE,str_equa, &
          L_str_criteria,L_var_criteria,L_eps,NOT_ACCEPTED_CELL)
     sol2%user=Fsol1%user
     sol2%val=0.75_dp*sol%val+0.25_dp*sol1%val+0.25*Fsol1%val
-    call advance(mesh,sol2,Fsol2,f_equa,flux,order,dt,t,n,3, &
+    call advance(mesh,sol2,Fsol2,f_equa,flux,order,scheme,dt,t,n,3, &
          gauss_weight,period,order_pc,NOT_ACCEPTED_EDGE,str_equa, &
          L_str_criteria,L_var_criteria,L_eps,NOT_ACCEPTED_CELL)
     soltemp%user=Fsol2%user
@@ -401,7 +403,7 @@ contains
     return
   end subroutine SSPRK3
 
-  subroutine SSPRK4(mesh,sol0,sol,soltemp,f_equa,flux,order,t,dt,n, &
+  subroutine SSPRK4(mesh,sol0,sol,soltemp,f_equa,flux,order,scheme,t,dt,n, &
        gauss_weight,period,order_pc,NOT_ACCEPTED_EDGE,str_equa, &
        L_str_criteria,L_var_criteria,L_eps,NOT_ACCEPTED_CELL)
     type(meshStruct), intent(inout) :: mesh
@@ -409,7 +411,7 @@ contains
     type(solStruct), intent(inout) :: soltemp
     procedure (sub_f), pointer, intent(in) :: f_equa
     procedure (sub_flux), pointer, intent(in) :: flux
-    integer, intent(in) :: order,n
+    integer, intent(in) :: order,scheme,n
     real(dp), intent(in) :: dt
     real(dp), intent(inout) :: t
     real(dp), dimension(:), intent(in) :: gauss_weight
@@ -435,27 +437,27 @@ contains
     sol3=sol
     sol4=sol
 
-    call advance(mesh,sol0,Fsol,f_equa,flux,order,dt,t,n,1, &
+    call advance(mesh,sol0,Fsol,f_equa,flux,order,scheme,dt,t,n,1, &
          gauss_weight,period,order_pc,NOT_ACCEPTED_EDGE,str_equa, &
          L_str_criteria,L_var_criteria,L_eps,NOT_ACCEPTED_CELL)
     sol1%user=Fsol%user
     sol1%val=sol%val+0.391752226571890_dp*Fsol%val
-    call advance(mesh,sol1,Fsol1,f_equa,flux,order,dt,t,n,2, &
+    call advance(mesh,sol1,Fsol1,f_equa,flux,order,scheme,dt,t,n,2, &
          gauss_weight,period,order_pc,NOT_ACCEPTED_EDGE,str_equa, &
          L_str_criteria,L_var_criteria,L_eps,NOT_ACCEPTED_CELL)
     sol2%user=Fsol1%user
     sol2%val=0.444370493651235_dp*sol%val+0.555629506348765_dp*sol1%val+0.368410593050371_dp*Fsol1%val   
-    call advance(mesh,sol2,Fsol2,f_equa,flux,order,dt,t,n,3, &
+    call advance(mesh,sol2,Fsol2,f_equa,flux,order,scheme,dt,t,n,3, &
          gauss_weight,period,order_pc,NOT_ACCEPTED_EDGE,str_equa, &
          L_str_criteria,L_var_criteria,L_eps,NOT_ACCEPTED_CELL)
     sol3%user=Fsol2%user
     sol3%val=0.620101851488403_dp*sol%val+0.379898148511597_dp*sol2%val+0.251891774271694_dp*Fsol2%val
-    call advance(mesh,sol3,Fsol3,f_equa,flux,order,dt,t,n,4, &
+    call advance(mesh,sol3,Fsol3,f_equa,flux,order,scheme,dt,t,n,4, &
          gauss_weight,period,order_pc,NOT_ACCEPTED_EDGE,str_equa, &
          L_str_criteria,L_var_criteria,L_eps,NOT_ACCEPTED_CELL)
     sol4%user=Fsol3%user
     sol4%val=0.178079954393132_dp*sol%val+0.821920045606868_dp*sol3%val+0.544974750228521_dp*Fsol3%val
-    call advance(mesh,sol4,Fsol4,f_equa,flux,order,dt,t,n,5, &
+    call advance(mesh,sol4,Fsol4,f_equa,flux,order,scheme,dt,t,n,5, &
          gauss_weight,period,order_pc,NOT_ACCEPTED_EDGE,str_equa, &
          L_str_criteria,L_var_criteria,L_eps,NOT_ACCEPTED_CELL)
     soltemp%user=Fsol4%user
@@ -478,7 +480,7 @@ contains
     return
   end subroutine SSPRK4
 
-  subroutine SSPRK5(mesh,sol0,sol,soltemp,f_equa,flux,order,t,dt,n, &
+  subroutine SSPRK5(mesh,sol0,sol,soltemp,f_equa,flux,order,scheme,t,dt,n, &
        gauss_weight,period,order_pc,NOT_ACCEPTED_EDGE,str_equa, &
        L_str_criteria,L_var_criteria,L_eps,NOT_ACCEPTED_CELL)
     type(meshStruct), intent(inout) :: mesh
@@ -486,7 +488,7 @@ contains
     type(solStruct), intent(inout) :: soltemp
     procedure (sub_f), pointer, intent(in) :: f_equa
     procedure (sub_flux), pointer, intent(in) :: flux
-    integer, intent(in) :: order,n
+    integer, intent(in) :: order,scheme,n
     real(dp), intent(in) :: dt
     real(dp), intent(inout) :: t
     real(dp), dimension(:), intent(in) :: gauss_weight
@@ -522,57 +524,57 @@ contains
     sol8=sol
     sol9=sol
 
-    call advance(mesh,sol0,Fsol,f_equa,flux,order,dt,t,n,1, &
+    call advance(mesh,sol0,Fsol,f_equa,flux,order,scheme,dt,t,n,1, &
          gauss_weight,period,order_pc,NOT_ACCEPTED_EDGE,str_equa, &
          L_str_criteria,L_var_criteria,L_eps,NOT_ACCEPTED_CELL)
     sol1%user=Fsol%user
     sol1%val=sol%val+0.173586107937995_dp*Fsol%val
-    call advance(mesh,sol1,Fsol1,f_equa,flux,order,dt,t,n,2, &
+    call advance(mesh,sol1,Fsol1,f_equa,flux,order,scheme,dt,t,n,2, &
          gauss_weight,period,order_pc,NOT_ACCEPTED_EDGE,str_equa, &
          L_str_criteria,L_var_criteria,L_eps,NOT_ACCEPTED_CELL)
     sol2%user=Fsol1%user
     sol2%val=0.258168167463650_dp*sol%val+0.741831832536350_dp*sol1%val+0.218485490268790_dp*Fsol1%val  
-    call advance(mesh,sol2,Fsol2,f_equa,flux,order,dt,t,n,3, &
+    call advance(mesh,sol2,Fsol2,f_equa,flux,order,scheme,dt,t,n,3, &
          gauss_weight,period,order_pc,NOT_ACCEPTED_EDGE,str_equa, &
          L_str_criteria,L_var_criteria,L_eps,NOT_ACCEPTED_CELL)
     sol3%user=Fsol2%user
     sol3%val=0.037493531856076_dp*sol1%val+0.962506468143924_dp*sol2%val+ &
          0.011042654588541_dp*Fsol1%val+0.283478934653295_dp*Fsol2%val
-    call advance(mesh,sol3,Fsol3,f_equa,flux,order,dt,t,n,4, &
+    call advance(mesh,sol3,Fsol3,f_equa,flux,order,scheme,dt,t,n,4, &
          gauss_weight,period,order_pc,NOT_ACCEPTED_EDGE,str_equa, &
          L_str_criteria,L_var_criteria,L_eps,NOT_ACCEPTED_CELL)
     sol4%user=Fsol3%user
     sol4%val=0.595955269449077_dp*sol%val+0.404044730550923_dp*sol2%val+0.118999896166647_dp*Fsol2%val
-    call advance(mesh,sol4,Fsol4,f_equa,flux,order,dt,t,n,5, &
+    call advance(mesh,sol4,Fsol4,f_equa,flux,order,scheme,dt,t,n,5, &
          gauss_weight,period,order_pc,NOT_ACCEPTED_EDGE,str_equa, &
          L_str_criteria,L_var_criteria,L_eps,NOT_ACCEPTED_CELL)
     sol5%user=Fsol4%user
     sol5%val=0.331848124368345_dp*sol%val+0.008466192609453_dp*sol3%val+0.659685683022202_dp*sol4%val+ &
          0.025030881091201_dp*Fsol%val-0.002493476502164_dp*Fsol3%val+0.194291675763785_dp*Fsol4%val
-    call advance(mesh,sol5,Fsol5,f_equa,flux,order,dt,t,n,6, &
+    call advance(mesh,sol5,Fsol5,f_equa,flux,order,scheme,dt,t,n,6, &
          gauss_weight,period,order_pc,NOT_ACCEPTED_EDGE,str_equa, &
          L_str_criteria,L_var_criteria,L_eps,NOT_ACCEPTED_CELL)
     sol6%user=Fsol5%user
     sol6%val=0.086976414344414_dp*sol%val+0.913023585655586_dp*sol5%val+0.268905157462563_dp*Fsol5%val
-    call advance(mesh,sol6,Fsol6,f_equa,flux,order,dt,t,n,7, &
+    call advance(mesh,sol6,Fsol6,f_equa,flux,order,scheme,dt,t,n,7, &
          gauss_weight,period,order_pc,NOT_ACCEPTED_EDGE,str_equa, &
          L_str_criteria,L_var_criteria,L_eps,NOT_ACCEPTED_CELL)
     sol7%user=Fsol6%user
     sol7%val=0.075863700003186_dp*sol%val+0.267513039663395_dp*sol2%val+0.656623260333419_dp*sol6%val+ &
          0.066115378914543_dp*Fsol2%val+0.193389726166555_dp*Fsol6%val
-    call advance(mesh,sol7,Fsol7,f_equa,flux,order,dt,t,n,8, &
+    call advance(mesh,sol7,Fsol7,f_equa,flux,order,scheme,dt,t,n,8, &
          gauss_weight,period,order_pc,NOT_ACCEPTED_EDGE,str_equa, &
          L_str_criteria,L_var_criteria,L_eps,NOT_ACCEPTED_CELL)
     sol8%user=Fsol7%user
     sol8%val=0.005212058095597_dp*sol%val+0.407430107306541_dp*sol3%val+0.587357834597862_dp*sol7%val- &
          0.119996962708895_dp*Fsol3%val+0.172989562899406_dp*Fsol7%val
-    call advance(mesh,sol8,Fsol8,f_equa,flux,order,dt,t,n,9, &
+    call advance(mesh,sol8,Fsol8,f_equa,flux,order,scheme,dt,t,n,9, &
          gauss_weight,period,order_pc,NOT_ACCEPTED_EDGE,str_equa, &
          L_str_criteria,L_var_criteria,L_eps,NOT_ACCEPTED_CELL)
     sol9%user=Fsol8%user
     sol9%val=0.122832051947995_dp*sol%val+0.877167948052005_dp*sol8%val+ &
          0.000000000000035_dp*Fsol%val+0.258344898092277_dp*Fsol8%val
-    call advance(mesh,sol9,Fsol9,f_equa,flux,order,dt,t,n,10, &
+    call advance(mesh,sol9,Fsol9,f_equa,flux,order,scheme,dt,t,n,10, &
          gauss_weight,period,order_pc,NOT_ACCEPTED_EDGE,str_equa, &
          L_str_criteria,L_var_criteria,L_eps,NOT_ACCEPTED_CELL)
     soltemp%user=Fsol9%user

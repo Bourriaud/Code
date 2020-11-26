@@ -55,12 +55,13 @@ contains
     integer, dimension(:), intent(in) :: sol_refine
     real(dp), dimension(:,:), intent(inout):: sol_interp
     real(dp), dimension(:,:,:), intent(inout):: pol_interp
-    integer :: k,p1,p2
+    integer :: k,p1,p2,scheme
     real(dp), dimension(:), allocatable :: u1,u2,u3,u4
     real(dp) :: xc,yc,dx,dy,Xg,Yg
 
     allocate(u1(sol%nvar),u2(sol%nvar),u3(sol%nvar),u4(sol%nvar))
 
+    scheme=2
     sol_interp=0.0_dp
     do k=1,mesh%nc
        pol_interp(k,1:size(mesh%cell(k)%polCoef(:,1)),1:sol%nvar)=mesh%cell(k)%polCoef
@@ -73,7 +74,7 @@ contains
        case(1)
           if (allocated(mesh%cell(k)%polCoef)) deallocate(mesh%cell(k)%polCoef)
           allocate(mesh%cell(k)%polcoef(order*(order-1)/2+order-1,sol%nvar))
-          call reconstruct(mesh,sol,k,order,gauss_weight,period,mesh%cell(k)%polTest)
+          call reconstruct(mesh,sol,k,order,scheme,gauss_weight,period,mesh%cell(k)%polTest)
           xc=mesh%cell(k)%xc
           yc=mesh%cell(k)%yc
           dx=mesh%cell(k)%dx/4.0_dp
@@ -205,7 +206,7 @@ contains
     integer, intent(out) :: minlevel,maxlevel,coarsen_recursive,refine_recursive
     logical, dimension(2), intent(in) :: period
     integer, dimension(:), intent(inout) :: sol_coarsen,sol_refine
-    integer :: k,isol
+    integer :: k,isol,scheme
     real(dp) :: grad
 
     minlevel=level-1
@@ -213,11 +214,12 @@ contains
     coarsen_recursive=0
     refine_recursive=0
     isol=1
+    scheme=2
 
     do k=1,mesh%nc
        sol_coarsen(k)=0
        sol_refine(k)=0
-       call reconstruct(mesh,sol,k,2,gauss_weight2,period,mesh%cell(k)%polTest)
+       call reconstruct(mesh,sol,k,2,scheme,gauss_weight2,period,mesh%cell(k)%polTest)
        grad=sqrt(mesh%cell(k)%polTest(1,isol)**2+mesh%cell(k)%polTest(2,isol)**2)
        if (grad<0.03_dp.and.mesh%cell(k)%level>minlevel) sol_coarsen(k)=1   !0.002
        if (grad>0.05_dp) sol_refine(k)=1   !0.004
@@ -234,7 +236,7 @@ contains
     integer, intent(out) :: minlevel,maxlevel,coarsen_recursive,refine_recursive
     logical, dimension(2), intent(in) :: period
     integer, dimension(:), intent(inout) :: sol_coarsen,sol_refine
-    integer :: k,isol
+    integer :: k,isol,scheme
     real(dp) :: grad
 
     minlevel=level-1
@@ -242,11 +244,12 @@ contains
     coarsen_recursive=0
     refine_recursive=0
     isol=1
+    scheme=2
     
     do k=1,mesh%nc
        sol_coarsen(k)=0
        sol_refine(k)=0
-       call reconstruct(mesh,sol,k,2,gauss_weight2,period,mesh%cell(k)%polTest)
+       call reconstruct(mesh,sol,k,2,scheme,gauss_weight2,period,mesh%cell(k)%polTest)
        grad=sqrt(mesh%cell(k)%polTest(1,isol)**2+mesh%cell(k)%polTest(2,isol)**2)
        if (grad<0.8_dp.and.mesh%cell(k)%level>minlevel) sol_coarsen(k)=1
        if (grad>1.0_dp) sol_refine(k)=1
@@ -263,7 +266,7 @@ contains
     integer, intent(out) :: minlevel,maxlevel,coarsen_recursive,refine_recursive
     logical, dimension(2), intent(in) :: period
     integer, dimension(:), intent(inout) :: sol_coarsen,sol_refine
-    integer :: k,isol
+    integer :: k,isol,scheme
     real(dp) :: lap
 
     minlevel=level-1
@@ -271,11 +274,12 @@ contains
     coarsen_recursive=0
     refine_recursive=0
     isol=1
+    scheme=2
     
     do k=1,mesh%nc
        sol_coarsen(k)=0
        sol_refine(k)=0
-       call reconstruct(mesh,sol,k,3,gauss_weight3,period,mesh%cell(k)%polTest)
+       call reconstruct(mesh,sol,k,3,scheme,gauss_weight3,period,mesh%cell(k)%polTest)
        lap=abs(mesh%cell(k)%polTest(3,isol)+mesh%cell(k)%polTest(5,isol))
        if (lap<3.0_dp.and.mesh%cell(k)%level>minlevel) sol_coarsen(k)=1
        if (lap>6.0_dp) sol_refine(k)=1

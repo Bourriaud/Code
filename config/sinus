@@ -7,20 +7,20 @@ none restart.txt	Restart file
 0.	yL
 10.	yR
 -------------------- Numerical parameters --------------------------------
-5	level
+7	level
 0.2	cfl
-1.0	tf
+10.0	tf
 advection	equation
 godunov	flux
-SSPRK3	time scheme
-3	space order
-true	periodic stencil
+SSPRK4	time scheme
+4	space order
+true true	periodic stencil
+1	scheme (1=classic reconstruction, 2=compact reconstruction)
 -------------------- Limitation parameters -------------------------------
 1 1 1 1	cascade
-1	number of detection criterias
-DMP 1 1.0e-4	detection criteria + variable + sensibility
+0	number of detection criteriasDMP 1 1.0e-4	detection criteria + variable + sensibility
 -------------------- Output parameters -----------------------------------
-10	save frequency
+100	save frequency
 10	print frequency
 sinus	namefile
 0	verbosity

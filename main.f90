@@ -16,7 +16,7 @@ program main
   type(meshStruct) :: mesh
   type(solStruct) :: sol
   real(dp) :: xL,xR,yL,yR,cfl,tf,eL1,eL2,tstart,tfinish
-  integer :: nvar,fs,fp,verbosity,order,i,k,f_adapt,recursivity,total_cell,average_cell
+  integer :: nvar,fs,fp,verbosity,order,scheme,i,k,f_adapt,recursivity,total_cell,average_cell
   integer :: level,minlevel,maxlevel,nrk,dim
   logical, dimension(2) :: period
   integer, dimension(:), allocatable :: cascade,L_var_criteria,order_pc
@@ -40,7 +40,7 @@ program main
   
   call get_config(config_file)
   call init(config_file,test_case,restart_file,xL,xR,yL,yR,level,nvar,cfl,tf,fs,fp,namefile,verbosity,sol, &
-       str_equa,str_flux,str_time_scheme,order,nrk,period,cascade,L_str_criteria,L_var_criteria,L_eps, &
+       str_equa,str_flux,str_time_scheme,order,scheme,nrk,period,cascade,L_str_criteria,L_var_criteria,L_eps, &
        gauss_point,gauss_weight,str_exactSol,exact_file,bool_AMR,str_fn_adapt,f_adapt,recursivity,order_pc)
   call buildP4EST(level,connectivity,p4est)
   call buildMesh_P4EST(p4est,xL,xR,yL,yR,gauss_point,order,nrk,mesh,sol,quadrants,period)
@@ -57,7 +57,7 @@ program main
   if (bool_AMR) then
      do i=0,recursivity-1
         do k=1,mesh%nc
-           call reconstruct1(mesh,sol,k,order,gauss_weight,period,mesh%cell(k)%polCoef)
+           call reconstruct1(mesh,sol,k,order,gauss_weight,mesh%cell(k)%polCoef)
         enddo
         call adapt(fn_adapt,p4est,quadrants,mesh,sol,level+i,order,gauss_weight,gauss_point, &
              period,minlevel,maxlevel)
@@ -74,7 +74,7 @@ program main
      enddo
   else
      do k=1,mesh%nc
-        call reconstruct1(mesh,sol,k,order,gauss_weight,period,mesh%cell(k)%polCoef)
+        call reconstruct1(mesh,sol,k,order,gauss_weight,mesh%cell(k)%polCoef)
      enddo
   endif
 
@@ -87,7 +87,7 @@ program main
   call userSol(0.0_dp,mesh,sol,str_equa,exactSol,exact_file,dim)
   call writeSol(mesh,sol,namefile,0)
   call writeSol2(mesh,sol,namefile,0)
-  call calculation(mesh,sol,level,order,nrk,cfl,tf,fs,fp,namefile,verbosity,str_equa, &
+  call calculation(mesh,sol,level,order,scheme,nrk,cfl,tf,fs,fp,namefile,verbosity,str_equa, &
        f_equa,flux,speed,time_scheme,exactSol,order_pc,cascade, &
        L_str_criteria,L_var_criteria,L_eps,gauss_weight,gauss_point,period, &
        bool_AMR,fn_adapt,f_adapt,recursivity,total_cell,average_cell,exact_file,dim)
@@ -364,13 +364,13 @@ contains
     return
   end subroutine init_FV
 
-  subroutine calculation(mesh,sol,level,order,nrk,cfl,tf,fs,fp,namefile,verbosity,str_equa, &
+  subroutine calculation(mesh,sol,level,order,scheme,nrk,cfl,tf,fs,fp,namefile,verbosity,str_equa, &
        f_equa,flux,speed,time_scheme,exactSol,order_pc,cascade, &
        L_str_criteria,L_var_criteria,L_eps,gauss_weight,gauss_point,period, &
        bool_AMR,fn_adapt,f_adapt,recursivity,total_cell,average_cell,exact_file,dim)
     type(meshStruct), intent(inout) :: mesh
     type(solStruct), intent(inout) :: sol
-    integer, intent(in) :: level,order,nrk,fs,fp,verbosity,f_adapt,recursivity,dim
+    integer, intent(in) :: level,order,scheme,nrk,fs,fp,verbosity,f_adapt,recursivity,dim
     real(dp), intent(in) :: cfl,tf
     character(len=20),intent(in) :: namefile,str_equa,exact_file
     procedure (sub_f), pointer, intent(in) :: f_equa
@@ -407,7 +407,7 @@ contains
     endif
 
     do while (t<tf)
-       call timestep(mesh,sol,str_equa,f_equa,flux,speed,time_scheme,order,nrk,cfl,t,n,tf, &
+       call timestep(mesh,sol,str_equa,f_equa,flux,speed,time_scheme,order,scheme,nrk,cfl,t,n,tf, &
             cascade,L_str_criteria,L_var_criteria,L_eps,gauss_weight,period,verbosity,order_pc)
        if (bool_AMR.and.mod(n,f_adapt)==0) then
           do i=0,recursivity-1
